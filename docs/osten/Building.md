@@ -16,6 +16,7 @@ sudo apt-get install git build-essential bison flex texinfo autoconf automake \
 ```
 
 For a graphical boot check, also install `qemu-system-x86` and `ovmf`.
+On Ubuntu, `--no-install-recommends` keeps that emulator installation small.
 
 ## Host tools and cross-compiler
 
@@ -29,8 +30,9 @@ mkdir -p ../../host-tools/bin
 ./jam0 -sBINDIR="$(cd ../.. && pwd)/host-tools/bin" install
 ```
 
-The buildtools checkout should be recorded at a known commit for a repeatable
-build. Record `git -C buildtools rev-parse HEAD` alongside the OSTen commit.
+The first toolchain bootstrap used buildtools commit
+`8375c2dbeaf109c520798cb234d57f0895463201`. Record the exact buildtools
+commit alongside the OSTen commit for each build.
 
 In the OSTen checkout:
 
@@ -48,6 +50,20 @@ if you want later builds to reuse the compiler. Adjust `-j4` to available
 memory and cores; parallel compilation has not yet been validated for OSTen.
 
 ## Image and boot check
+
+GitHub's Haiku mirror used for this fork does not advertise `hrev` tags, so
+Jam cannot derive the revision automatically from a shallow checkout. Before
+the first Jam invocation, create the ignored local file
+`build/jam/UserBuildConfig` from the OSTen repository root with an explicit,
+honest build label, for example:
+
+```sh
+printf '%s\n' 'HAIKU_REVISION = osten-baseline-e5a43367 ;' \
+  > build/jam/UserBuildConfig
+```
+
+This label describes the fork baseline rather than claiming an upstream Haiku
+revision. Replace it when the source revision can be established from tags.
 
 From `generated.x86_64`:
 
