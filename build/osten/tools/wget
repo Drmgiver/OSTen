@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Redirect HaikuPorts build packages when the primary host is unavailable.
+# The repository index keeps its checksum-specific URL unchanged.
+
+args=()
+for arg in "$@"; do
+	case "$arg" in
+		https://eu.hpkg.haiku-os.org/haikuports/master/build-packages/*/packages/*.hpkg)
+			arg="https://haiku-buildpackages.cdn.haiku-os.org/packages/${arg##*/}"
+			;;
+	esac
+	args+=("$arg")
+done
+
+exec /usr/bin/wget "${args[@]}"

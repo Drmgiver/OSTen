@@ -52,24 +52,31 @@ memory and cores; parallel compilation has not yet been validated for OSTen.
 ## Image and boot check
 
 GitHub's Haiku mirror used for this fork does not advertise `hrev` tags, so
-Jam cannot derive the revision automatically from a shallow checkout. Before
-the first Jam invocation, create the ignored local file
-`build/jam/UserBuildConfig` from the OSTen repository root with an explicit,
-honest build label, for example:
-
-```sh
-printf '%s\n' 'HAIKU_REVISION = osten-baseline-e5a43367 ;' \
-  > build/jam/UserBuildConfig
-```
-
-This label describes the fork baseline rather than claiming an upstream Haiku
-revision. Replace it when the source revision can be established from tags.
+Jam cannot derive the revision automatically from this shallow checkout. Pass
+an explicit build label with Jam's `-s` option. This label describes the fork
+baseline rather than claiming an upstream Haiku revision. Record the source
+commit alongside it, and replace the label when an upstream revision can be
+established from tags.
 
 From `generated.x86_64`:
 
 ```sh
-PATH="$(cd ../../host-tools/bin && pwd):$PATH" jam -q -j4 @nightly-raw
+PATH="$(cd ../../host-tools/bin && pwd):$PATH" \
+  jam -q -j4 -sHAIKU_REVISION=osten-baseline-e5a43367 @nightly-raw
 ```
+
+If the HaikuPorts build-package host is unreachable but Haiku's build-package
+CDN is accessible, put OSTen's optional download helper before the host tools
+on `PATH` for this Jam invocation:
+
+```sh
+PATH="$(cd ../build/osten/tools && pwd):$(cd ../../host-tools/bin && pwd):$PATH" \
+  jam -q -j4 -sHAIKU_REVISION=osten-baseline-e5a43367 @nightly-raw
+```
+
+The helper only redirects build-package files; the repository index retains
+its original checksum-specific URL. It requires Bash and `/usr/bin/wget` on
+the Linux build host. On an unrestricted host, use the ordinary invocation.
 
 The inherited target should produce `haiku.image` in the build output. The
 first milestone is to boot that stock image in QEMU and record the versions,
