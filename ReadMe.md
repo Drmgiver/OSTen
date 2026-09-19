@@ -1,3 +1,12 @@
+OSTen
+=======================
+OSTen explores how Classic Macintosh system software could have evolved beyond
+System 8. The project is in its foundation stage: this repository is currently
+a fork of Haiku, and the OSTen desktop has not been implemented yet. See the
+[project charter](docs/osten/Project.md) and [build notes](docs/osten/Building.md).
+
+The original Haiku documentation follows.
+
 Haiku
 =======================
 **[Homepage](https://www.haiku-os.org/)
