@@ -90,8 +90,10 @@ after three minutes without needing a graphical desktop on the host:
 bash build/osten/tools/boot-smoke generated.x86_64/haiku-nightly.image boot-evidence
 ```
 
-Inspect `boot-evidence/screenshot.ppm` to confirm that the Haiku desktop
-appeared. A screenshot file alone does not establish a successful boot.
+The helper records the first-boot Welcome screen, presses its default
+"Try it out" action, and captures `boot-evidence/screenshot.ppm` after another
+90 seconds. Inspect the latter image to confirm the Haiku desktop appeared.
+A screenshot file alone does not establish a successful desktop boot.
 
 ## Persistent baseline build
 

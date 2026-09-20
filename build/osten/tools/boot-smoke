@@ -45,6 +45,12 @@ done
 test -S "$monitor"
 sleep "${OSTEN_BOOT_WAIT_SECONDS:-180}"
 kill -0 "$qemu_pid"
-printf 'screendump %s\nquit\n' "$output/screenshot.ppm" | socat -T 10 - "UNIX-CONNECT:$monitor" > "$output/monitor.log"
+printf 'screendump %s\nsendkey ret\n' "$output/welcome.ppm" \
+	| socat -T 5 - "UNIX-CONNECT:$monitor" > "$output/monitor.log"
+test -s "$output/welcome.ppm"
+sleep "${OSTEN_DESKTOP_WAIT_SECONDS:-90}"
+kill -0 "$qemu_pid"
+printf 'screendump %s\nquit\n' "$output/screenshot.ppm" \
+	| socat -T 10 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
 test -s "$output/screenshot.ppm"
-echo "Saved QEMU screenshot to $output/screenshot.ppm"
+echo "Saved first-boot and desktop screenshots to $output"

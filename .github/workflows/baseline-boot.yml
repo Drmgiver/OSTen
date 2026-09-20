@@ -55,9 +55,11 @@ jobs:
           /usr/bin/python3 - <<'PY'
           from PIL import Image
 
+          welcome = Image.open('baseline-boot/welcome.ppm').convert('RGB')
+          welcome.save('baseline-boot/welcome.png')
           image = Image.open('baseline-boot/screenshot.ppm').convert('RGB')
           image.save('baseline-boot/screenshot.png')
-          print(f'Captured VGA display: {image.width}x{image.height}')
+          print(f'Captured first-boot and desktop views: {image.width}x{image.height}')
           PY
           cp baseline/build-manifest.txt baseline-boot/build-manifest.txt
 
