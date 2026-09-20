@@ -83,6 +83,16 @@ The first milestone is to boot that stock image in QEMU and record the
 versions, commits, command line, and observed desktop. Image naming and
 contents will change when an OSTen image profile exists.
 
+On a Linux host with `qemu-system-x86_64` and `socat`, capture the display
+after three minutes without needing a graphical desktop on the host:
+
+```sh
+bash build/osten/tools/boot-smoke generated.x86_64/haiku-nightly.image boot-evidence
+```
+
+Inspect `boot-evidence/screenshot.ppm` to confirm that the Haiku desktop
+appeared. A screenshot file alone does not establish a successful boot.
+
 ## Persistent baseline build
 
 The [baseline image workflow](../../.github/workflows/baseline-image.yml)
@@ -92,6 +102,7 @@ Successful runs attach the raw image and a manifest with the OSTen and
 buildtools commits. The artifact expires after seven days; the workflow is
 the reproducible record. A successful image build still needs a QEMU boot
 check before the baseline milestone is accepted.
+
 
 The `buildtools` checkout and `host-tools` directory live outside this
 repository; do not commit generated binaries or disk images to Git.

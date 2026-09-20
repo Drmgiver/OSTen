@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Capture the VGA display of a stock baseline image after booting in QEMU.
+set -euo pipefail
+
+if [ "$#" -ne 2 ]; then
+	echo "usage: $0 haiku-nightly.image output-directory" >&2
+	exit 2
+fi
+
+image=$(realpath "$1")
+output=$2
+test -s "$image"
+mkdir -p "$output"
+output=$(realpath "$output")
+monitor="$output/qemu-monitor.sock"
+rm -f "$monitor"
+
+command -v qemu-system-x86_64 >/dev/null
+command -v socat >/dev/null
+
+printf 'qemu-system-x86_64 -m 2048 -smp 2 -snapshot -drive file=%s,format=raw,if=ide -vga std -display none -monitor unix:%s,server=on,wait=off -serial file:%s -no-reboot\n' \
+	"$image" "$monitor" "$output/serial.log" > "$output/command.txt"
+
+qemu-system-x86_64 \
+	-m 2048 -smp 2 -snapshot \
+	-drive "file=$image,format=raw,if=ide" \
+	-vga std -display none \
+	-monitor "unix:$monitor,server=on,wait=off" \
+	-serial "file:$output/serial.log" \
+	-no-reboot > "$output/qemu.log" 2>&1 &
+qemu_pid=$!
+trap 'kill "$qemu_pid" 2>/dev/null || true; wait "$qemu_pid" 2>/dev/null || true; rm -f "$monitor"' EXIT
+
+for ((attempt = 0; attempt < 30; attempt++)); do
+	if [ -S "$monitor" ]; then
+		break
+	fi
+	if ! kill -0 "$qemu_pid" 2>/dev/null; then
+		cat "$output/qemu.log" >&2
+		exit 1
+	fi
+	sleep 1
+done
+test -S "$monitor"
+sleep "${OSTEN_BOOT_WAIT_SECONDS:-180}"
+kill -0 "$qemu_pid"
+printf 'screendump %s\nquit\n' "$output/screenshot.ppm" | socat -T 10 - "UNIX-CONNECT:$monitor" > "$output/monitor.log"
+test -s "$output/screenshot.ppm"
+echo "Saved QEMU screenshot to $output/screenshot.ppm"
