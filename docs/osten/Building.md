@@ -119,8 +119,10 @@ The `nightly-osten-raw` profile reuses the tested nightly build settings and
 creates `osten-preview.image`. It adds an ordinary `System Folder` at the root
 of the boot volume with `Control Panels`, `Extensions`, `Fonts`, and
 `Startup Items`, plus a root `Applications` folder. It still runs Haiku's
-Tracker and Deskbar until the OSTen System and Finder are built and connected
-to desktop startup.
+Tracker and Deskbar during the transition. The first `System` application is
+a visible file in `System Folder`; the launch service starts its menu bar
+beside the stock desktop. Finder and the rest of the System behavior still
+need to be built before Tracker and Deskbar can be removed.
 
 From `generated.x86_64`, build this separate profile with:
 

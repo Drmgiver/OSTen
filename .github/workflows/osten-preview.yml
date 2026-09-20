@@ -7,6 +7,9 @@ on:
       - .github/workflows/osten-preview.yml
       - build/jam/DefaultBuildProfiles
       - build/jam/images/definitions/common-tail
+      - data/launch/user
+      - src/apps/Jamfile
+      - src/apps/osten/**
 
 permissions:
   contents: read

@@ -5,6 +5,12 @@ service x-vnd.Haiku-app_server {
 
 target desktop {
 	env /system/boot/SetupEnvironment
+	# The first OSTen System runs beside the Haiku desktop until Finder is ready.
+	service x-vnd.OSTen-System {
+		launch /boot/System\ Folder/System
+		if file_exists /boot/System\ Folder/System
+		on initial_volumes_mounted
+	}
 
 	service x-vnd.Be-TRAK {
 		launch /system/Tracker

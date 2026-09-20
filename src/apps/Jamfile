@@ -35,6 +35,7 @@ HaikuSubInclude mediaplayer ;
 HaikuSubInclude midiplayer ;
 HaikuSubInclude musiccollection ;
 HaikuSubInclude networkstatus ;
+HaikuSubInclude osten ;
 HaikuSubInclude overlayimage ;
 HaikuSubInclude packageinstaller ;
 HaikuSubInclude pairs ;
