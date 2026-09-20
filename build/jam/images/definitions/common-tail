@@ -54,6 +54,7 @@ AddDirectoryToHaikuImage trash : trash.rdef ;
 if $(HAIKU_BUILD_PROFILE) = nightly-osten-raw {
 	AddDirectoryToHaikuImage "System Folder" ;
 	AddFilesToHaikuImage "System Folder" : OSTenSystem : System ;
+	AddFilesToHaikuImage "System Folder" : OSTenFinder : Finder ;
 	AddDirectoryToHaikuImage "System Folder" "Control Panels" ;
 	AddDirectoryToHaikuImage "System Folder" Extensions ;
 	AddDirectoryToHaikuImage "System Folder" Fonts ;

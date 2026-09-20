@@ -121,8 +121,10 @@ of the boot volume with `Control Panels`, `Extensions`, `Fonts`, and
 `Startup Items`, plus a root `Applications` folder. It still runs Haiku's
 Tracker and Deskbar during the transition. The first `System` application is
 a visible file in `System Folder`; the launch service starts its menu bar
-beside the stock desktop. Finder and the rest of the System behavior still
-need to be built before Tracker and Deskbar can be removed.
+beside the stock desktop. The first `Finder` application also lives there and
+opens the boot volume in a window, then opens folders in separate windows.
+This initial navigation and menu bar must be verified before the stock desktop
+can be replaced.
 
 From `generated.x86_64`, build this separate profile with:
 

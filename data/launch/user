@@ -11,6 +11,11 @@ target desktop {
 		if file_exists /boot/System\ Folder/System
 		on initial_volumes_mounted
 	}
+	service x-vnd.OSTen-Finder {
+		launch /boot/System\ Folder/Finder
+		if file_exists /boot/System\ Folder/Finder
+		on initial_volumes_mounted
+	}
 
 	service x-vnd.Be-TRAK {
 		launch /system/Tracker

@@ -2,3 +2,4 @@
 SubDir HAIKU_TOP src apps osten ;
 
 HaikuSubInclude system ;
+HaikuSubInclude finder ;
