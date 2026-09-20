@@ -103,6 +103,11 @@ buildtools commits. The artifact expires after seven days; the workflow is
 the reproducible record. A successful image build still needs a QEMU boot
 check before the baseline milestone is accepted.
 
+The [baseline boot screenshot workflow](../../.github/workflows/baseline-boot.yml)
+waits for the image build, starts its image in QEMU, and attaches a screenshot
+and QEMU logs. Inspect the screenshot before recording the boot milestone as
+complete. Updating that workflow or the boot helper starts another check.
+
 
 The `buildtools` checkout and `host-tools` directory live outside this
 repository; do not commit generated binaries or disk images to Git.

@@ -1,0 +1,71 @@
+name: Baseline boot screenshot
+
+on:
+  push:
+    branches: [osten/main]
+    paths:
+      - .github/workflows/baseline-boot.yml
+      - build/osten/tools/boot-smoke
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for baseline image and download it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --workflow baseline-image.yml --branch osten/main \
+            --limit 1 --json databaseId --jq '.[0].databaseId')
+          test -n "$run_id"
+          echo "Waiting for baseline build $run_id"
+          while true; do
+            conclusion=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" \
+              --jq 'if .status == "completed" then (.conclusion // "unknown") else "pending" end')
+            if [ "$conclusion" = success ]; then
+              break
+            fi
+            if [ "$conclusion" != pending ]; then
+              echo "Baseline build $run_id ended: $conclusion" >&2
+              exit 1
+            fi
+            sleep 60
+          done
+          source_sha=$(gh run view "$run_id" --json headSha --jq '.headSha')
+          mkdir -p baseline
+          gh run download "$run_id" -n "osten-baseline-$source_sha" --dir baseline
+          test -s baseline/haiku-nightly.image
+          test -s baseline/build-manifest.txt
+          grep -Fx "OSTen=$source_sha" baseline/build-manifest.txt
+          printf 'baseline_run=%s\n' "$run_id" >> baseline/build-manifest.txt
+          cat baseline/build-manifest.txt
+
+      - name: Install QEMU and capture display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 socat python3-pil
+          bash build/osten/tools/boot-smoke baseline/haiku-nightly.image baseline-boot
+          /usr/bin/python3 - <<'PY'
+          from PIL import Image
+
+          image = Image.open('baseline-boot/screenshot.ppm').convert('RGB')
+          image.save('baseline-boot/screenshot.png')
+          print(f'Captured VGA display: {image.width}x{image.height}')
+          PY
+          cp baseline/build-manifest.txt baseline-boot/build-manifest.txt
+
+      - name: Save boot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osten-baseline-boot-${{ github.sha }}
+          path: baseline-boot/
+          if-no-files-found: warn
+          retention-days: 7
