@@ -1,0 +1,75 @@
+name: Baseline image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [osten/main]
+    paths:
+      - .github/workflows/baseline-image.yml
+      - build/osten/tools/wget
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bison flex texinfo autoconf automake gawk nasm \
+            wget zip unzip xorriso mtools python3 pkg-config zlib1g-dev \
+            libzstd-dev libgmp-dev libmpfr-dev libmpc-dev
+
+      - name: Check out Haiku buildtools
+        run: |
+          git clone --depth 1 https://github.com/haiku/buildtools.git ../buildtools
+          if [ "$(git -C ../buildtools rev-parse HEAD)" != 8375c2dbeaf109c520798cb234d57f0895463201 ]; then
+            git -C ../buildtools fetch --depth 1 origin 8375c2dbeaf109c520798cb234d57f0895463201
+            git -C ../buildtools checkout --detach 8375c2dbeaf109c520798cb234d57f0895463201
+          fi
+
+      - name: Build Jam
+        run: |
+          make -C ../buildtools/jam -j4
+          mkdir -p ../host-tools/bin
+          ( cd ../buildtools/jam && ./jam0 -sBINDIR="$(realpath ../../host-tools/bin)" install )
+
+      - name: Build cross compiler
+        run: |
+          mkdir -p generated.x86_64
+          cd generated.x86_64
+          PATH="$(realpath ../../host-tools/bin):$PATH" \
+            ../configure -j4 --cross-tools-source ../../buildtools \
+            --build-cross-tools x86_64
+
+      - name: Build raw image
+        run: |
+          cd generated.x86_64
+          PATH="$(realpath ../build/osten/tools):$(realpath ../../host-tools/bin):$PATH" \
+            jam -q -j4 -sHAIKU_REVISION=osten-baseline-e5a43367 @nightly-raw
+          test -s haiku-nightly.image
+          if find download -maxdepth 1 -type f -name '*.hpkg' -size 0 -print -quit | grep -q .; then
+            echo 'An empty downloaded package was found.' >&2
+            exit 1
+          fi
+          sha256sum haiku-nightly.image
+          printf 'OSTen=%s\nbuildtools=%s\n' \
+            "$GITHUB_SHA" "$(git -C ../../buildtools rev-parse HEAD)" \
+            > build-manifest.txt
+
+      - name: Save image and build revisions
+        uses: actions/upload-artifact@v4
+        with:
+          name: osten-baseline-${{ github.sha }}
+          path: |
+            generated.x86_64/haiku-nightly.image
+            generated.x86_64/build-manifest.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

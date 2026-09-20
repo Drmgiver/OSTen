@@ -78,10 +78,20 @@ The helper only redirects build-package files; the repository index retains
 its original checksum-specific URL. It requires Bash and `/usr/bin/wget` on
 the Linux build host. On an unrestricted host, use the ordinary invocation.
 
-The inherited target should produce `haiku.image` in the build output. The
-first milestone is to boot that stock image in QEMU and record the versions,
-commits, command line, and observed desktop. Image naming and contents will
-change when an OSTen image profile exists.
+The nightly raw target produces `haiku-nightly.image` in the build output.
+The first milestone is to boot that stock image in QEMU and record the
+versions, commits, command line, and observed desktop. Image naming and
+contents will change when an OSTen image profile exists.
+
+## Persistent baseline build
+
+The [baseline image workflow](../../.github/workflows/baseline-image.yml)
+runs the same build on Ubuntu 24.04 when that workflow or the download helper
+changes on `osten/main`. It can also be started manually from GitHub Actions.
+Successful runs attach the raw image and a manifest with the OSTen and
+buildtools commits. The artifact expires after seven days; the workflow is
+the reproducible record. A successful image build still needs a QEMU boot
+check before the baseline milestone is accepted.
 
 The `buildtools` checkout and `host-tools` directory live outside this
 repository; do not commit generated binaries or disk images to Git.
