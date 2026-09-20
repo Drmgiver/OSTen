@@ -48,6 +48,18 @@ AddDirectoryToHaikuImage system var empty ;
 AddDirectoryToHaikuImage system var log ;
 AddDirectoryToHaikuImage trash : trash.rdef ;
 
+# Initial OSTen image layout. These directories live on the boot volume,
+# outside the Haiku system package, so they can be moved and inspected in
+# the Finder as ordinary visible files.
+if $(HAIKU_BUILD_PROFILE) = nightly-osten-raw {
+	AddDirectoryToHaikuImage "System Folder" ;
+	AddDirectoryToHaikuImage "System Folder" "Control Panels" ;
+	AddDirectoryToHaikuImage "System Folder" Extensions ;
+	AddDirectoryToHaikuImage "System Folder" Fonts ;
+	AddDirectoryToHaikuImage "System Folder" "Startup Items" ;
+	AddDirectoryToHaikuImage Applications ;
+}
+
 
 #pragma mark - Optional Packages
 

@@ -1,0 +1,94 @@
+name: OSTen preview image
+
+on:
+  push:
+    branches: [osten/main]
+    paths:
+      - .github/workflows/osten-preview.yml
+      - build/jam/DefaultBuildProfiles
+      - build/jam/images/definitions/common-tail
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bison flex texinfo autoconf automake gawk nasm \
+            wget zip unzip xorriso mtools python3 pkg-config zlib1g-dev \
+            libzstd-dev libgmp-dev libmpfr-dev libmpc-dev qemu-system-x86 \
+            socat python3-pil
+
+      - name: Check out Haiku buildtools
+        run: |
+          git clone --depth 1 https://github.com/haiku/buildtools.git ../buildtools
+          if [ "$(git -C ../buildtools rev-parse HEAD)" != 8375c2dbeaf109c520798cb234d57f0895463201 ]; then
+            git -C ../buildtools fetch --depth 1 origin 8375c2dbeaf109c520798cb234d57f0895463201
+            git -C ../buildtools checkout --detach 8375c2dbeaf109c520798cb234d57f0895463201
+          fi
+
+      - name: Build Jam
+        run: |
+          make -C ../buildtools/jam -j4
+          mkdir -p ../host-tools/bin
+          ( cd ../buildtools/jam && ./jam0 -sBINDIR="$(realpath ../../host-tools/bin)" install )
+
+      - name: Build cross compiler
+        run: |
+          mkdir -p generated.x86_64
+          cd generated.x86_64
+          PATH="$(realpath ../../host-tools/bin):$PATH" \
+            ../configure -j4 --cross-tools-source ../../buildtools \
+            --build-cross-tools x86_64
+
+      - name: Build preview image
+        run: |
+          cd generated.x86_64
+          PATH="$(realpath ../build/osten/tools):$(realpath ../../host-tools/bin):$PATH" \
+            jam -q -j4 -sHAIKU_REVISION=osten-preview-e5a43367 @nightly-osten-raw
+          test -s osten-preview.image
+          sha256sum osten-preview.image
+          printf 'OSTen=%s\nbuildtools=%s\nprofile=nightly-osten-raw\n' \
+            "$GITHUB_SHA" "$(git -C ../../buildtools rev-parse HEAD)" \
+            > build-manifest.txt
+
+      - name: Save preview image
+        uses: actions/upload-artifact@v4
+        with:
+          name: osten-preview-${{ github.sha }}
+          path: |
+            generated.x86_64/osten-preview.image
+            generated.x86_64/build-manifest.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Boot preview image
+        run: |
+          bash build/osten/tools/boot-smoke generated.x86_64/osten-preview.image preview-boot
+          /usr/bin/python3 - <<'PY'
+          from PIL import Image
+
+          for name in ('welcome', 'screenshot'):
+              image = Image.open(f'preview-boot/{name}.ppm').convert('RGB')
+              image.save(f'preview-boot/{name}.png')
+              print(f'{name}: {image.width}x{image.height}')
+          PY
+          cp generated.x86_64/build-manifest.txt preview-boot/build-manifest.txt
+
+      - name: Save preview boot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osten-preview-boot-${{ github.sha }}
+          path: preview-boot/
+          if-no-files-found: warn
+          retention-days: 7

@@ -105,10 +105,34 @@ buildtools commits. The artifact expires after seven days; the workflow is
 the reproducible record. A successful image build still needs a QEMU boot
 check before the baseline milestone is accepted.
 
+The first accepted baseline and its captured desktop are recorded in
+[Baseline.md](Baseline.md).
+
 The [baseline boot screenshot workflow](../../.github/workflows/baseline-boot.yml)
 waits for the image build, starts its image in QEMU, and attaches a screenshot
 and QEMU logs. Inspect the screenshot before recording the boot milestone as
 complete. Updating that workflow or the boot helper starts another check.
+
+## First OSTen preview image
+
+The `nightly-osten-raw` profile reuses the tested nightly build settings and
+creates `osten-preview.image`. It adds an ordinary `System Folder` at the root
+of the boot volume with `Control Panels`, `Extensions`, `Fonts`, and
+`Startup Items`, plus a root `Applications` folder. It still runs Haiku's
+Tracker and Deskbar until the OSTen System and Finder are built and connected
+to desktop startup.
+
+From `generated.x86_64`, build this separate profile with:
+
+```sh
+PATH="$(cd ../build/osten/tools && pwd):$(cd ../../host-tools/bin && pwd):$PATH" \
+  jam -q -j4 -sHAIKU_REVISION=osten-preview-e5a43367 @nightly-osten-raw
+```
+
+The [OSTen preview image workflow](../../.github/workflows/osten-preview.yml)
+builds and boots that profile independently, saving the image, manifest, and
+boot screenshots. The profile's visible folder layout must be checked in the
+booted image before marking that part complete.
 
 
 The `buildtools` checkout and `host-tools` directory live outside this

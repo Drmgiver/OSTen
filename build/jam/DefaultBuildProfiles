@@ -50,6 +50,9 @@ rule DefineDefaultBuildProfiles
 
 	# nightly profiles
 	DefineBuildProfile nightly-raw : image : "haiku-nightly.image" ;
+	# First OSTen image: retain the tested nightly package selection while
+	# placing the visible OSTen folder structure on the boot volume.
+	DefineBuildProfile nightly-osten-raw : image : "osten-preview.image" ;
 	DefineBuildProfile nightly-mmc : haiku-mmc-image : "haiku-nightly.mmc" ;
 	DefineBuildProfile nightly-vmware : vmware-image : "haiku-nightly.vmdk" ;
 	DefineBuildProfile nightly-cd : cd-image : "haiku-nightly.iso" ;
