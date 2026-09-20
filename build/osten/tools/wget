@@ -3,14 +3,29 @@
 # Redirect HaikuPorts build packages when the primary host is unavailable.
 # The repository index keeps its checksum-specific URL unchanged.
 
-args=()
-for arg in "$@"; do
-	case "$arg" in
+args=("$@")
+output_index=-1
+package_url=false
+for i in "${!args[@]}"; do
+	case "${args[i]}" in
+		-O)
+			output_index=$((i + 1))
+			;;
 		https://eu.hpkg.haiku-os.org/haikuports/master/build-packages/*/packages/*.hpkg)
-			arg="https://haiku-buildpackages.cdn.haiku-os.org/packages/${arg##*/}"
+			args[i]="https://haiku-buildpackages.cdn.haiku-os.org/packages/${args[i]##*/}"
+			package_url=true
 			;;
 	esac
-	args+=("$arg")
 done
 
-exec /usr/bin/wget "${args[@]}"
+if ! "$package_url" || ((output_index < 0 || output_index >= ${#args[@]})); then
+	exec /usr/bin/wget "${args[@]}"
+fi
+
+target=${args[output_index]}
+temporary=$(mktemp "${target}.partial.XXXXXX") || exit 1
+trap 'rm -f "$temporary"' EXIT
+args[output_index]=$temporary
+/usr/bin/wget "${args[@]}" || exit 1
+test -s "$temporary" || exit 1
+mv -f "$temporary" "$target"
