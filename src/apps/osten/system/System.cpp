@@ -6,8 +6,11 @@
 #include <MenuBar.h>
 #include <MenuItem.h>
 #include <Message.h>
+#include <Messenger.h>
 #include <Screen.h>
 #include <Window.h>
+
+#include "OSTenMessages.h"
 
 
 namespace {
@@ -29,6 +32,34 @@ public:
 		systemMenu->AddItem(new BMenuItem("About OSTen...",
 			new BMessage(kAboutOSTen)));
 		bar->AddItem(systemMenu);
+
+		BMenu* fileMenu = new BMenu("File");
+		fileMenu->AddItem(new BMenuItem("New Folder",
+			new BMessage(kOSTenNewFolder), 'N'));
+		fileMenu->AddSeparatorItem();
+		fileMenu->AddItem(new BMenuItem("Open",
+			new BMessage(kOSTenOpen), 'O'));
+		fileMenu->AddItem(new BMenuItem("Close Window",
+			new BMessage(kOSTenClose), 'W'));
+		bar->AddItem(fileMenu);
+
+		BMenu* editMenu = new BMenu("Edit");
+		editMenu->AddItem(new BMenuItem("Select All",
+			new BMessage(kOSTenSelectAll), 'A'));
+		bar->AddItem(editMenu);
+
+		BMenu* viewMenu = new BMenu("View");
+		BMenuItem* iconsItem = new BMenuItem("as Icons",
+			new BMessage(kOSTenViewAsIcons));
+		iconsItem->SetMarked(true);
+		viewMenu->AddItem(iconsItem);
+		bar->AddItem(viewMenu);
+
+		BMenu* specialMenu = new BMenu("Special");
+		BMenuItem* emptyTrash = new BMenuItem("Empty Trash...", NULL);
+		emptyTrash->SetEnabled(false);
+		specialMenu->AddItem(emptyTrash);
+		bar->AddItem(specialMenu);
 		AddChild(bar);
 	}
 
@@ -36,6 +67,15 @@ public:
 	{
 		if (message->what == kAboutOSTen) {
 			(new BAlert("About OSTen", "OSTen preview", "OK"))->Go();
+			return;
+		}
+		if (message->what == kOSTenNewFolder
+			|| message->what == kOSTenOpen
+			|| message->what == kOSTenClose
+			|| message->what == kOSTenSelectAll
+			|| message->what == kOSTenViewAsIcons) {
+			BMessenger finder("application/x-vnd.OSTen-Finder");
+			finder.SendMessage(message);
 			return;
 		}
 		BWindow::MessageReceived(message);

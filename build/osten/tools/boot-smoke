@@ -50,7 +50,14 @@ printf 'screendump %s\nsendkey ret\n' "$output/welcome.ppm" \
 test -s "$output/welcome.ppm"
 sleep "${OSTEN_DESKTOP_WAIT_SECONDS:-90}"
 kill -0 "$qemu_pid"
-printf 'screendump %s\nquit\n' "$output/screenshot.ppm" \
+printf 'screendump %s\n' "$output/screenshot.ppm" \
 	| socat -T 10 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
 test -s "$output/screenshot.ppm"
-echo "Saved first-boot and desktop screenshots to $output"
+printf 'sendkey ret\n' \
+	| socat -T 5 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
+sleep "${OSTEN_FINDER_WAIT_SECONDS:-5}"
+kill -0 "$qemu_pid"
+printf 'screendump %s\nquit\n' "$output/finder.ppm" \
+	| socat -T 10 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
+test -s "$output/finder.ppm"
+echo "Saved first-boot, desktop, and Finder screenshots to $output"

@@ -2,6 +2,7 @@
 SubDir HAIKU_TOP src apps osten finder ;
 
 UsePrivateHeaders interface ;
+SubDirHdrs $(HAIKU_TOP) src apps osten ;
 
 Application OSTenFinder :
 	Finder.cpp

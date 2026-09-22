@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 SubDir HAIKU_TOP src apps osten system ;
 
+SubDirHdrs $(HAIKU_TOP) src apps osten ;
+
 Application OSTenSystem :
 	System.cpp
 	: be [ TargetLibstdc++ ]

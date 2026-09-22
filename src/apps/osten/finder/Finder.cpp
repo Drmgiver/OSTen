@@ -1,26 +1,335 @@
 /* SPDX-License-Identifier: MIT */
 
+#include <Alert.h>
 #include <Application.h>
 #include <Directory.h>
 #include <Entry.h>
 #include <InterfaceDefs.h>
-#include <ListView.h>
 #include <Message.h>
+#include <Messenger.h>
+#include <Node.h>
+#include <Path.h>
 #include <Roster.h>
 #include <Screen.h>
-#include <ScrollView.h>
 #include <StorageDefs.h>
-#include <StringItem.h>
+#include <String.h>
 #include <View.h>
 #include <Window.h>
 #include <WindowPrivate.h>
 
+#include <algorithm>
+#include <string.h>
 #include <vector>
+
+#include "OSTenMessages.h"
 
 
 namespace {
 
 const uint32 kOpenEntry = 'open';
+const uint32 kFinderWindowActivated = 'oswa';
+const char* kWindowFrameAttribute = "OSTen:window_frame";
+
+const float kCellWidth = 94;
+const float kCellHeight = 86;
+const float kIconTop = 8;
+
+
+struct FinderItem {
+	entry_ref	ref;
+	BString		name;
+	bool		isDirectory;
+	bool		selected;
+	BRect		cell;
+};
+
+
+class FolderView : public BView {
+public:
+	FolderView(BRect frame, const entry_ref& directory)
+		:
+		BView(frame, "Folder icons", B_FOLLOW_ALL,
+			B_WILL_DRAW | B_FRAME_EVENTS | B_NAVIGABLE),
+		fDirectory(directory),
+		fIsBootVolumeRoot(false)
+	{
+		SetViewColor(255, 255, 255);
+		SetLowColor(255, 255, 255);
+		BEntry folder(&fDirectory);
+		BPath path;
+		fIsBootVolumeRoot = folder.GetPath(&path) == B_OK
+			&& strcmp(path.Path(), "/boot") == 0;
+		Refresh();
+	}
+
+	void AttachedToWindow() override
+	{
+		MakeFocus(true);
+	}
+
+	void Draw(BRect updateRect) override
+	{
+		for (size_t index = 0; index < fItems.size(); index++) {
+			if (fItems[index].cell.Intersects(updateRect))
+				_DrawItem(fItems[index]);
+		}
+	}
+
+	void FrameResized(float width, float height) override
+	{
+		_LayoutItems();
+		Invalidate();
+	}
+
+	void KeyDown(const char* bytes, int32 numBytes) override
+	{
+		if (numBytes == 1 && bytes[0] == B_ENTER) {
+			_OpenSelection();
+			return;
+		}
+		BView::KeyDown(bytes, numBytes);
+	}
+
+	void MouseDown(BPoint where) override
+	{
+		MakeFocus(true);
+		int32 hit = _ItemAt(where);
+		uint32 keyModifiers = modifiers();
+		bool extend = (keyModifiers & (B_COMMAND_KEY | B_SHIFT_KEY)) != 0;
+
+		if (!extend)
+			_ClearSelection();
+		if (hit >= 0) {
+			if (extend)
+				fItems[hit].selected = !fItems[hit].selected;
+			else
+				fItems[hit].selected = true;
+		}
+		Invalidate();
+
+		int32 clicks = 1;
+		if (Window()->CurrentMessage() != NULL)
+			Window()->CurrentMessage()->FindInt32("clicks", &clicks);
+		if (hit >= 0 && clicks >= 2) {
+			BMessage open(kOpenEntry);
+			open.AddInt32("index", hit);
+			Window()->PostMessage(&open);
+		}
+	}
+
+	void Refresh(const char* selectName = NULL)
+	{
+		fItems.clear();
+		BDirectory contents(&fDirectory);
+		BEntry entry;
+		while (contents.GetNextEntry(&entry) == B_OK) {
+			entry_ref ref;
+			char name[B_FILE_NAME_LENGTH];
+			if (entry.GetRef(&ref) != B_OK || entry.GetName(name) != B_OK)
+				continue;
+			if (_ShouldHide(name))
+				continue;
+
+			FinderItem item;
+			item.ref = ref;
+			item.name = name;
+			item.isDirectory = entry.IsDirectory();
+			item.selected = selectName != NULL && item.name == selectName;
+			fItems.push_back(item);
+		}
+
+		std::sort(fItems.begin(), fItems.end(),
+			[](const FinderItem& left, const FinderItem& right) {
+				return left.name.ICompare(right.name) < 0;
+			});
+		_LayoutItems();
+		Invalidate();
+	}
+
+	void SelectAll()
+	{
+		for (size_t index = 0; index < fItems.size(); index++)
+			fItems[index].selected = true;
+		Invalidate();
+	}
+
+	std::vector<int32> SelectedIndices() const
+	{
+		std::vector<int32> selected;
+		for (size_t index = 0; index < fItems.size(); index++) {
+			if (fItems[index].selected)
+				selected.push_back((int32)index);
+		}
+		return selected;
+	}
+
+	bool EntryAt(int32 index, entry_ref& ref) const
+	{
+		if (index < 0 || (size_t)index >= fItems.size())
+			return false;
+		ref = fItems[index].ref;
+		return true;
+	}
+
+private:
+	bool _ShouldHide(const char* name) const
+	{
+		if (name[0] == '.')
+			return true;
+		if (!fIsBootVolumeRoot)
+			return false;
+		return strcmp(name, "_packages") == 0
+			|| strcmp(name, "data") == 0
+			|| strcmp(name, "home") == 0
+			|| strcmp(name, "system") == 0
+			|| strcmp(name, "trash") == 0;
+	}
+
+	void _LayoutItems()
+	{
+		int32 columns = (int32)((Bounds().Width() - 12) / kCellWidth);
+		if (columns < 1)
+			columns = 1;
+		for (size_t index = 0; index < fItems.size(); index++) {
+			int32 column = (int32)index % columns;
+			int32 row = (int32)index / columns;
+			float left = 10 + column * kCellWidth;
+			float top = 8 + row * kCellHeight;
+			fItems[index].cell.Set(left, top, left + kCellWidth - 8,
+				top + kCellHeight - 6);
+		}
+	}
+
+	int32 _ItemAt(BPoint point) const
+	{
+		for (size_t index = 0; index < fItems.size(); index++) {
+			if (fItems[index].cell.Contains(point))
+				return (int32)index;
+		}
+		return -1;
+	}
+
+	void _ClearSelection()
+	{
+		for (size_t index = 0; index < fItems.size(); index++)
+			fItems[index].selected = false;
+	}
+
+	void _OpenSelection()
+	{
+		for (size_t index = 0; index < fItems.size(); index++) {
+			if (!fItems[index].selected)
+				continue;
+			BMessage open(kOpenEntry);
+			open.AddInt32("index", (int32)index);
+			Window()->PostMessage(&open);
+		}
+	}
+
+	void _DrawItem(const FinderItem& item)
+	{
+		BRect icon(item.cell.left + 25, item.cell.top + kIconTop,
+			item.cell.left + 61, item.cell.top + kIconTop + 34);
+		if (item.isDirectory)
+			_DrawFolderIcon(icon);
+		else
+			_DrawFileIcon(icon);
+
+		BString display(item.name);
+		TruncateString(&display, B_TRUNCATE_MIDDLE, item.cell.Width() - 6);
+		float textWidth = StringWidth(display.String());
+		float textX = item.cell.left + (item.cell.Width() - textWidth) / 2;
+		float baseline = item.cell.top + 65;
+		BRect label(textX - 3, baseline - 13, textX + textWidth + 3,
+			baseline + 3);
+		if (item.selected) {
+			SetHighColor(0, 0, 128);
+			FillRect(label);
+			SetHighColor(255, 255, 255);
+		} else
+			SetHighColor(0, 0, 0);
+		DrawString(display.String(), BPoint(textX, baseline));
+	}
+
+	void _DrawFolderIcon(BRect rect)
+	{
+		SetHighColor(35, 35, 35);
+		FillRect(BRect(rect.left + 2, rect.top + 7, rect.right,
+			rect.bottom));
+		FillRect(BRect(rect.left + 6, rect.top + 2, rect.left + 20,
+			rect.top + 9));
+		SetHighColor(242, 206, 82);
+		FillRect(BRect(rect.left + 4, rect.top + 9, rect.right - 2,
+			rect.bottom - 2));
+		FillRect(BRect(rect.left + 8, rect.top + 4, rect.left + 19,
+			rect.top + 9));
+		SetHighColor(255, 231, 137);
+		StrokeLine(BPoint(rect.left + 6, rect.top + 11),
+			BPoint(rect.right - 4, rect.top + 11));
+	}
+
+	void _DrawFileIcon(BRect rect)
+	{
+		SetHighColor(35, 35, 35);
+		FillRect(BRect(rect.left + 7, rect.top, rect.right - 5,
+			rect.bottom));
+		SetHighColor(244, 244, 244);
+		FillRect(BRect(rect.left + 9, rect.top + 2, rect.right - 7,
+			rect.bottom - 2));
+		SetHighColor(110, 110, 110);
+		StrokeLine(BPoint(rect.left + 13, rect.top + 11),
+			BPoint(rect.right - 11, rect.top + 11));
+		StrokeLine(BPoint(rect.left + 13, rect.top + 17),
+			BPoint(rect.right - 11, rect.top + 17));
+		StrokeLine(BPoint(rect.left + 13, rect.top + 23),
+			BPoint(rect.right - 15, rect.top + 23));
+	}
+
+private:
+	entry_ref				fDirectory;
+	bool					fIsBootVolumeRoot;
+	std::vector<FinderItem>	fItems;
+};
+
+
+static BRect
+FolderWindowFrame(const entry_ref& directory, int32 depth)
+{
+	BRect frame(60 + depth * 28, 60 + depth * 28,
+		530 + depth * 28, 405 + depth * 28);
+	BNode node(&directory);
+	BRect stored;
+	if (node.ReadAttr(kWindowFrameAttribute, B_RECT_TYPE, 0, &stored,
+			sizeof(BRect)) == (ssize_t)sizeof(BRect)
+		&& stored.Width() >= 280 && stored.Height() >= 180) {
+		frame = stored;
+	}
+
+	BRect screen = BScreen().Frame();
+	screen.top = 26;
+	if (frame.Width() > screen.Width())
+		frame.right = frame.left + screen.Width();
+	if (frame.Height() > screen.Height())
+		frame.bottom = frame.top + screen.Height();
+	if (frame.left < screen.left)
+		frame.OffsetBy(screen.left - frame.left, 0);
+	if (frame.top < screen.top)
+		frame.OffsetBy(0, screen.top - frame.top);
+	if (frame.right > screen.right)
+		frame.OffsetBy(screen.right - frame.right, 0);
+	if (frame.bottom > screen.bottom)
+		frame.OffsetBy(0, screen.bottom - frame.bottom);
+	return frame;
+}
+
+
+static void
+NotifyFinderWindowActivated(BWindow* window)
+{
+	BMessage activated(kFinderWindowActivated);
+	activated.AddMessenger("window", BMessenger(window));
+	be_app->PostMessage(&activated);
+}
 
 
 class FinderWindow : public BWindow {
@@ -28,11 +337,11 @@ public:
 	FinderWindow(const entry_ref& directory, int32 depth,
 		const char* displayName = NULL)
 		:
-		BWindow(BRect(60 + depth * 28, 60 + depth * 28,
-			530 + depth * 28, 405 + depth * 28), "Finder",
-			B_TITLED_WINDOW, 0),
+		BWindow(FolderWindowFrame(directory, depth), "Finder",
+			B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS),
+		fDirectory(directory),
 		fDepth(depth),
-		fList(NULL)
+		fView(NULL)
 	{
 		BEntry folder(&directory);
 		char title[B_FILE_NAME_LENGTH];
@@ -42,47 +351,113 @@ public:
 			SetTitle(title);
 
 		BRect frame = Bounds();
-		frame.InsetBy(10, 10);
-		frame.right -= 15;
-		fList = new BListView(frame, "Folder contents");
-		fList->SetInvocationMessage(new BMessage(kOpenEntry));
-		fList->SetTarget(this);
-		AddChild(new BScrollView("Contents", fList, B_FOLLOW_ALL, 0,
-			false, true));
+		frame.InsetBy(7, 7);
+		fView = new FolderView(frame, directory);
+		AddChild(fView);
+	}
 
-		BDirectory contents(&directory);
-		BEntry item;
-		while (contents.GetNextEntry(&item) == B_OK) {
-			entry_ref ref;
-			char name[B_FILE_NAME_LENGTH];
-			if (item.GetRef(&ref) != B_OK || item.GetName(name) != B_OK)
-				continue;
-			fEntries.push_back(ref);
-			fList->AddItem(new BStringItem(name));
-		}
+	void FrameMoved(BPoint newPosition) override
+	{
+		BWindow::FrameMoved(newPosition);
+		_SaveFrame();
+	}
+
+	void FrameResized(float width, float height) override
+	{
+		BWindow::FrameResized(width, height);
+		_SaveFrame();
+	}
+
+	void WindowActivated(bool active) override
+	{
+		BWindow::WindowActivated(active);
+		if (active)
+			NotifyFinderWindowActivated(this);
+	}
+
+	bool QuitRequested() override
+	{
+		_SaveFrame();
+		return true;
 	}
 
 	void MessageReceived(BMessage* message) override
 	{
-		if (message->what == kOpenEntry) {
-			int32 selection = fList->CurrentSelection();
-			if (selection >= 0 && (size_t)selection < fEntries.size()) {
-				entry_ref ref = fEntries[selection];
-				BEntry item(&ref);
-				if (item.IsDirectory())
-					(new FinderWindow(ref, fDepth + 1))->Show();
-				else
-					be_roster->Launch(&ref);
+		switch (message->what) {
+			case kOpenEntry:
+			{
+				int32 index;
+				if (message->FindInt32("index", &index) == B_OK)
+					_OpenEntry(index);
+				return;
 			}
-			return;
+			case kOSTenOpen:
+				_OpenSelection();
+				return;
+			case kOSTenClose:
+				PostMessage(B_QUIT_REQUESTED);
+				return;
+			case kOSTenNewFolder:
+				_CreateFolder();
+				return;
+			case kOSTenSelectAll:
+				fView->SelectAll();
+				return;
+			case kOSTenViewAsIcons:
+				return;
 		}
 		BWindow::MessageReceived(message);
 	}
 
 private:
-	int32				fDepth;
-	BListView*			fList;
-	std::vector<entry_ref>	fEntries;
+	void _OpenEntry(int32 index)
+	{
+		entry_ref ref;
+		if (!fView->EntryAt(index, ref))
+			return;
+		BEntry entry(&ref);
+		if (entry.IsDirectory())
+			(new FinderWindow(ref, fDepth + 1))->Show();
+		else
+			be_roster->Launch(&ref);
+	}
+
+	void _OpenSelection()
+	{
+		std::vector<int32> selected = fView->SelectedIndices();
+		for (size_t index = 0; index < selected.size(); index++)
+			_OpenEntry(selected[index]);
+	}
+
+	void _CreateFolder()
+	{
+		BDirectory directory(&fDirectory);
+		BString name("untitled folder");
+		int32 suffix = 2;
+		while (directory.Contains(name.String())) {
+			name.SetToFormat("untitled folder %ld", (long)suffix);
+			suffix++;
+		}
+		if (directory.CreateDirectory(name.String(), NULL) == B_OK)
+			fView->Refresh(name.String());
+		else {
+			(new BAlert("New Folder", "The folder could not be created.",
+				"OK"))->Go();
+		}
+	}
+
+	void _SaveFrame()
+	{
+		BNode node(&fDirectory);
+		BRect frame = Frame();
+		node.WriteAttr(kWindowFrameAttribute, B_RECT_TYPE, 0, &frame,
+			sizeof(BRect));
+	}
+
+private:
+	entry_ref	fDirectory;
+	int32		fDepth;
+	FolderView*	fView;
 };
 
 
@@ -97,17 +472,24 @@ class DesktopView : public BView {
 public:
 	DesktopView(BRect frame)
 		:
-		BView(frame, "OSTen Desktop", B_FOLLOW_ALL, B_WILL_DRAW),
-		fSelectedItem(kNoDesktopItem)
+		BView(frame, "OSTen Desktop", B_FOLLOW_ALL,
+			B_WILL_DRAW | B_FRAME_EVENTS | B_NAVIGABLE),
+		fDiskSelected(false),
+		fTrashSelected(false)
 	{
-		SetViewColor((rgb_color){54, 104, 150, 255});
+		SetViewColor(54, 104, 150);
 		_LayoutItems();
+	}
+
+	void AttachedToWindow() override
+	{
+		MakeFocus(true);
 	}
 
 	void Draw(BRect updateRect) override
 	{
-		_DrawDisk(fDiskRect, fSelectedItem == kBootVolumeItem);
-		_DrawTrash(fTrashRect, fSelectedItem == kTrashItem);
+		_DrawDisk(fDiskRect, fDiskSelected);
+		_DrawTrash(fTrashRect, fTrashSelected);
 	}
 
 	void FrameResized(float width, float height) override
@@ -116,15 +498,33 @@ public:
 		Invalidate();
 	}
 
+	void KeyDown(const char* bytes, int32 numBytes) override
+	{
+		if (numBytes == 1 && bytes[0] == B_ENTER) {
+			OpenSelection();
+			return;
+		}
+		BView::KeyDown(bytes, numBytes);
+	}
+
 	void MouseDown(BPoint where) override
 	{
+		MakeFocus(true);
 		desktop_item item = kNoDesktopItem;
 		if (fDiskHitRect.Contains(where))
 			item = kBootVolumeItem;
 		else if (fTrashHitRect.Contains(where))
 			item = kTrashItem;
 
-		fSelectedItem = item;
+		bool extend = (modifiers() & (B_COMMAND_KEY | B_SHIFT_KEY)) != 0;
+		if (!extend) {
+			fDiskSelected = false;
+			fTrashSelected = false;
+		}
+		if (item == kBootVolumeItem)
+			fDiskSelected = extend ? !fDiskSelected : true;
+		else if (item == kTrashItem)
+			fTrashSelected = extend ? !fTrashSelected : true;
 		Invalidate();
 
 		int32 clicks = 1;
@@ -132,6 +532,25 @@ public:
 			Window()->CurrentMessage()->FindInt32("clicks", &clicks);
 		if (item != kNoDesktopItem && clicks >= 2)
 			_OpenItem(item);
+	}
+
+	void OpenSelection()
+	{
+		if (!fDiskSelected && !fTrashSelected) {
+			_OpenItem(kBootVolumeItem);
+			return;
+		}
+		if (fDiskSelected)
+			_OpenItem(kBootVolumeItem);
+		if (fTrashSelected)
+			_OpenItem(kTrashItem);
+	}
+
+	void SelectAll()
+	{
+		fDiskSelected = true;
+		fTrashSelected = true;
+		Invalidate();
 	}
 
 private:
@@ -202,11 +621,12 @@ private:
 	}
 
 private:
-	desktop_item	fSelectedItem;
-	BRect			fDiskRect;
-	BRect			fDiskHitRect;
-	BRect			fTrashRect;
-	BRect			fTrashHitRect;
+	bool	fDiskSelected;
+	bool	fTrashSelected;
+	BRect	fDiskRect;
+	BRect	fDiskHitRect;
+	BRect	fTrashRect;
+	BRect	fTrashHitRect;
 };
 
 
@@ -228,15 +648,43 @@ public:
 			B_NOT_MOVABLE | B_WILL_ACCEPT_FIRST_CLICK | B_NOT_ZOOMABLE
 				| B_NOT_CLOSABLE | B_NOT_MINIMIZABLE | B_NOT_RESIZABLE
 				| B_ASYNCHRONOUS_CONTROLS,
-			B_ALL_WORKSPACES)
+			B_ALL_WORKSPACES),
+		fView(new DesktopView(Bounds()))
 	{
-		AddChild(new DesktopView(Bounds()));
+		AddChild(fView);
+	}
+
+	void WindowActivated(bool active) override
+	{
+		BWindow::WindowActivated(active);
+		if (active)
+			NotifyFinderWindowActivated(this);
 	}
 
 	bool QuitRequested() override
 	{
 		return false;
 	}
+
+	void MessageReceived(BMessage* message) override
+	{
+		switch (message->what) {
+			case kOSTenOpen:
+				fView->OpenSelection();
+				return;
+			case kOSTenSelectAll:
+				fView->SelectAll();
+				return;
+			case kOSTenClose:
+			case kOSTenNewFolder:
+			case kOSTenViewAsIcons:
+				return;
+		}
+		BWindow::MessageReceived(message);
+	}
+
+private:
+	DesktopView* fView;
 };
 
 
@@ -250,8 +698,35 @@ public:
 
 	void ReadyToRun() override
 	{
-		(new DesktopWindow())->Show();
+		DesktopWindow* desktop = new DesktopWindow();
+		fDesktopTarget = BMessenger(desktop);
+		fCommandTarget = fDesktopTarget;
+		desktop->Show();
 	}
+
+	void MessageReceived(BMessage* message) override
+	{
+		if (message->what == kFinderWindowActivated) {
+			BMessenger target;
+			if (message->FindMessenger("window", &target) == B_OK)
+				fCommandTarget = target;
+			return;
+		}
+		if (message->what == kOSTenNewFolder
+			|| message->what == kOSTenOpen
+			|| message->what == kOSTenClose
+			|| message->what == kOSTenSelectAll
+			|| message->what == kOSTenViewAsIcons) {
+			if (fCommandTarget.SendMessage(message) != B_OK)
+				fDesktopTarget.SendMessage(message);
+			return;
+		}
+		BApplication::MessageReceived(message);
+	}
+
+private:
+	BMessenger fCommandTarget;
+	BMessenger fDesktopTarget;
 };
 
 } // namespace

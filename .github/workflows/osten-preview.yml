@@ -80,7 +80,7 @@ jobs:
           /usr/bin/python3 - <<'PY'
           from PIL import Image
 
-          for name in ('welcome', 'screenshot'):
+          for name in ('welcome', 'screenshot', 'finder'):
               image = Image.open(f'preview-boot/{name}.ppm').convert('RGB')
               image.save(f'preview-boot/{name}.png')
               print(f'{name}: {image.width}x{image.height}')
