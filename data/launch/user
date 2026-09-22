@@ -5,7 +5,8 @@ service x-vnd.Haiku-app_server {
 
 target desktop {
 	env /system/boot/SetupEnvironment
-	# The first OSTen System runs beside the Haiku desktop until Finder is ready.
+	# The visible System Folder selects the OSTen shell. Ordinary Haiku images
+	# do not contain these files and continue to launch Tracker and Deskbar.
 	service x-vnd.OSTen-System {
 		launch /boot/System\ Folder/System
 		if file_exists /boot/System\ Folder/System
@@ -19,12 +20,14 @@ target desktop {
 
 	service x-vnd.Be-TRAK {
 		launch /system/Tracker
+		if not file_exists /boot/System\ Folder/Finder
 		legacy
 		on initial_volumes_mounted
 	}
 
 	service x-vnd.Be-TSKB {
 		launch /system/Deskbar
+		if not file_exists /boot/System\ Folder/System
 		on initial_volumes_mounted
 	}
 
@@ -59,7 +62,10 @@ target desktop {
 
 	job first-login {
 		launch /bin/sh /system/boot/PostInstallScript "first login" ~/config/settings/first_login /boot/system/boot/first-login
-		if file_exists ~/config/settings/first_login
+		if {
+			file_exists ~/config/settings/first_login
+			not file_exists /boot/System\ Folder/System
+		}
 		requires x-vnd.Be-TSKB
 	}
 
