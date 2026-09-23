@@ -760,6 +760,7 @@ public:
 
 	void MouseDown(BPoint where) override
 	{
+		Window()->Activate(true);
 		MakeFocus(true);
 		desktop_item item = kNoDesktopItem;
 		if (fDiskHitRect.Contains(where))
