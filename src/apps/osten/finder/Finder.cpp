@@ -2,13 +2,17 @@
 
 #include <Alert.h>
 #include <Application.h>
+#include <CopyEngine.h>
 #include <Directory.h>
 #include <Entry.h>
 #include <InterfaceDefs.h>
+#include <MenuItem.h>
 #include <Message.h>
 #include <Messenger.h>
 #include <Node.h>
 #include <Path.h>
+#include <PopUpMenu.h>
+#include <RemoveEngine.h>
 #include <Roster.h>
 #include <Screen.h>
 #include <StorageDefs.h>
@@ -18,6 +22,7 @@
 #include <WindowPrivate.h>
 
 #include <algorithm>
+#include <math.h>
 #include <string.h>
 #include <vector>
 
@@ -28,6 +33,10 @@ namespace {
 
 const uint32 kOpenEntry = 'open';
 const uint32 kFinderWindowActivated = 'oswa';
+const uint32 kFinderDragEntries = 'osdg';
+const uint32 kFinderMoveToTrash = 'ostr';
+const uint32 kFinderRefreshAll = 'osrf';
+const uint32 kFinderRefreshFolder = 'osrw';
 const char* kWindowFrameAttribute = "OSTen:window_frame";
 
 const float kCellWidth = 94;
@@ -44,6 +53,135 @@ struct FinderItem {
 };
 
 
+static bool
+PathContains(const BPath& directory, const BPath& entry)
+{
+	const char* directoryPath = directory.Path();
+	const char* entryPath = entry.Path();
+	size_t length = strlen(directoryPath);
+	return strncmp(directoryPath, entryPath, length) == 0
+		&& (entryPath[length] == '\0' || entryPath[length] == '/');
+}
+
+
+static void
+MakeUniqueName(BDirectory& directory, const char* original, BString& name)
+{
+	name = original;
+	if (!directory.Contains(name.String()))
+		return;
+
+	for (int32 suffix = 2; ; suffix++) {
+		name.SetToFormat("%s %ld", original, (long)suffix);
+		if (!directory.Contains(name.String()))
+			return;
+	}
+}
+
+
+static status_t
+TransferEntry(const entry_ref& sourceRef, BDirectory& targetDirectory,
+	const BPath& targetDirectoryPath, bool copy, bool preserveExisting)
+{
+	BEntry source(&sourceRef, false);
+	if (source.InitCheck() != B_OK)
+		return source.InitCheck();
+
+	BPath sourcePath;
+	status_t error = source.GetPath(&sourcePath);
+	if (error != B_OK)
+		return error;
+
+	if (source.IsDirectory() && PathContains(sourcePath, targetDirectoryPath))
+		return B_BAD_VALUE;
+
+	char originalName[B_FILE_NAME_LENGTH];
+	error = source.GetName(originalName);
+	if (error != B_OK)
+		return error;
+
+	BEntry parent;
+	error = source.GetParent(&parent);
+	if (error != B_OK)
+		return error;
+	BEntry targetDirectoryEntry;
+	error = targetDirectory.GetEntry(&targetDirectoryEntry);
+	if (error != B_OK)
+		return error;
+	bool sameDirectory = parent == targetDirectoryEntry;
+	if (sameDirectory && !copy)
+		return B_OK;
+
+	BString targetName(originalName);
+	if (copy && sameDirectory) {
+		BString copyName;
+		copyName.SetToFormat("%s copy", originalName);
+		MakeUniqueName(targetDirectory, copyName.String(), targetName);
+	} else if (preserveExisting)
+		MakeUniqueName(targetDirectory, originalName, targetName);
+
+	BPath destinationPath(targetDirectoryPath);
+	error = destinationPath.Append(targetName.String());
+	if (error != B_OK)
+		return error;
+
+	BEntry destination(destinationPath.Path(), false);
+	if (destination.Exists()) {
+		error = BRemoveEngine().RemoveEntry(destination);
+		if (error != B_OK)
+			return error;
+	}
+
+	if (copy) {
+		return BCopyEngine(BCopyEngine::COPY_RECURSIVELY
+			| BCopyEngine::UNLINK_DESTINATION).CopyEntry(sourcePath.Path(),
+				destinationPath.Path());
+	}
+
+	error = source.MoveTo(&targetDirectory, targetName.String(), true);
+	if (error != B_CROSS_DEVICE_LINK)
+		return error;
+
+	error = BCopyEngine(BCopyEngine::COPY_RECURSIVELY
+		| BCopyEngine::UNLINK_DESTINATION).CopyEntry(sourcePath.Path(),
+			destinationPath.Path());
+	if (error != B_OK)
+		return error;
+	return BRemoveEngine().RemoveEntry(source);
+}
+
+
+static void
+TransferEntries(const BMessage* message, const entry_ref& targetRef,
+	bool preserveExisting = false)
+{
+	BDirectory targetDirectory(&targetRef);
+	BEntry targetEntry(&targetRef);
+	BPath targetPath;
+	status_t firstError = targetDirectory.InitCheck();
+	if (firstError == B_OK)
+		firstError = targetEntry.GetPath(&targetPath);
+
+	bool copy = false;
+	message->FindBool("copy", &copy);
+	for (int32 index = 0; firstError == B_OK; index++) {
+		entry_ref sourceRef;
+		if (message->FindRef("refs", index, &sourceRef) != B_OK)
+			break;
+		status_t error = TransferEntry(sourceRef, targetDirectory, targetPath,
+			copy, preserveExisting);
+		if (error != B_OK)
+			firstError = error;
+	}
+
+	if (firstError != B_OK) {
+		(new BAlert("Finder", "The item could not be moved or copied.",
+			"OK"))->Go();
+	}
+	be_app->PostMessage(kFinderRefreshAll);
+}
+
+
 class FolderView : public BView {
 public:
 	FolderView(BRect frame, const entry_ref& directory)
@@ -51,7 +189,9 @@ public:
 		BView(frame, "Folder icons", B_FOLLOW_ALL,
 			B_WILL_DRAW | B_FRAME_EVENTS | B_NAVIGABLE),
 		fDirectory(directory),
-		fIsBootVolumeRoot(false)
+		fIsBootVolumeRoot(false),
+		fTrackingDrag(false),
+		fPressedIndex(-1)
 	{
 		SetViewColor(255, 255, 255);
 		SetLowColor(255, 255, 255);
@@ -94,17 +234,31 @@ public:
 	{
 		MakeFocus(true);
 		int32 hit = _ItemAt(where);
+		int32 buttons = B_PRIMARY_MOUSE_BUTTON;
+		if (Window()->CurrentMessage() != NULL)
+			Window()->CurrentMessage()->FindInt32("buttons", &buttons);
+
+		if ((buttons & B_SECONDARY_MOUSE_BUTTON) != 0) {
+			if (hit >= 0 && !fItems[hit].selected) {
+				_ClearSelection();
+				fItems[hit].selected = true;
+				Invalidate();
+			}
+			_ShowContextMenu(where, hit);
+			return;
+		}
+		if ((buttons & B_PRIMARY_MOUSE_BUTTON) == 0)
+			return;
+
 		uint32 keyModifiers = modifiers();
 		bool extend = (keyModifiers & (B_COMMAND_KEY | B_SHIFT_KEY)) != 0;
 
-		if (!extend)
+		if (!extend && (hit < 0 || !fItems[hit].selected))
 			_ClearSelection();
-		if (hit >= 0) {
-			if (extend)
-				fItems[hit].selected = !fItems[hit].selected;
-			else
-				fItems[hit].selected = true;
-		}
+		if (hit >= 0 && extend)
+			fItems[hit].selected = !fItems[hit].selected;
+		else if (hit >= 0)
+			fItems[hit].selected = true;
 		Invalidate();
 
 		int32 clicks = 1;
@@ -114,7 +268,53 @@ public:
 			BMessage open(kOpenEntry);
 			open.AddInt32("index", hit);
 			Window()->PostMessage(&open);
+			return;
 		}
+
+		fTrackingDrag = hit >= 0 && fItems[hit].selected;
+		fPressedIndex = hit;
+		fDragStart = where;
+		if (fTrackingDrag)
+			SetMouseEventMask(B_POINTER_EVENTS, B_LOCK_WINDOW_FOCUS);
+	}
+
+	void MouseUp(BPoint where) override
+	{
+		fTrackingDrag = false;
+		fPressedIndex = -1;
+	}
+
+	void MouseMoved(BPoint where, uint32 transit,
+		const BMessage* dragMessage) override
+	{
+		if (!fTrackingDrag || dragMessage != NULL)
+			return;
+		if (fabsf(where.x - fDragStart.x) < 4
+			&& fabsf(where.y - fDragStart.y) < 4) {
+			return;
+		}
+
+		BMessage drag(kFinderDragEntries);
+		_AddSelectedRefs(drag);
+		drag.AddBool("copy", (modifiers() & B_OPTION_KEY) != 0);
+		BRect dragRect = fItems[fPressedIndex].cell;
+		fTrackingDrag = false;
+		DragMessage(&drag, dragRect, this);
+	}
+
+	void MessageReceived(BMessage* message) override
+	{
+		if (message->what == kFinderDragEntries && message->WasDropped()) {
+			entry_ref target = fDirectory;
+			BPoint point = message->DropPoint();
+			ConvertFromScreen(&point);
+			int32 hit = _ItemAt(point);
+			if (hit >= 0 && fItems[hit].isDirectory)
+				target = fItems[hit].ref;
+			TransferEntries(message, target);
+			return;
+		}
+		BView::MessageReceived(message);
 	}
 
 	void Refresh(const char* selectName = NULL)
@@ -153,6 +353,17 @@ public:
 		Invalidate();
 	}
 
+	void MoveSelectionToTrash()
+	{
+		BMessage move(kFinderDragEntries);
+		_AddSelectedRefs(move);
+		move.AddBool("copy", false);
+		BEntry trash("/boot/trash");
+		entry_ref trashRef;
+		if (trash.GetRef(&trashRef) == B_OK)
+			TransferEntries(&move, trashRef, true);
+	}
+
 	std::vector<int32> SelectedIndices() const
 	{
 		std::vector<int32> selected;
@@ -172,6 +383,37 @@ public:
 	}
 
 private:
+	void _AddSelectedRefs(BMessage& message) const
+	{
+		for (size_t index = 0; index < fItems.size(); index++) {
+			if (fItems[index].selected)
+				message.AddRef("refs", &fItems[index].ref);
+		}
+	}
+
+	void _ShowContextMenu(BPoint where, int32 hit)
+	{
+		BPopUpMenu* menu = new BPopUpMenu("", false, false);
+		if (hit >= 0) {
+			BMessage* open = new BMessage(kOpenEntry);
+			open->AddInt32("index", hit);
+			menu->AddItem(new BMenuItem("Open", open));
+			menu->AddSeparatorItem();
+			menu->AddItem(new BMenuItem("Move to Trash",
+				new BMessage(kFinderMoveToTrash)));
+		} else {
+			menu->AddItem(new BMenuItem("New Folder",
+				new BMessage(kOSTenNewFolder)));
+			menu->AddSeparatorItem();
+			menu->AddItem(new BMenuItem("Select All",
+				new BMessage(kOSTenSelectAll)));
+		}
+		menu->SetTargetForItems(Window());
+		menu->SetAsyncAutoDestruct(true);
+		ConvertToScreen(&where);
+		menu->Go(where, true, false, true);
+	}
+
 	bool _ShouldHide(const char* name) const
 	{
 		if (name[0] == '.')
@@ -288,6 +530,9 @@ private:
 private:
 	entry_ref				fDirectory;
 	bool					fIsBootVolumeRoot;
+	bool					fTrackingDrag;
+	int32					fPressedIndex;
+	BPoint					fDragStart;
 	std::vector<FinderItem>	fItems;
 };
 
@@ -403,6 +648,12 @@ public:
 			case kOSTenSelectAll:
 				fView->SelectAll();
 				return;
+			case kFinderMoveToTrash:
+				fView->MoveSelectionToTrash();
+				return;
+			case kFinderRefreshFolder:
+				fView->Refresh();
+				return;
 			case kOSTenViewAsIcons:
 				return;
 		}
@@ -515,6 +766,20 @@ public:
 			item = kBootVolumeItem;
 		else if (fTrashHitRect.Contains(where))
 			item = kTrashItem;
+		int32 buttons = B_PRIMARY_MOUSE_BUTTON;
+		if (Window()->CurrentMessage() != NULL)
+			Window()->CurrentMessage()->FindInt32("buttons", &buttons);
+
+		if ((buttons & B_SECONDARY_MOUSE_BUTTON) != 0) {
+			fDiskSelected = item == kBootVolumeItem;
+			fTrashSelected = item == kTrashItem;
+			Invalidate();
+			if (item != kNoDesktopItem)
+				_ShowContextMenu(where);
+			return;
+		}
+		if ((buttons & B_PRIMARY_MOUSE_BUTTON) == 0)
+			return;
 
 		bool extend = (modifiers() & (B_COMMAND_KEY | B_SHIFT_KEY)) != 0;
 		if (!extend) {
@@ -532,6 +797,30 @@ public:
 			Window()->CurrentMessage()->FindInt32("clicks", &clicks);
 		if (item != kNoDesktopItem && clicks >= 2)
 			_OpenItem(item);
+	}
+
+	void MessageReceived(BMessage* message) override
+	{
+		if (message->what == kFinderDragEntries && message->WasDropped()) {
+			BPoint point = message->DropPoint();
+			ConvertFromScreen(&point);
+			const char* targetPath = NULL;
+			bool preserveExisting = false;
+			if (fTrashHitRect.Contains(point)) {
+				targetPath = "/boot/trash";
+				preserveExisting = true;
+			} else if (fDiskHitRect.Contains(point))
+				targetPath = "/boot";
+
+			if (targetPath != NULL) {
+				BEntry target(targetPath);
+				entry_ref targetRef;
+				if (target.GetRef(&targetRef) == B_OK)
+					TransferEntries(message, targetRef, preserveExisting);
+			}
+			return;
+		}
+		BView::MessageReceived(message);
 	}
 
 	void OpenSelection()
@@ -554,6 +843,16 @@ public:
 	}
 
 private:
+	void _ShowContextMenu(BPoint where)
+	{
+		BPopUpMenu* menu = new BPopUpMenu("", false, false);
+		menu->AddItem(new BMenuItem("Open", new BMessage(kOSTenOpen)));
+		menu->SetTargetForItems(Window());
+		menu->SetAsyncAutoDestruct(true);
+		ConvertToScreen(&where);
+		menu->Go(where, true, false, true);
+	}
+
 	void _LayoutItems()
 	{
 		BRect bounds = Bounds();
@@ -706,6 +1005,11 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+		if (message->what == kFinderRefreshAll) {
+			for (int32 index = 0; BWindow* window = WindowAt(index); index++)
+				window->PostMessage(kFinderRefreshFolder);
+			return;
+		}
 		if (message->what == kFinderWindowActivated) {
 			BMessenger target;
 			if (message->FindMessenger("window", &target) == B_OK)

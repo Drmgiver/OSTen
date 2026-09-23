@@ -26,6 +26,13 @@ base while the OSTen user-facing system is developed.
 
 - Finder owns the spatial desktop and windows. Use a global menu bar, an
   Application menu, explicit Quit, and no Dock.
+- Treat a modern two-button mouse and scroll wheel as standard. Left-click
+  performs ordinary selection and direct manipulation; right-click opens a
+  contextual menu without requiring a keyboard modifier. Contextual menus may
+  accelerate work, but essential commands must remain available elsewhere.
+- Use direct file manipulation: dragging moves an item, Option-dragging copies
+  it, and dragging to Trash discards it. File replacement happens visibly at
+  the destination without an installer or a separate conflict-choice mode.
 - Show mounted disks on the desktop; eject disks by dragging to the Trash.
   Include aliases, seven labels, desktop printer icons, Find File, WindowShade,
   spring-loaded folders, and pop-up folders.

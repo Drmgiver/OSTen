@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 SubDir HAIKU_TOP src apps osten finder ;
 
-UsePrivateHeaders interface ;
+UsePrivateHeaders interface storage ;
 SubDirHdrs $(HAIKU_TOP) src apps osten ;
 
 Application OSTenFinder :
