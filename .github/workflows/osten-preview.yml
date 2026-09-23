@@ -85,6 +85,17 @@ jobs:
               image = Image.open(f'preview-boot/{name}.ppm').convert('RGB')
               image.save(f'preview-boot/{name}.png')
               print(f'{name}: {image.width}x{image.height}')
+
+          desktop = Image.open('preview-boot/screenshot.png').convert('RGB')
+          finder = Image.open('preview-boot/finder.png').convert('RGB')
+          desktop_white = sum(all(channel >= 235 for channel in pixel)
+              for pixel in desktop.getdata())
+          finder_white = sum(all(channel >= 235 for channel in pixel)
+              for pixel in finder.getdata())
+          added_white = finder_white - desktop_white
+          print(f'Finder added bright pixels: {added_white}')
+          if added_white < 50000:
+              raise SystemExit('Finder window did not appear in boot evidence')
           PY
           cp generated.x86_64/build-manifest.txt preview-boot/build-manifest.txt
 

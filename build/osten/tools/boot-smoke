@@ -53,11 +53,7 @@ kill -0 "$qemu_pid"
 printf 'screendump %s\n' "$output/screenshot.ppm" \
 	| socat -T 10 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
 test -s "$output/screenshot.ppm"
-for step in 1 2 3 4 5; do
-	printf 'mouse_move 116 -64\n' \
-		| socat -T 5 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
-done
-printf 'mouse_button 1\nmouse_button 0\nmouse_button 1\nmouse_button 0\n' \
+printf 'mouse_button 1\nmouse_button 0\nsendkey ret\n' \
 	| socat -T 5 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
 sleep "${OSTEN_FINDER_WAIT_SECONDS:-5}"
 kill -0 "$qemu_pid"
