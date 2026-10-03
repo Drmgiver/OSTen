@@ -510,6 +510,11 @@ public:
 		frame.InsetBy(7, 7);
 		fView = new FolderView(frame, directory);
 		AddChild(fView);
+
+		AddShortcut('O', B_COMMAND_KEY, new BMessage(kOSTenOpen));
+		AddShortcut('N', B_COMMAND_KEY, new BMessage(kOSTenNewFolder));
+		AddShortcut('W', B_COMMAND_KEY, new BMessage(kOSTenClose));
+		AddShortcut('A', B_COMMAND_KEY, new BMessage(kOSTenSelectAll));
 	}
 
 	void FrameMoved(BPoint newPosition) override

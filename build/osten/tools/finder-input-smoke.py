@@ -59,10 +59,48 @@ def screenshot(name):
     command('screendump', {'filename': str(output / f'{name}.ppm')})
 
 
-# Root folder context menu, then Applications and its test executable.
+# Root folder context menu, then exercise shortcuts in the focused
+# Applications Finder window.
 click(350, 320, 'right')
 screenshot('context-menu')
 key('esc')
+click(215, 95)
+key('ret')
+
+key('alt-n')
+screenshot('new-folder-shortcut')
+image = Image.open(output / 'new-folder-shortcut.ppm').convert('RGB')
+folder_area = image.crop((84, 85, 562, 438))
+yellow_pixels = sum(
+    r >= 220 and 160 <= g <= 230 and b <= 130
+    for r, g, b in folder_area.getdata()
+)
+if yellow_pixels < 300:
+    raise RuntimeError('Command-N did not create a folder in the focused window')
+
+key('alt-a')
+screenshot('select-all-shortcut')
+image = Image.open(output / 'select-all-shortcut.ppm').convert('RGB')
+folder_area = image.crop((84, 85, 562, 438))
+selected_pixels = sum(
+    r <= 10 and g <= 10 and 100 <= b <= 150
+    for r, g, b in folder_area.getdata()
+)
+if selected_pixels < 300:
+    raise RuntimeError('Command-A did not select the focused window contents')
+
+key('alt-w')
+time.sleep(2)
+screenshot('close-shortcut')
+closed = Image.open(output / 'close-shortcut.ppm').convert('RGB')
+root = Image.open(output / 'finder.ppm').convert('RGB')
+white_pixels = lambda image: sum(
+    r >= 235 and g >= 235 and b >= 235 for r, g, b in image.getdata()
+)
+if white_pixels(closed) > white_pixels(root) + 10000:
+    raise RuntimeError('Command-W did not close the focused Finder window')
+
+# Reopen Applications, then launch the native transfer test app with Command-O.
 click(215, 95)
 key('ret')
 click(135, 125)
