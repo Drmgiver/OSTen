@@ -1,0 +1,92 @@
+name: Verify saved OSTen preview
+
+on:
+  push:
+    branches: [osten/main]
+    paths:
+      - .github/workflows/osten-verify-preview.yml
+      - build/osten/tools/finder-input-smoke.py
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select a saved image with unchanged runtime sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p saved-preview
+          selected=false
+          for run_id in $(gh run list --workflow osten-preview.yml --branch osten/main \
+            --limit 10 --json databaseId --jq '.[].databaseId'); do
+            image_sha=$(gh run view "$run_id" --json headSha --jq '.headSha')
+            artifact_name="osten-preview-$image_sha"
+            available=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts" \
+              --jq ".artifacts[] | select(.name == \"$artifact_name\" and .expired == false) | .id")
+            if [ -z "$available" ]; then
+              continue
+            fi
+            gh api "repos/$GITHUB_REPOSITORY/compare/$image_sha...$GITHUB_SHA" > comparison.json
+            matches=$(jq '(.files | length) < 300 and
+              all(.files[]; .filename | startswith(".github/workflows/") or
+                startswith("docs/") or . == "build/osten/tools/boot-smoke" or
+                . == "build/osten/tools/finder-input-smoke.py")' comparison.json)
+            if [ "$matches" != true ]; then
+              continue
+            fi
+            gh run download "$run_id" -n "$artifact_name" --dir saved-preview
+            grep -Fx "OSTen=$image_sha" saved-preview/build-manifest.txt
+            grep -Fx 'transfer-tests=1' saved-preview/build-manifest.txt
+            printf 'verification_commit=%s\nimage_run=%s\n' "$GITHUB_SHA" "$run_id" \
+              >> saved-preview/build-manifest.txt
+            selected=true
+            break
+          done
+          if [ "$selected" != true ]; then
+            echo 'No saved test image matches the current runtime sources.' >&2
+            exit 1
+          fi
+
+      - name: Boot and exercise Finder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 socat python3-pil
+          OSTEN_TRANSFER_TESTS=1 bash build/osten/tools/boot-smoke \
+            saved-preview/osten-preview.image preview-boot
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          for name in ('welcome', 'screenshot', 'finder', 'context-menu', 'transfer-tests'):
+              image = Image.open(f'preview-boot/{name}.ppm').convert('RGB')
+              image.save(f'preview-boot/{name}.png')
+          desktop = Image.open('preview-boot/screenshot.png').convert('RGB')
+          finder = Image.open('preview-boot/finder.png').convert('RGB')
+          bright = lambda image: sum(all(c >= 235 for c in p) for p in image.getdata())
+          added = bright(finder) - bright(desktop)
+          print(f'Finder added bright pixels: {added}')
+          if added < 50000:
+              raise SystemExit('Finder window did not appear')
+          log = Path('preview-boot/serial.log').read_text(errors='replace')
+          if 'OSTEN_TRANSFER_TESTS_FAIL' in log or 'OSTEN_TRANSFER_TESTS_PASS 16' not in log:
+              print(log[-8000:])
+              raise SystemExit('Native Finder transfer tests did not all pass')
+          print(log[log.index('PASS move file'):])
+          PY
+          cp saved-preview/build-manifest.txt preview-boot/build-manifest.txt
+
+      - name: Save verified boot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osten-verified-boot-${{ github.sha }}
+          path: preview-boot/
+          if-no-files-found: warn
+          retention-days: 7
