@@ -63,7 +63,7 @@ def screenshot(name):
 click(350, 320, 'right')
 screenshot('context-menu')
 key('esc')
-click(110, 95)
+click(215, 95)
 key('alt-o')
 click(135, 125)
 key('alt-o')
