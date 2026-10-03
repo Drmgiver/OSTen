@@ -115,7 +115,20 @@ DecorManager::DecorManager()
 	fPreviewWindow(NULL),
 	fCurrentDecorPath("Default")
 {
-	_LoadSettingsFromDisk();
+	// Keep a saved choice authoritative. OSTen starts with the Mac OS
+	// Platinum decorator when this is a fresh user settings directory.
+	if (!_LoadSettingsFromDisk()) {
+		BPath path;
+		if (find_directory(B_SYSTEM_ADDONS_DIRECTORY, &path, true) == B_OK
+			&& path.Append("decorators/MacDecorator") == B_OK) {
+			status_t error = B_OK;
+			DecorAddOn* decorator = _LoadDecor(path.Path(), error);
+			if (decorator != NULL) {
+				fCurrentDecor = decorator;
+				fCurrentDecorPath = path.Path();
+			}
+		}
+	}
 }
 
 
