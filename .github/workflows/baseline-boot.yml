@@ -22,8 +22,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          run_id=$(gh run list --workflow baseline-image.yml --branch osten/main \
-            --limit 1 --json databaseId --jq '.[0].databaseId')
+          # A changed boot check needs a fresh baseline for this source commit.
+          # Both workflows start on the same push; wait for its run to appear.
+          run_id=
+          for attempt in {1..30}; do
+            run_id=$(gh run list --workflow baseline-image.yml --branch osten/main \
+              --limit 10 --json databaseId,headSha \
+              --jq ".[] | select(.headSha == \"$GITHUB_SHA\") | .databaseId" | head -n 1)
+            if [ -n "$run_id" ]; then
+              break
+            fi
+            sleep 10
+          done
           test -n "$run_id"
           echo "Waiting for baseline build $run_id"
           while true; do

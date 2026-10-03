@@ -6,6 +6,8 @@ on:
     branches: [osten/main]
     paths:
       - .github/workflows/baseline-image.yml
+      - .github/workflows/baseline-boot.yml
+      - build/osten/tools/boot-smoke
       - build/osten/tools/wget
 
 permissions:
