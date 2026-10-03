@@ -66,7 +66,9 @@ key('esc')
 click(215, 95)
 key('ret')
 click(135, 125)
-key('ret')
+# A focused Finder folder must route the global Command-O shortcut to its
+# selected item, not back to the desktop or the previously active window.
+key('alt-o')
 for attempt in range(30):
     log = (output / 'serial.log').read_text(errors='replace')
     if 'OSTEN_TRANSFER_TESTS_PASS 16' in log or 'OSTEN_TRANSFER_TESTS_FAIL' in log:
