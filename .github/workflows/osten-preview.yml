@@ -8,7 +8,6 @@ on:
       - build/jam/DefaultBuildProfiles
       - build/jam/images/definitions/common-tail
       - build/osten/tools/boot-smoke
-      - build/osten/tools/finder-input-smoke.py
       - data/launch/user
       - src/apps/Jamfile
       - src/apps/osten/**

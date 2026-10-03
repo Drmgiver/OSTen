@@ -64,9 +64,9 @@ click(350, 320, 'right')
 screenshot('context-menu')
 key('esc')
 click(215, 95)
-key('alt-o')
+key('ret')
 click(135, 125)
-key('alt-o')
+key('ret')
 for attempt in range(30):
     log = (output / 'serial.log').read_text(errors='replace')
     if 'OSTEN_TRANSFER_TESTS_PASS 16' in log or 'OSTEN_TRANSFER_TESTS_FAIL' in log:
