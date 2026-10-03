@@ -54,6 +54,7 @@ jobs:
             exit 1
           fi
 
+      # Enter opens the selection in the focused Finder icon view.
       - name: Boot and exercise Finder
         run: |
           sudo apt-get update
