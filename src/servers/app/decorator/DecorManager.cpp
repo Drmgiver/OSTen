@@ -115,9 +115,9 @@ DecorManager::DecorManager()
 	fPreviewWindow(NULL),
 	fCurrentDecorPath("Default")
 {
-	// Keep a saved choice authoritative. OSTen starts with the Mac OS
-	// Platinum decorator when this is a fresh user settings directory.
-	if (!_LoadSettingsFromDisk()) {
+	// Preserve saved third-party choices. The stock "Default" decorator
+	// is Haiku's yellow-tab chrome, so OSTen uses Mac OS Platinum instead.
+	if (!_LoadSettingsFromDisk() || fCurrentDecorPath == "Default") {
 		BPath path;
 		if (find_directory(B_SYSTEM_ADDONS_DIRECTORY, &path, true) == B_OK
 			&& path.Append("decorators/MacDecorator") == B_OK) {
