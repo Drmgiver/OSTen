@@ -1,0 +1,9 @@
+OSTen=16853e36c4394df8aa3d2bdca38e5a5470e5a6ed
+buildtools=8375c2dbeaf109c520798cb234d57f0895463201
+profile=nightly-osten-raw
+transfer-tests=1
+verification_commit=f0920877523bac23c556a66855787573aafd7ea6
+image_run=37152078823
+verification_run=37154388214
+baseline_image_run=37152227565
+baseline_boot_run=37152227519

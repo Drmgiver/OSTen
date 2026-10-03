@@ -1,0 +1,17 @@
+PASS move file
+PASS copy attributes
+PASS duplicate names
+PASS same folder move
+PASS trash collision
+PASS replace file
+PASS replace directory
+PASS move identity
+PASS failed copy preserves destination
+PASS reject self
+PASS reject descendant
+PASS reject ancestor replacement
+PASS reject aliased descendant
+PASS copy dangling link
+PASS missing source
+PASS sibling path prefix
+OSTEN_TRANSFER_TESTS_PASS 16
