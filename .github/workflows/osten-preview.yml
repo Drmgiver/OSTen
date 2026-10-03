@@ -8,6 +8,7 @@ on:
       - build/jam/DefaultBuildProfiles
       - build/jam/images/definitions/common-tail
       - build/osten/tools/boot-smoke
+      - build/osten/tools/finder-input-smoke.py
       - data/launch/user
       - src/apps/Jamfile
       - src/apps/osten/**
@@ -57,10 +58,10 @@ jobs:
         run: |
           cd generated.x86_64
           PATH="$(realpath ../build/osten/tools):$(realpath ../../host-tools/bin):$PATH" \
-            jam -q -j4 -sHAIKU_REVISION=osten-preview-e5a43367 @nightly-osten-raw
+            jam -q -j4 -sHAIKU_REVISION=osten-preview-e5a43367 -sOSTEN_TRANSFER_TESTS=1 @nightly-osten-raw
           test -s osten-preview.image
           sha256sum osten-preview.image
-          printf 'OSTen=%s\nbuildtools=%s\nprofile=nightly-osten-raw\n' \
+          printf 'OSTen=%s\nbuildtools=%s\nprofile=nightly-osten-raw\ntransfer-tests=1\n' \
             "$GITHUB_SHA" "$(git -C ../../buildtools rev-parse HEAD)" \
             > build-manifest.txt
 
@@ -77,11 +78,11 @@ jobs:
 
       - name: Boot preview image
         run: |
-          bash build/osten/tools/boot-smoke generated.x86_64/osten-preview.image preview-boot
+          OSTEN_TRANSFER_TESTS=1 bash build/osten/tools/boot-smoke generated.x86_64/osten-preview.image preview-boot
           /usr/bin/python3 - <<'PY'
           from PIL import Image
 
-          for name in ('welcome', 'screenshot', 'finder'):
+          for name in ('welcome', 'screenshot', 'finder', 'context-menu', 'transfer-tests'):
               image = Image.open(f'preview-boot/{name}.ppm').convert('RGB')
               image.save(f'preview-boot/{name}.png')
               print(f'{name}: {image.width}x{image.height}')
@@ -97,6 +98,7 @@ jobs:
           if added_white < 50000:
               raise SystemExit('Finder window did not appear in boot evidence')
           PY
+          rg "OSTEN_TRANSFER_TESTS_PASS 16" preview-boot/serial.log
           cp generated.x86_64/build-manifest.txt preview-boot/build-manifest.txt
 
       - name: Save preview boot evidence

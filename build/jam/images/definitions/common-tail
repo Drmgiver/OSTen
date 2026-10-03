@@ -60,6 +60,10 @@ if $(HAIKU_BUILD_PROFILE) = nightly-osten-raw {
 	AddDirectoryToHaikuImage "System Folder" Fonts ;
 	AddDirectoryToHaikuImage "System Folder" "Startup Items" ;
 	AddDirectoryToHaikuImage Applications ;
+	if $(OSTEN_TRANSFER_TESTS) = 1 {
+		AddFilesToHaikuImage Applications : OSTenTransferTests
+			: "Finder Transfer Tests" ;
+	}
 }
 
 

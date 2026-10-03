@@ -6,6 +6,7 @@ SubDirHdrs $(HAIKU_TOP) src apps osten ;
 
 Application OSTenFinder :
 	Finder.cpp
+	FileOperations.cpp
 	: be [ TargetLibstdc++ ]
 	: Finder.rdef
 ;

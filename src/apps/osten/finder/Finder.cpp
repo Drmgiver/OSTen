@@ -2,7 +2,6 @@
 
 #include <Alert.h>
 #include <Application.h>
-#include <CopyEngine.h>
 #include <Directory.h>
 #include <Entry.h>
 #include <InterfaceDefs.h>
@@ -12,7 +11,6 @@
 #include <Node.h>
 #include <Path.h>
 #include <PopUpMenu.h>
-#include <RemoveEngine.h>
 #include <Roster.h>
 #include <Screen.h>
 #include <StorageDefs.h>
@@ -27,6 +25,7 @@
 #include <vector>
 
 #include "OSTenMessages.h"
+#include "FileOperations.h"
 
 
 namespace {
@@ -53,115 +52,20 @@ struct FinderItem {
 };
 
 
-static bool
-PathContains(const BPath& directory, const BPath& entry)
-{
-	const char* directoryPath = directory.Path();
-	const char* entryPath = entry.Path();
-	size_t length = strlen(directoryPath);
-	return strncmp(directoryPath, entryPath, length) == 0
-		&& (entryPath[length] == '\0' || entryPath[length] == '/');
-}
-
-
-static void
-MakeUniqueName(BDirectory& directory, const char* original, BString& name)
-{
-	name = original;
-	if (!directory.Contains(name.String()))
-		return;
-
-	for (int32 suffix = 2; ; suffix++) {
-		name.SetToFormat("%s %ld", original, (long)suffix);
-		if (!directory.Contains(name.String()))
-			return;
-	}
-}
-
-
-static status_t
-TransferEntry(const entry_ref& sourceRef, BDirectory& targetDirectory,
-	const BPath& targetDirectoryPath, bool copy, bool preserveExisting)
-{
-	BEntry source(&sourceRef, false);
-	if (source.InitCheck() != B_OK)
-		return source.InitCheck();
-
-	BPath sourcePath;
-	status_t error = source.GetPath(&sourcePath);
-	if (error != B_OK)
-		return error;
-
-	if (source.IsDirectory() && PathContains(sourcePath, targetDirectoryPath))
-		return B_BAD_VALUE;
-
-	char originalName[B_FILE_NAME_LENGTH];
-	error = source.GetName(originalName);
-	if (error != B_OK)
-		return error;
-
-	BEntry parent;
-	error = source.GetParent(&parent);
-	if (error != B_OK)
-		return error;
-	BEntry targetDirectoryEntry;
-	error = targetDirectory.GetEntry(&targetDirectoryEntry);
-	if (error != B_OK)
-		return error;
-	bool sameDirectory = parent == targetDirectoryEntry;
-	if (sameDirectory && !copy)
-		return B_OK;
-
-	BString targetName(originalName);
-	if (copy && sameDirectory) {
-		BString copyName;
-		copyName.SetToFormat("%s copy", originalName);
-		MakeUniqueName(targetDirectory, copyName.String(), targetName);
-	} else if (preserveExisting)
-		MakeUniqueName(targetDirectory, originalName, targetName);
-
-	BPath destinationPath(targetDirectoryPath);
-	error = destinationPath.Append(targetName.String());
-	if (error != B_OK)
-		return error;
-
-	BEntry destination(destinationPath.Path(), false);
-	if (destination.Exists()) {
-		error = BRemoveEngine().RemoveEntry(destination);
-		if (error != B_OK)
-			return error;
-	}
-
-	if (copy) {
-		return BCopyEngine(BCopyEngine::COPY_RECURSIVELY
-			| BCopyEngine::UNLINK_DESTINATION).CopyEntry(sourcePath.Path(),
-				destinationPath.Path());
-	}
-
-	error = source.MoveTo(&targetDirectory, targetName.String(), true);
-	if (error != B_CROSS_DEVICE_LINK)
-		return error;
-
-	error = BCopyEngine(BCopyEngine::COPY_RECURSIVELY
-		| BCopyEngine::UNLINK_DESTINATION).CopyEntry(sourcePath.Path(),
-			destinationPath.Path());
-	if (error != B_OK)
-		return error;
-	return BRemoveEngine().RemoveEntry(source);
-}
-
-
 static void
 TransferEntries(const BMessage* message, const entry_ref& targetRef,
 	bool preserveExisting = false)
 {
 	BDirectory targetDirectory(&targetRef);
-	BEntry targetEntry(&targetRef);
+	BEntry targetEntry;
 	BPath targetPath;
 	status_t firstError = targetDirectory.InitCheck();
 	if (firstError == B_OK)
+		firstError = targetDirectory.GetEntry(&targetEntry);
+	if (firstError == B_OK)
 		firstError = targetEntry.GetPath(&targetPath);
 
+	BString recoveryPath;
 	bool copy = false;
 	message->FindBool("copy", &copy);
 	for (int32 index = 0; firstError == B_OK; index++) {
@@ -169,14 +73,19 @@ TransferEntries(const BMessage* message, const entry_ref& targetRef,
 		if (message->FindRef("refs", index, &sourceRef) != B_OK)
 			break;
 		status_t error = TransferEntry(sourceRef, targetDirectory, targetPath,
-			copy, preserveExisting);
+			copy, preserveExisting, &recoveryPath);
 		if (error != B_OK)
 			firstError = error;
 	}
 
 	if (firstError != B_OK) {
-		(new BAlert("Finder", "The item could not be moved or copied.",
-			"OK"))->Go();
+		BString explanation("The item could not be moved or copied.\n\n");
+		explanation << strerror(firstError);
+		if (!recoveryPath.IsEmpty()) {
+			explanation << "\n\nFiles were kept for recovery in:\n"
+				<< recoveryPath;
+		}
+		(new BAlert("Finder", explanation.String(), "OK"))->Go();
 	}
 	be_app->PostMessage(kFinderRefreshAll);
 }
@@ -319,6 +228,8 @@ public:
 
 	void Refresh(const char* selectName = NULL)
 	{
+		fTrackingDrag = false;
+		fPressedIndex = -1;
 		fItems.clear();
 		BDirectory contents(&fDirectory);
 		BEntry entry;
