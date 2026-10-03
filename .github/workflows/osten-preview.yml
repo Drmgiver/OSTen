@@ -11,6 +11,9 @@ on:
       - data/launch/user
       - src/apps/Jamfile
       - src/apps/osten/**
+      - src/add-ons/decorators/**
+      - src/servers/app/Jamfile
+      - src/servers/app/decorator/**
 
 permissions:
   contents: read
