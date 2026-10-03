@@ -99,6 +99,14 @@ jobs:
           print(f'Finder added bright pixels: {added_white}')
           if added_white < 50000:
               raise SystemExit('Finder window did not appear in boot evidence')
+          title_bar = finder.crop((175, 31, 530, 56))
+          platinum_pixels = sum(
+              max(pixel) - min(pixel) <= 8 and min(pixel) >= 160
+              for pixel in title_bar.getdata()
+          )
+          print(f'Finder Platinum title-bar pixels: {platinum_pixels}')
+          if platinum_pixels < 4000:
+              raise SystemExit('Finder is still using the yellow-tab decorator')
           PY
           grep -F "OSTEN_TRANSFER_TESTS_PASS 16" preview-boot/serial.log
           cp generated.x86_64/build-manifest.txt preview-boot/build-manifest.txt
