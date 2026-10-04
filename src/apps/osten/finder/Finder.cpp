@@ -404,38 +404,71 @@ private:
 		DrawString(display.String(), BPoint(textX, baseline));
 	}
 
+	// Classic Finder folders use a clear tab, a pale face, and a narrow
+	// shaded edge so the shape stays readable at the small icon size.
 	void _DrawFolderIcon(BRect rect)
 	{
-		SetHighColor(35, 35, 35);
-		FillRect(BRect(rect.left + 2, rect.top + 7, rect.right,
-			rect.bottom));
-		FillRect(BRect(rect.left + 6, rect.top + 2, rect.left + 20,
+		BRect body(rect.left + 2, rect.top + 8, rect.right - 1,
+			rect.bottom - 2);
+		BRect tab(rect.left + 3, rect.top + 3, rect.left + 20,
+			rect.top + 11);
+
+		SetHighColor(48, 42, 31);
+		FillRect(body);
+		FillRect(tab);
+
+		SetHighColor(217, 180, 97);
+		FillRect(BRect(rect.left + 4, rect.top + 10, rect.right - 3,
+			rect.bottom - 4));
+		FillRect(BRect(rect.left + 5, rect.top + 5, rect.left + 18,
 			rect.top + 9));
-		SetHighColor(242, 206, 82);
-		FillRect(BRect(rect.left + 4, rect.top + 9, rect.right - 2,
-			rect.bottom - 2));
-		FillRect(BRect(rect.left + 8, rect.top + 4, rect.left + 19,
-			rect.top + 9));
-		SetHighColor(255, 231, 137);
-		StrokeLine(BPoint(rect.left + 6, rect.top + 11),
-			BPoint(rect.right - 4, rect.top + 11));
+
+		SetHighColor(248, 226, 166);
+		FillRect(BRect(rect.left + 5, rect.top + 11, rect.right - 5,
+			rect.top + 13));
+		SetHighColor(234, 203, 128);
+		FillRect(BRect(rect.left + 5, rect.top + 14, rect.right - 5,
+			rect.bottom - 7));
+		SetHighColor(190, 145, 66);
+		FillRect(BRect(rect.right - 5, rect.top + 13, rect.right - 3,
+			rect.bottom - 4));
+		FillRect(BRect(rect.left + 4, rect.bottom - 5, rect.right - 3,
+			rect.bottom - 4));
+
+		SetHighColor(72, 59, 37);
+		StrokeLine(BPoint(rect.left + 4, rect.top + 9),
+			BPoint(rect.left + 19, rect.top + 9));
+		StrokeLine(BPoint(rect.left + 20, rect.top + 10),
+			BPoint(rect.right - 3, rect.top + 10));
 	}
 
+	// A folded-corner paper icon is the neutral Macintosh document symbol.
 	void _DrawFileIcon(BRect rect)
 	{
-		SetHighColor(35, 35, 35);
-		FillRect(BRect(rect.left + 7, rect.top, rect.right - 5,
-			rect.bottom));
-		SetHighColor(244, 244, 244);
-		FillRect(BRect(rect.left + 9, rect.top + 2, rect.right - 7,
-			rect.bottom - 2));
-		SetHighColor(110, 110, 110);
-		StrokeLine(BPoint(rect.left + 13, rect.top + 11),
-			BPoint(rect.right - 11, rect.top + 11));
-		StrokeLine(BPoint(rect.left + 13, rect.top + 17),
-			BPoint(rect.right - 11, rect.top + 17));
-		StrokeLine(BPoint(rect.left + 13, rect.top + 23),
-			BPoint(rect.right - 15, rect.top + 23));
+		SetHighColor(48, 42, 31);
+		FillRect(BRect(rect.left + 6, rect.top + 1, rect.right - 5,
+			rect.bottom - 1));
+		SetHighColor(249, 247, 237);
+		FillRect(BRect(rect.left + 8, rect.top + 3, rect.right - 7,
+			rect.bottom - 3));
+		SetHighColor(207, 202, 186);
+		FillRect(BRect(rect.right - 13, rect.top + 3, rect.right - 8,
+			rect.top + 8));
+		SetHighColor(48, 42, 31);
+		StrokeLine(BPoint(rect.right - 13, rect.top + 3),
+			BPoint(rect.right - 13, rect.top + 8));
+		StrokeLine(BPoint(rect.right - 13, rect.top + 8),
+			BPoint(rect.right - 8, rect.top + 8));
+
+		SetHighColor(139, 133, 117);
+		StrokeLine(BPoint(rect.left + 11, rect.top + 13),
+			BPoint(rect.right - 11, rect.top + 13));
+		StrokeLine(BPoint(rect.left + 11, rect.top + 18),
+			BPoint(rect.right - 11, rect.top + 18));
+		StrokeLine(BPoint(rect.left + 11, rect.top + 23),
+			BPoint(rect.right - 13, rect.top + 23));
+		StrokeLine(BPoint(rect.left + 11, rect.top + 28),
+			BPoint(rect.right - 11, rect.top + 28));
 	}
 
 private:
@@ -796,33 +829,58 @@ private:
 		DrawString(label, BPoint(x, y));
 	}
 
+	// The startup volume is drawn as a compact beige external hard drive.
 	void _DrawDisk(BRect rect, bool selected)
 	{
-		SetHighColor(40, 40, 40);
-		FillRoundRect(rect, 4, 4);
-		SetHighColor(224, 224, 224);
-		BRect face = rect.InsetByCopy(2, 2);
-		FillRoundRect(face, 3, 3);
-		SetHighColor(90, 90, 90);
-		StrokeLine(BPoint(face.left + 4, face.top + 7),
-			BPoint(face.right - 4, face.top + 7));
-		SetHighColor(0, 0, 0);
-		FillRect(BRect(face.right - 6, face.bottom - 5,
-			face.right - 3, face.bottom - 2));
+		SetHighColor(48, 42, 31);
+		FillRoundRect(rect, 3, 3);
+		BRect caseFace = rect.InsetByCopy(1, 1);
+		SetHighColor(227, 224, 211);
+		FillRoundRect(caseFace, 2, 2);
+		SetHighColor(250, 248, 238);
+		FillRect(BRect(caseFace.left + 2, caseFace.top + 2,
+			caseFace.right - 2, caseFace.top + 7));
+		SetHighColor(183, 180, 167);
+		FillRect(BRect(caseFace.left + 2, caseFace.top + 9,
+			caseFace.right - 2, caseFace.bottom - 2));
+		SetHighColor(91, 89, 79);
+		StrokeLine(BPoint(caseFace.left + 2, caseFace.top + 8),
+			BPoint(caseFace.right - 2, caseFace.top + 8));
+		StrokeLine(BPoint(caseFace.left + 3, caseFace.bottom - 5),
+			BPoint(caseFace.right - 3, caseFace.bottom - 5));
+		SetHighColor(45, 53, 47);
+		FillRect(BRect(caseFace.right - 7, caseFace.bottom - 4,
+			caseFace.right - 4, caseFace.bottom - 2));
+		SetHighColor(112, 137, 91);
+		FillRect(BRect(caseFace.right - 6, caseFace.bottom - 4,
+			caseFace.right - 5, caseFace.bottom - 3));
 		_DrawLabel("OSTen", fDiskHitRect, selected);
 	}
 
+	// A wire basket and overhanging lid give Trash its familiar Finder shape.
 	void _DrawTrash(BRect rect, bool selected)
 	{
-		SetHighColor(30, 30, 30);
-		StrokeRect(BRect(rect.left + 3, rect.top + 7,
-			rect.right - 3, rect.bottom));
-		StrokeLine(BPoint(rect.left, rect.top + 6),
-			BPoint(rect.right, rect.top + 6));
-		StrokeLine(BPoint(rect.left + 8, rect.top + 2),
-			BPoint(rect.right - 8, rect.top + 2));
-		for (float x = rect.left + 9; x < rect.right; x += 7)
+		SetHighColor(48, 42, 31);
+		FillRect(BRect(rect.left + 2, rect.top + 7, rect.right - 2,
+			rect.bottom - 1));
+		SetHighColor(225, 222, 207);
+		FillRect(BRect(rect.left + 4, rect.top + 9, rect.right - 4,
+			rect.bottom - 3));
+		SetHighColor(48, 42, 31);
+		FillRect(BRect(rect.left, rect.top + 5, rect.right, rect.top + 7));
+		FillRect(BRect(rect.left + 7, rect.top + 2, rect.right - 7,
+			rect.top + 4));
+		FillRect(BRect(rect.left + 10, rect.top, rect.right - 10,
+			rect.top + 1));
+
+		SetHighColor(126, 123, 110);
+		for (float x = rect.left + 7; x <= rect.right - 7; x += 5)
 			StrokeLine(BPoint(x, rect.top + 11), BPoint(x, rect.bottom - 4));
+		for (float y = rect.top + 13; y <= rect.bottom - 5; y += 5)
+			StrokeLine(BPoint(rect.left + 5, y), BPoint(rect.right - 5, y));
+		SetHighColor(250, 248, 238);
+		StrokeLine(BPoint(rect.left + 4, rect.top + 9),
+			BPoint(rect.left + 4, rect.bottom - 4));
 		_DrawLabel("Trash", fTrashHitRect, selected);
 	}
 
