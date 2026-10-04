@@ -104,7 +104,7 @@ if white_pixels(closed) > white_pixels(root) + 10000:
 # Reopen Applications, then launch the native transfer test app with Command-O.
 click(215, 95)
 key('ret')
-click(135, 125)
+click(150, 128)
 # A focused Finder folder must route the global Command-O shortcut to its
 # selected item, not back to the desktop or the previously active window.
 key('alt-o')
@@ -114,4 +114,6 @@ for attempt in range(30):
         break
     time.sleep(1)
 screenshot('transfer-tests')
+if 'OSTEN_TRANSFER_TESTS_PASS 16' not in log:
+    raise RuntimeError('Native transfer tests did not pass:\\n' + log[-8000:])
 connection.close()
