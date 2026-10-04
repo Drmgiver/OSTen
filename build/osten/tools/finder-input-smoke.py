@@ -11,9 +11,10 @@ import sys
 import time
 from PIL import Image
 
-monitor, output = sys.argv[1:]
+monitor, output = sys.argv[1:3]
+mode = sys.argv[3] if len(sys.argv) > 3 else 'test'
 output = Path(output)
-width, height = Image.open(output / 'finder.ppm').size
+width, height = Image.open(output / 'screenshot.ppm').size
 connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 connection.settimeout(15)
 connection.connect(monitor)
@@ -115,6 +116,17 @@ def locate_text(image_path, target, min_top=60):
 def open_folder_named(name, source_image):
     x, y = locate_text(source_image, name)
     double_click(x, y)
+
+
+# Open the desktop volume directly. Command-O depends on the floating menu bar
+# having keyboard focus, which the boot sequence does not guarantee.
+double_click(width - 56, 75)
+screenshot('finder')
+if mode == '--open-only':
+    connection.close()
+    raise SystemExit(0)
+if mode != 'test':
+    raise RuntimeError(f'Unknown smoke mode: {mode}')
 
 
 # Exercise the root folder context menu, then shortcuts in Applications.

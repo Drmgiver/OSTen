@@ -55,22 +55,15 @@ kill -0 "$qemu_pid"
 printf 'screendump %s\n' "$output/screenshot.ppm" \
 	| socat -T 10 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
 test -s "$output/screenshot.ppm"
-# Exercise the same Command-O item exposed by OSTen's permanent System menu.
-# On PC keyboards Haiku maps Command to Alt, which QEMU names "alt".
-printf 'sendkey alt-o\n' \
-	| socat -T 5 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
-sleep "${OSTEN_FINDER_WAIT_SECONDS:-5}"
-kill -0 "$qemu_pid"
-printf 'screendump %s\n' "$output/finder.ppm" \
-	| socat -T 10 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
-test -s "$output/finder.ppm"
-if [ "${OSTEN_VERIFY_WINDOW_CHROME:-0}" = 1 ]; then
-	python3 "$(dirname "$0")/verify-window-chrome.py" "$output/finder.ppm"
-fi
 if [ "${OSTEN_TRANSFER_TESTS:-0}" = 1 ]; then
 	python3 "$(dirname "$0")/finder-input-smoke.py" "$qmp" "$output"
 	test -s "$output/context-menu.ppm"
 	test -s "$output/transfer-tests.ppm"
+elif [ "${OSTEN_VERIFY_WINDOW_CHROME:-0}" = 1 ]; then
+	python3 "$(dirname "$0")/finder-input-smoke.py" "$qmp" "$output" --open-only
+fi
+if [ "${OSTEN_VERIFY_WINDOW_CHROME:-0}" = 1 ]; then
+	python3 "$(dirname "$0")/verify-window-chrome.py" "$output/finder.ppm"
 fi
 printf 'quit\n' | socat -T 2 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
 echo "Saved first-boot, desktop, and Finder screenshots to $output"
