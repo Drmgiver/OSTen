@@ -64,6 +64,9 @@ kill -0 "$qemu_pid"
 printf 'screendump %s\n' "$output/finder.ppm" \
 	| socat -T 10 - "UNIX-CONNECT:$monitor" >> "$output/monitor.log"
 test -s "$output/finder.ppm"
+if [ "${OSTEN_VERIFY_WINDOW_CHROME:-0}" = 1 ]; then
+	python3 "$(dirname "$0")/verify-window-chrome.py" "$output/finder.ppm"
+fi
 if [ "${OSTEN_TRANSFER_TESTS:-0}" = 1 ]; then
 	python3 "$(dirname "$0")/finder-input-smoke.py" "$qmp" "$output"
 	test -s "$output/context-menu.ppm"

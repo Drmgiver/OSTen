@@ -142,18 +142,28 @@ DecorManager::InitializeDefaultDecorator()
 		return;
 	}
 
-	BPath path;
-	status_t error = find_directory(B_SYSTEM_ADDONS_DIRECTORY, &path, true);
-	if (error == B_OK)
-		error = path.Append("decorators");
-	if (error == B_OK)
-		error = path.Append("MacDecorator");
+	const directory_which addOnDirectories[] = {
+		B_SYSTEM_NONPACKAGED_ADDONS_DIRECTORY,
+		B_SYSTEM_ADDONS_DIRECTORY
+	};
+	status_t error = B_ENTRY_NOT_FOUND;
 	DecorAddOn* decorator = NULL;
-	if (error == B_OK)
-		decorator = _LoadDecor(path.Path(), error);
+	BString decoratorPath;
+	for (int32 i = 0; i < 2 && decorator == NULL; i++) {
+		BPath path;
+		error = find_directory(addOnDirectories[i], &path, true);
+		if (error == B_OK)
+			error = path.Append("decorators");
+		if (error == B_OK)
+			error = path.Append("MacDecorator");
+		if (error == B_OK)
+			decorator = _LoadDecor(path.Path(), error);
+		if (decorator != NULL)
+			decoratorPath = path.Path();
+	}
 	if (decorator != NULL) {
 		fCurrentDecor = decorator;
-		fCurrentDecorPath = path.Path();
+		fCurrentDecorPath = decoratorPath;
 		fOstenDefaultChecked = true;
 		_SaveSettingsToDisk();
 	} else {

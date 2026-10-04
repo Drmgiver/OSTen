@@ -9,6 +9,7 @@ on:
       - build/jam/images/definitions/common-tail
       - build/osten/tools/boot-smoke
       - build/osten/tools/finder-input-smoke.py
+      - build/osten/tools/verify-window-chrome.py
       - data/launch/user
       - src/apps/Jamfile
       - src/apps/osten/**
@@ -34,7 +35,7 @@ jobs:
             build-essential bison flex texinfo autoconf automake gawk nasm \
             wget zip unzip xorriso mtools python3 pkg-config zlib1g-dev \
             libzstd-dev libgmp-dev libmpfr-dev libmpc-dev qemu-system-x86 \
-            socat python3-pil
+            socat python3-pil tesseract-ocr
 
       - name: Check out Haiku buildtools
         run: |
@@ -82,7 +83,7 @@ jobs:
 
       - name: Boot preview image
         run: |
-          OSTEN_TRANSFER_TESTS=1 bash build/osten/tools/boot-smoke generated.x86_64/osten-preview.image preview-boot
+          OSTEN_TRANSFER_TESTS=1 OSTEN_VERIFY_WINDOW_CHROME=1 bash build/osten/tools/boot-smoke generated.x86_64/osten-preview.image preview-boot
           /usr/bin/python3 - <<'PY'
           from PIL import Image
 
@@ -101,21 +102,7 @@ jobs:
           print(f'Finder added bright pixels: {added_white}')
           if added_white < 50000:
               raise SystemExit('Finder window did not appear in boot evidence')
-          active_tab = finder.crop((84, 57, 235, 84))
-          yellow_pixels = sum(
-              r >= 220 and 160 <= g <= 230 and b <= 130
-              for r, g, b in active_tab.getdata()
-          )
-          platinum_pixels = sum(
-              max(pixel) - min(pixel) <= 8 and min(pixel) >= 160
-              for pixel in active_tab.getdata()
-          )
-          print(f'Finder active-tab yellow pixels: {yellow_pixels}')
-          print(f'Finder Platinum title-bar pixels: {platinum_pixels}')
-          if yellow_pixels > 300:
-              raise SystemExit('Finder is still using the yellow-tab decorator')
-          if platinum_pixels < 1800:
-              raise SystemExit('Finder Platinum title bar did not appear')
+          # The smoke script verifies the title bar before its input tests.
           PY
           grep -F "OSTEN_TRANSFER_TESTS_PASS 16" preview-boot/serial.log
           cp generated.x86_64/build-manifest.txt preview-boot/build-manifest.txt
