@@ -506,6 +506,9 @@ Desktop::Init()
 
 	fSettings.SetTo(new DesktopSettingsPrivate(fServerReadOnlyMemory));
 
+	// Select OSTen's stock window chrome before any application windows open.
+	gDecorManager.InitializeDefaultDecorator();
+
 	for (int32 i = 0; i < kMaxWorkspaces; i++) {
 		_Windows(i).SetIndex(i);
 		fWorkspaces[i].RestoreConfiguration(*fSettings->WorkspacesMessage(i));

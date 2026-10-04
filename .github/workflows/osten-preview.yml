@@ -14,6 +14,7 @@ on:
       - src/apps/osten/**
       - src/add-ons/decorators/**
       - src/servers/app/Jamfile
+      - src/servers/app/Desktop.cpp
       - src/servers/app/decorator/**
 
 permissions:

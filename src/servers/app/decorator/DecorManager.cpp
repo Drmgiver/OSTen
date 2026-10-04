@@ -127,44 +127,49 @@ DecorManager::~DecorManager()
 }
 
 
+void
+DecorManager::InitializeDefaultDecorator()
+{
+	if (fOstenDefaultChecked)
+		return;
+
+	bool useOstenDefault = fCurrentDecorPath == "Default"
+		|| fCurrentDecorPath == "BeDecorator"
+		|| fCurrentDecorPath.EndsWith("/BeDecorator");
+	if (!useOstenDefault) {
+		// A user-selected decorator takes precedence over OSTen's default.
+		fOstenDefaultChecked = true;
+		return;
+	}
+
+	BPath path;
+	status_t error = find_directory(B_SYSTEM_ADDONS_DIRECTORY, &path, true);
+	if (error == B_OK)
+		error = path.Append("decorators");
+	if (error == B_OK)
+		error = path.Append("MacDecorator");
+	DecorAddOn* decorator = NULL;
+	if (error == B_OK)
+		decorator = _LoadDecor(path.Path(), error);
+	if (decorator != NULL) {
+		fCurrentDecor = decorator;
+		fCurrentDecorPath = path.Path();
+		fOstenDefaultChecked = true;
+		_SaveSettingsToDisk();
+	} else {
+		// Keep the check pending so early window allocations can retry.
+		syslog(LOG_WARNING,
+			"app_server: can't load OSTen Mac OS Platinum "
+			"decorator (status %ld)", (long)error);
+	}
+}
+
+
 Decorator*
 DecorManager::AllocateDecorator(Window* window)
 {
-	// The default decorator add-on may not be available during static
-	// app_server initialization. Load OSTen's Mac OS Platinum decorator on
-	// the first real window allocation instead.
-	if (!fOstenDefaultChecked) {
-		bool useOstenDefault = fCurrentDecorPath == "Default"
-			|| fCurrentDecorPath == "BeDecorator"
-			|| fCurrentDecorPath.EndsWith("/BeDecorator");
-		if (!useOstenDefault) {
-			// A user-selected decorator takes precedence over OSTen's default.
-			fOstenDefaultChecked = true;
-		} else {
-			BPath path;
-			status_t error = find_directory(B_SYSTEM_ADDONS_DIRECTORY,
-				&path, true);
-			if (error == B_OK)
-				error = path.Append("decorators");
-			if (error == B_OK)
-				error = path.Append("MacDecorator");
-			DecorAddOn* decorator = NULL;
-			if (error == B_OK)
-				decorator = _LoadDecor(path.Path(), error);
-			if (decorator != NULL) {
-				fCurrentDecor = decorator;
-				fCurrentDecorPath = path.Path();
-				fOstenDefaultChecked = true;
-				_SaveSettingsToDisk();
-			} else {
-				// Keep retrying on the next window allocation. The add-on
-				// may not be ready during early app_server startup.
-				syslog(LOG_WARNING,
-					"app_server: can't load OSTen Mac OS Platinum "
-					"decorator (status %ld)", (long)error);
-			}
-		}
-	}
+	// Also retry here in case the add-on wasn't ready during Desktop::Init.
+	InitializeDefaultDecorator();
 
 	// Create a new instance of the current decorator.
 	// Ownership is that of the caller

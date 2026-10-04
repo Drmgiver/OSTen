@@ -68,6 +68,7 @@ public:
 								DecorManager();
 								~DecorManager();
 
+			void				InitializeDefaultDecorator();
 			Decorator*			AllocateDecorator(Window *window);
 			WindowBehaviour*	AllocateWindowBehaviour(Window *window);
 			void				CleanupForWindow(Window *window);
