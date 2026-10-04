@@ -91,6 +91,7 @@ private:
 
 			Window*				fPreviewWindow;
 			BString				fCurrentDecorPath;
+			bool				fOstenDefaultChecked;
 };
 
 extern DecorManager gDecorManager;
