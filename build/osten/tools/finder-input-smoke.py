@@ -171,7 +171,9 @@ if white_pixels(closed) > white_pixels(opened) + 10000:
     raise RuntimeError('Command-W did not close the focused Finder window')
 
 screenshot('root-after-close')
-open_folder_named('Applications', output / 'root-after-close.ppm')
+# Applications remains selected in the parent window after Command-W.
+# Double-click its stable icon cell; reverse-video text is unreliable for OCR.
+double_click(215, 135)
 screenshot('applications-reopened')
 # Select the native test app by its visible label, then open it with Command-O.
 x, y = locate_text(output / 'applications-reopened.ppm', 'Finder')

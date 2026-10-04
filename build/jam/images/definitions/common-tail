@@ -33,6 +33,8 @@ AddDirectoryToHaikuImage system non-packaged data fonts ;
 AddDirectoryToHaikuImage system non-packaged lib ;
 AddDirectoryToHaikuImage system non-packaged add-ons control_look ;
 AddDirectoryToHaikuImage system non-packaged add-ons decorators ;
+AddFilesToHaikuImage system non-packaged add-ons decorators
+	: MacDecorator ;
 AddDirectoryToHaikuImage system non-packaged add-ons opengl ;
 AddDirectoryToHaikuImage system non-packaged add-ons kernel drivers bin ;
 AddDirectoryToHaikuImage system non-packaged add-ons kernel drivers dev ;
