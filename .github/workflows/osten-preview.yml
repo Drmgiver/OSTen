@@ -99,7 +99,7 @@ jobs:
           print(f'Finder added bright pixels: {added_white}')
           if added_white < 50000:
               raise SystemExit('Finder window did not appear in boot evidence')
-          title_bar = finder.crop((175, 31, 530, 56))
+          title_bar = finder.crop((175, 60, 530, 85))
           platinum_pixels = sum(
               max(pixel) - min(pixel) <= 8 and min(pixel) >= 160
               for pixel in title_bar.getdata()

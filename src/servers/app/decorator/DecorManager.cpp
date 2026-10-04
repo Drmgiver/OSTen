@@ -115,12 +115,18 @@ DecorManager::DecorManager()
 	fPreviewWindow(NULL),
 	fCurrentDecorPath("Default")
 {
-	// Preserve saved third-party choices. The stock "Default" decorator
-	// is Haiku's yellow-tab chrome, so OSTen uses Mac OS Platinum instead.
-	if (!_LoadSettingsFromDisk() || fCurrentDecorPath == "Default") {
+	// Preserve saved third-party choices. The stock "Default" and
+	// "BeDecorator" selections use Haiku's yellow-tab chrome, so OSTen uses
+	// Mac OS Platinum for either stock selection.
+	bool settingsLoaded = _LoadSettingsFromDisk();
+	bool useOstenDefault = fCurrentDecorPath == "Default"
+		|| fCurrentDecorPath == "BeDecorator"
+		|| fCurrentDecorPath.EndsWith("/BeDecorator");
+	if (!settingsLoaded || useOstenDefault) {
 		BPath path;
 		if (find_directory(B_SYSTEM_ADDONS_DIRECTORY, &path, true) == B_OK
-			&& path.Append("decorators/MacDecorator") == B_OK) {
+			&& path.Append("decorators") == B_OK
+			&& path.Append("MacDecorator") == B_OK) {
 			status_t error = B_OK;
 			DecorAddOn* decorator = _LoadDecor(path.Path(), error);
 			if (decorator != NULL) {

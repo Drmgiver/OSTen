@@ -66,6 +66,7 @@ screenshot('context-menu')
 key('esc')
 click(215, 95)
 key('ret')
+screenshot('finder')
 
 key('alt-n')
 screenshot('new-folder-shortcut')
