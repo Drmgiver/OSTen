@@ -186,6 +186,29 @@ static bool SiblingPrefix() {
  CHECK(w.Has("item2/item/file", "keep me")); return true;
 }
 
+static bool SystemFolderPathBoundaries() {
+ CHECK(IsOSTenSystemFolderPath(BPath("/boot/System Folder")));
+ CHECK(IsOSTenSystemFolderPath(BPath("/boot/System Folder/Extensions")));
+ CHECK(!IsOSTenSystemFolderPath(BPath("/boot/System Folder Backup")));
+ CHECK(!IsOSTenSystemFolderPath(BPath("/boot/home")));
+ return true;
+}
+static bool SystemFolderTransferPolicy() {
+ BPath system("/boot/System Folder");
+ BPath extension("/boot/System Folder/Extensions/test");
+ BPath other("/boot/home/test");
+ BPath outside("/boot/trash/test");
+ CHECK(!MayTransferSystemFolderItem(system, outside, false, false));
+ CHECK(!MayTransferSystemFolderItem(extension, outside, false, false));
+ CHECK(!MayTransferSystemFolderItem(other, extension, true, false));
+ CHECK(!MayTransferSystemFolderItem(other, system, false, false));
+ CHECK(MayTransferSystemFolderItem(extension, outside, true, false));
+ CHECK(MayTransferSystemFolderItem(other, outside, false, false));
+ CHECK(MayTransferSystemFolderItem(system, outside, false, true));
+ CHECK(MayTransferSystemFolderItem(other, extension, true, true));
+ return true;
+}
+
 struct Test { const char* name; bool (*run)(); };
 class TestApp : public BApplication {
 public:
@@ -201,7 +224,9 @@ public:
    {"reject ancestor replacement", RejectAncestorReplacement},
    {"reject aliased descendant", RejectAliasedDescendant},
    {"copy dangling link", CopyDanglingLink}, {"missing source", MissingSource},
-   {"sibling path prefix", SiblingPrefix}
+   {"sibling path prefix", SiblingPrefix},
+   {"system folder path boundaries", SystemFolderPathBoundaries},
+   {"system folder transfer policy", SystemFolderTransferPolicy}
   };
   BString report; int failures = 0;
   for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
@@ -209,7 +234,7 @@ public:
    report << (passed ? "PASS " : "FAIL ") << tests[i].name << "\n";
    if (!passed) { failures++; report << sFailure << "\n"; }
   }
-  report << (failures == 0 ? "OSTEN_TRANSFER_TESTS_PASS 16\n"
+  report << (failures == 0 ? "OSTEN_TRANSFER_TESTS_PASS 18\n"
    : "OSTEN_TRANSFER_TESTS_FAIL\n");
   BFile log("/boot/home/Finder transfer test results.txt",
    B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
@@ -217,7 +242,7 @@ public:
   // Haiku routes debug output to QEMU's kernel serial log.
   debug_printf("%s", report.String());
   (new BAlert("Finder transfer tests", failures == 0
-   ? "PASS: All 16 native Finder transfer tests passed."
+   ? "PASS: All 18 native Finder tests passed."
    : report.String(), "OK"))->Go();
   PostMessage(B_QUIT_REQUESTED);
  }
