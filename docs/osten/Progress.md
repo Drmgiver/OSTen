@@ -64,7 +64,9 @@ missing sources, and sibling path prefixes.
 
 The `OSTEN_TRANSFER_TESTS=1` image flag includes a visible test application in
 Applications. The preview workflow enables it. Native output reaches QEMU's
-serial log through Haiku debug output; require `OSTEN_TRANSFER_TESTS_PASS 16`.
+serial log through Haiku debug output. Run 27 verified the 16-case marker;
+the new, pending-verification Owner policy increment requires
+`OSTEN_TRANSFER_TESTS_PASS 18`.
 
 `osten-verify-preview.yml` can retest a saved image when only documentation,
 workflows, or boot input helpers changed. It rejects reuse if runtime files
