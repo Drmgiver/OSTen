@@ -76,17 +76,20 @@ commit whenever the baseline boot check changes, avoiding expired old artifacts.
 
 ## Exact next step
 
-The frozen filesystem review/build/boot increment is complete. Continue with
-Finder interaction polish, then System Folder protection:
+The Finder interaction increment is verified by Run 27 and independent
+verification #13. The next System Folder protection increment is committed but
+NOT yet verified on a booted image:
 
-1. Repair global Command-O/New Folder/Close/Select All shortcuts when a Finder
-   folder owns keyboard focus. Initial Command-O opens the root, but subsequent
-   focused-folder Command-O did not open its selection in QEMU. Enter did.
-2. Hide the implementation folder `_packages_` in the boot-volume view. The
-   current hide list checks `_packages` instead. Update the input harness if
-   icon positions change: it currently clicks Applications at (215, 95).
-3. Add explicit Owner unlock semantics for System Folder changes, and verify
-   those boundaries in a bootable increment.
+1. Run 27 passed the full build and QEMU boot with focused-folder keyboard
+   commands and `_packages_` hidden. Verification #13 passed independently.
+2. Finder starts with the System Folder locked. Moving its files out, replacing
+   it, copying into it, and creating a folder inside it are denied until the
+   Owner explicitly selects Special > System Folder Access... and confirms.
+   Copying protected files out remains permitted. The same dialog re-locks it;
+   restarting Finder always locks it.
+3. The policy is a Finder-local workflow guard, NOT OS-wide authentication or
+   authorization. Other applications can still change system files directly.
+   Full OS-enforced Owner identity and protection need later architecture work.
 
 Remaining limits: cross-volume moves have implementation/API review but no
 native two-volume regression case yet. Power-loss durability, concurrent
@@ -94,3 +97,15 @@ external mutations, and rollback failure injection remain unverified. Transfers
 run on the view thread, so a large copy can stall its window. Metadata/archive
 conventions, the Toolbox, and the rest of the approved Classic Mac model remain
 future work rather than completed features of this milestone.
+
+## October 14, 2026 continuation
+
+- [Run 27](https://github.com/Drmgiver/OSTen/actions/runs/38626522744):
+  full compile, boot, Finder shortcuts, and native file tests passed.
+- [Verification #13](https://github.com/Drmgiver/OSTen/actions/runs/38626528445):
+  independent test of unchanged runtime image passed.
+- In development: System Folder policy introduces two native cases, updating
+  the new test marker to `OSTEN_TRANSFER_TESTS_PASS 18` (previous verified
+  marker was 16). Await a new full build and QEMU result before advancing.
+- Historical evidence from October 3 remains valid; do not reinterpret its
+  16-case result as evidence of new System Folder permissions.
