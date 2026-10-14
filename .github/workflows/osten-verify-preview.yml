@@ -81,7 +81,7 @@ jobs:
           if added < 50000:
               raise SystemExit('Finder window did not appear')
           log = Path('preview-boot/serial.log').read_text(errors='replace')
-          if 'OSTEN_TRANSFER_TESTS_FAIL' in log or 'OSTEN_TRANSFER_TESTS_PASS 18' not in log:
+          if 'OSTEN_TRANSFER_TESTS_FAIL' in log or 'OSTEN_TRANSFER_TESTS_PASS 21' not in log:
               print(log[-8000:])
               raise SystemExit('Native Finder transfer tests did not all pass')
           print(log[log.index('PASS move file'):])

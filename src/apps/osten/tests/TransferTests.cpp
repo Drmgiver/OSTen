@@ -209,6 +209,44 @@ static bool SystemFolderTransferPolicy() {
  return true;
 }
 
+
+static bool RenameFile() {
+ Workspace w;
+ CHECK(w.Directory("items") && w.Write("items/old", "hello"));
+ BEntry entry(w.Path("items/old").String());
+ entry_ref ref;
+ CHECK(entry.GetRef(&ref) == B_OK);
+ CHECK(RenameFinderEntry(ref, "new") == B_OK);
+ CHECK(!w.Exists("items/old") && w.Has("items/new", "hello"));
+ return true;
+}
+static bool RenameRejectCollisionAndInvalid() {
+ Workspace w;
+ CHECK(w.Directory("items") && w.Write("items/old", "source")
+  && w.Write("items/existing", "destination"));
+ BEntry entry(w.Path("items/old").String());
+ entry_ref ref;
+ CHECK(entry.GetRef(&ref) == B_OK);
+ CHECK(RenameFinderEntry(ref, "") == B_BAD_VALUE);
+ CHECK(RenameFinderEntry(ref, "../escape") == B_BAD_VALUE);
+ CHECK(RenameFinderEntry(ref, "existing") != B_OK);
+ CHECK(w.Has("items/old", "source") && w.Has("items/existing", "destination"));
+ return true;
+}
+static bool EmptyTrashContents() {
+ Workspace w;
+ CHECK(w.Directory("trash") && w.Directory("trash/subfolder"));
+ CHECK(w.Write("trash/subfolder/file", "remove")
+  && w.Write("trash/file", "remove")
+  && w.Write("outside", "keep"));
+ CHECK(symlink(w.Path("outside").String(),
+  w.Path("trash/link").String()) == 0);
+ BDirectory trash(w.Path("trash").String());
+ CHECK(EmptyFinderDirectory(trash) == B_OK);
+ CHECK(trash.CountEntries() == 0 && w.Has("outside", "keep"));
+ return true;
+}
+
 struct Test { const char* name; bool (*run)(); };
 class TestApp : public BApplication {
 public:
@@ -226,7 +264,10 @@ public:
    {"copy dangling link", CopyDanglingLink}, {"missing source", MissingSource},
    {"sibling path prefix", SiblingPrefix},
    {"system folder path boundaries", SystemFolderPathBoundaries},
-   {"system folder transfer policy", SystemFolderTransferPolicy}
+   {"system folder transfer policy", SystemFolderTransferPolicy},
+   {"rename file", RenameFile},
+   {"reject unsafe rename", RenameRejectCollisionAndInvalid},
+   {"empty trash contents", EmptyTrashContents}
   };
   BString report; int failures = 0;
   for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
@@ -234,7 +275,7 @@ public:
    report << (passed ? "PASS " : "FAIL ") << tests[i].name << "\n";
    if (!passed) { failures++; report << sFailure << "\n"; }
   }
-  report << (failures == 0 ? "OSTEN_TRANSFER_TESTS_PASS 18\n"
+  report << (failures == 0 ? "OSTEN_TRANSFER_TESTS_PASS 21\n"
    : "OSTEN_TRANSFER_TESTS_FAIL\n");
   BFile log("/boot/home/Finder transfer test results.txt",
    B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
@@ -242,7 +283,7 @@ public:
   // Haiku routes debug output to QEMU's kernel serial log.
   debug_printf("%s", report.String());
   (new BAlert("Finder transfer tests", failures == 0
-   ? "PASS: All 18 native Finder tests passed."
+   ? "PASS: All 21 native Finder tests passed."
    : report.String(), "OK"))->Go();
   PostMessage(B_QUIT_REQUESTED);
  }

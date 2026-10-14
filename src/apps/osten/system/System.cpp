@@ -39,6 +39,10 @@ public:
 		fileMenu->AddSeparatorItem();
 		fileMenu->AddItem(new BMenuItem("Open",
 			new BMessage(kOSTenOpen), 'O'));
+		fileMenu->AddItem(new BMenuItem("Rename...",
+			new BMessage(kOSTenRename)));
+		fileMenu->AddItem(new BMenuItem("Get Info",
+			new BMessage(kOSTenGetInfo), 'I'));
 		fileMenu->AddItem(new BMenuItem("Close Window",
 			new BMessage(kOSTenClose), 'W'));
 		bar->AddItem(fileMenu);
@@ -53,12 +57,18 @@ public:
 			new BMessage(kOSTenViewAsIcons));
 		iconsItem->SetMarked(true);
 		viewMenu->AddItem(iconsItem);
+		viewMenu->AddSeparatorItem();
+		viewMenu->AddItem(new BMenuItem("Arrange by Name",
+			new BMessage(kOSTenArrangeName)));
+		viewMenu->AddItem(new BMenuItem("Arrange by Kind",
+			new BMessage(kOSTenArrangeKind)));
+		viewMenu->AddItem(new BMenuItem("Clean Up",
+			new BMessage(kOSTenCleanUp)));
 		bar->AddItem(viewMenu);
 
 		BMenu* specialMenu = new BMenu("Special");
-		BMenuItem* emptyTrash = new BMenuItem("Empty Trash...", NULL);
-		emptyTrash->SetEnabled(false);
-		specialMenu->AddItem(emptyTrash);
+		specialMenu->AddItem(new BMenuItem("Empty Trash...",
+			new BMessage(kOSTenEmptyTrash)));
 		specialMenu->AddSeparatorItem();
 		specialMenu->AddItem(new BMenuItem("System Folder Access...",
 			new BMessage(kOSTenSystemFolderAccess)));
@@ -77,6 +87,12 @@ public:
 			|| message->what == kOSTenClose
 			|| message->what == kOSTenSelectAll
 			|| message->what == kOSTenViewAsIcons
+			|| message->what == kOSTenRename
+			|| message->what == kOSTenGetInfo
+			|| message->what == kOSTenEmptyTrash
+			|| message->what == kOSTenArrangeName
+			|| message->what == kOSTenArrangeKind
+			|| message->what == kOSTenCleanUp
 			|| message->what == kOSTenSystemFolderAccess) {
 			BMessenger finder("application/x-vnd.OSTen-Finder");
 			finder.SendMessage(message);

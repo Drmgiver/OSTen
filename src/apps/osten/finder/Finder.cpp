@@ -14,6 +14,8 @@
 #include <PopUpMenu.h>
 #include <Roster.h>
 #include <Screen.h>
+#include <ScrollBar.h>
+#include <ScrollView.h>
 #include <StorageDefs.h>
 #include <String.h>
 #include <View.h>
@@ -29,6 +31,7 @@
 
 #include "OSTenMessages.h"
 #include "FileOperations.h"
+#include "FinderActions.h"
 #include "IconArtwork.h"
 
 
@@ -41,6 +44,7 @@ const uint32 kFinderMoveToTrash = 'ostr';
 const uint32 kFinderRefreshAll = 'osrf';
 const uint32 kFinderRefreshFolder = 'osrw';
 const char* kWindowFrameAttribute = "OSTen:window_frame";
+const char* kArrangeAttribute = "OSTen:arrange_kind";
 
 const float kCellWidth = 94;
 const float kCellHeight = 86;
@@ -201,18 +205,30 @@ TransferEntries(const BMessage* message, const entry_ref& targetRef,
 
 class FolderView : public BView {
 public:
-	FolderView(BRect frame, const entry_ref& directory)
+	FolderView(BRect frame, const entry_ref& directory, bool desktop = false)
 		:
 		BView(frame, "Folder icons", B_FOLLOW_ALL,
 			B_WILL_DRAW | B_FRAME_EVENTS | B_NAVIGABLE),
 		fDirectory(directory),
 		fIsBootVolumeRoot(false),
 		fIsSystemFolder(false),
+		fIsDesktop(desktop),
+		fArrangeKind(false),
 		fTrackingDrag(false),
 		fPressedIndex(-1)
 	{
-		SetViewColor(255, 255, 255);
-		SetLowColor(255, 255, 255);
+		if (fIsDesktop) {
+			SetViewColor(54, 104, 150);
+			SetLowColor(54, 104, 150);
+		} else {
+			SetViewColor(255, 255, 255);
+			SetLowColor(255, 255, 255);
+		}
+		BNode folderNode(&fDirectory);
+		int32 arrangeKind = 0;
+		if (folderNode.ReadAttr(kArrangeAttribute, B_INT32_TYPE, 0,
+				&arrangeKind, sizeof(arrangeKind)) == (ssize_t)sizeof(arrangeKind))
+			fArrangeKind = arrangeKind != 0;
 		BEntry folder(&fDirectory);
 		BPath path;
 		if (folder.GetPath(&path) == B_OK) {
@@ -225,6 +241,7 @@ public:
 	void AttachedToWindow() override
 	{
 		MakeFocus(true);
+		_LayoutItems();
 	}
 
 	void Draw(BRect updateRect) override
@@ -376,7 +393,9 @@ public:
 		}
 
 		std::sort(fItems.begin(), fItems.end(),
-			[](const FinderItem& left, const FinderItem& right) {
+			[this](const FinderItem& left, const FinderItem& right) {
+				if (fArrangeKind && left.isDirectory != right.isDirectory)
+					return left.isDirectory;
 				return left.name.ICompare(right.name) < 0;
 			});
 		_LayoutItems();
@@ -388,6 +407,16 @@ public:
 		for (size_t index = 0; index < fItems.size(); index++)
 			fItems[index].selected = true;
 		Invalidate();
+	}
+
+	void Arrange(bool byKind)
+	{
+		fArrangeKind = byKind;
+		int32 value = byKind ? 1 : 0;
+		BNode folder(&fDirectory);
+		folder.WriteAttr(kArrangeAttribute, B_INT32_TYPE, 0,
+			&value, sizeof(value));
+		Refresh();
 	}
 
 	void MoveSelectionToTrash()
@@ -435,6 +464,10 @@ private:
 			BMessage* open = new BMessage(kOpenEntry);
 			open->AddInt32("index", hit);
 			menu->AddItem(new BMenuItem("Open", open));
+			menu->AddItem(new BMenuItem("Rename...",
+				new BMessage(kOSTenRename)));
+			menu->AddItem(new BMenuItem("Get Info",
+				new BMessage(kOSTenGetInfo)));
 			menu->AddSeparatorItem();
 			menu->AddItem(new BMenuItem("Move to Trash",
 				new BMessage(kFinderMoveToTrash)));
@@ -444,6 +477,11 @@ private:
 			menu->AddSeparatorItem();
 			menu->AddItem(new BMenuItem("Select All",
 				new BMessage(kOSTenSelectAll)));
+			menu->AddSeparatorItem();
+			menu->AddItem(new BMenuItem("Arrange by Name",
+				new BMessage(kOSTenArrangeName)));
+			menu->AddItem(new BMenuItem("Arrange by Kind",
+				new BMessage(kOSTenArrangeKind)));
 		}
 		menu->SetTargetForItems(Window());
 		menu->SetAsyncAutoDestruct(true);
@@ -476,6 +514,17 @@ private:
 			float top = 8 + row * kCellHeight;
 			fItems[index].cell.Set(left, top, left + kCellWidth - 8,
 				top + kCellHeight - 6);
+		}
+		BScrollBar* scrollbar = ScrollBar(B_VERTICAL);
+		if (scrollbar != NULL) {
+			float rows = (fItems.size() + columns - 1) / columns;
+			float contentHeight = 12 + rows * kCellHeight;
+			float viewportHeight = Bounds().Height();
+			float overflow = std::max(0.0f, contentHeight - viewportHeight);
+			scrollbar->SetRange(0, overflow);
+			scrollbar->SetProportion(contentHeight > 0
+				? std::min(1.0f, viewportHeight / contentHeight) : 1.0f);
+			scrollbar->SetSteps(kCellHeight / 3, kCellHeight);
 		}
 	}
 
@@ -532,7 +581,9 @@ private:
 			SetHighColor(0, 0, 128);
 			FillRect(label);
 			SetHighColor(255, 255, 255);
-		} else
+		} else if (fIsDesktop)
+			SetHighColor(255, 255, 255);
+		else
 			SetHighColor(0, 0, 0);
 		DrawString(display.String(), BPoint(textX, baseline));
 	}
@@ -621,11 +672,38 @@ private:
 	entry_ref				fDirectory;
 	bool					fIsBootVolumeRoot;
 	bool					fIsSystemFolder;
+	bool					fIsDesktop;
+	bool					fArrangeKind;
 	bool					fTrackingDrag;
 	int32					fPressedIndex;
 	BPoint					fDragStart;
 	std::vector<FinderItem>	fItems;
 };
+
+
+
+static void
+ShowSelectedInfo(FolderView* view)
+{
+    if (view == NULL)
+        return;
+    std::vector<int32> indices = view->SelectedIndices();
+    entry_ref ref;
+    if (indices.size() == 1 && view->EntryAt(indices[0], ref))
+        ShowFinderInfo(ref);
+}
+
+
+static void
+RenameSelected(FolderView* view)
+{
+    if (view == NULL)
+        return;
+    std::vector<int32> indices = view->SelectedIndices();
+    entry_ref ref;
+    if (indices.size() == 1 && view->EntryAt(indices[0], ref))
+        ShowFinderRename(ref, sSystemFolderUnlocked.load());
+}
 
 
 static BRect
@@ -689,12 +767,14 @@ public:
 		BRect frame = Bounds();
 		frame.InsetBy(7, 7);
 		fView = new FolderView(frame, directory);
-		AddChild(fView);
+		AddChild(new BScrollView("Folder scrolling", fView, B_FOLLOW_ALL,
+			0, false, true, B_NO_BORDER));
 
 		AddShortcut('O', B_COMMAND_KEY, new BMessage(kOSTenOpen));
 		AddShortcut('N', B_COMMAND_KEY, new BMessage(kOSTenNewFolder));
 		AddShortcut('W', B_COMMAND_KEY, new BMessage(kOSTenClose));
 		AddShortcut('A', B_COMMAND_KEY, new BMessage(kOSTenSelectAll));
+		AddShortcut('I', B_COMMAND_KEY, new BMessage(kOSTenGetInfo));
 	}
 
 	void FrameMoved(BPoint newPosition) override
@@ -746,6 +826,19 @@ public:
 				return;
 			case kFinderMoveToTrash:
 				fView->MoveSelectionToTrash();
+				return;
+			case kOSTenRename:
+				RenameSelected(fView);
+				return;
+			case kOSTenGetInfo:
+				ShowSelectedInfo(fView);
+				return;
+			case kOSTenArrangeName:
+			case kOSTenCleanUp:
+				fView->Arrange(false);
+				return;
+			case kOSTenArrangeKind:
+				fView->Arrange(true);
 				return;
 			case kFinderRefreshFolder:
 				fView->Refresh();
@@ -816,6 +909,24 @@ private:
 	int32		fDepth;
 	FolderView*	fView;
 };
+
+
+
+static void
+OpenFinderEntry(const entry_ref& ref, int32 depth)
+{
+    BEntry entry(&ref);
+    if (entry.IsDirectory())
+        (new FinderWindow(ref, depth))->Show();
+    else {
+        status_t error = be_roster->Launch(&ref);
+        if (error != B_OK) {
+            BString reason("The file could not be opened.\n\n");
+            reason << strerror(error);
+            (new BAlert("Finder", reason.String(), "OK"))->Go();
+        }
+    }
+}
 
 
 enum desktop_item {
@@ -897,7 +1008,7 @@ public:
 			fTrashSelected = item == kTrashItem;
 			Invalidate();
 			if (item != kNoDesktopItem)
-				_ShowContextMenu(where);
+				_ShowContextMenu(where, item);
 			return;
 		}
 		if ((buttons & B_PRIMARY_MOUSE_BUTTON) == 0)
@@ -965,10 +1076,15 @@ public:
 	}
 
 private:
-	void _ShowContextMenu(BPoint where)
+	void _ShowContextMenu(BPoint where, desktop_item item)
 	{
 		BPopUpMenu* menu = new BPopUpMenu("", false, false);
 		menu->AddItem(new BMenuItem("Open", new BMessage(kOSTenOpen)));
+		if (item == kTrashItem) {
+			menu->AddSeparatorItem();
+			menu->AddItem(new BMenuItem("Empty Trash...",
+				new BMessage(kOSTenEmptyTrash)));
+		}
 		menu->SetTargetForItems(Window());
 		menu->SetAsyncAutoDestruct(true);
 		ConvertToScreen(&where);
@@ -1095,9 +1211,19 @@ public:
 				| B_NOT_CLOSABLE | B_NOT_MINIMIZABLE | B_NOT_RESIZABLE
 				| B_ASYNCHRONOUS_CONTROLS,
 			B_ALL_WORKSPACES),
-		fView(new DesktopView(Bounds()))
+		fView(new DesktopView(Bounds())),
+		fFolderView(NULL)
 	{
 		AddChild(fView);
+		// Desktop icons are backed by the normal, visible Desktop directory.
+		BEntry desktopDirectory("/boot/home/Desktop");
+		entry_ref desktopRef;
+		if (desktopDirectory.GetRef(&desktopRef) == B_OK) {
+			BRect files(6, 28, Bounds().right - 117,
+				Bounds().bottom - 14);
+			fFolderView = new FolderView(files, desktopRef, true);
+			AddChild(fFolderView);
+		}
 	}
 
 	void WindowActivated(bool active) override
@@ -1121,8 +1247,46 @@ public:
 			case kOSTenSelectAll:
 				fView->SelectAll();
 				return;
-			case kOSTenClose:
+			case kOpenEntry:
+			{
+				int32 index;
+				entry_ref ref;
+				if (fFolderView != NULL
+					&& message->FindInt32("index", &index) == B_OK
+					&& fFolderView->EntryAt(index, ref))
+					OpenFinderEntry(ref, 0);
+				return;
+			}
+			case kOSTenEmptyTrash:
+				be_app->PostMessage(kOSTenEmptyTrash);
+				return;
 			case kOSTenNewFolder:
+				_CreateDesktopFolder();
+				return;
+			case kOSTenRename:
+				RenameSelected(fFolderView);
+				return;
+			case kOSTenGetInfo:
+				ShowSelectedInfo(fFolderView);
+				return;
+			case kFinderMoveToTrash:
+				if (fFolderView != NULL)
+					fFolderView->MoveSelectionToTrash();
+				return;
+			case kFinderRefreshFolder:
+				if (fFolderView != NULL)
+					fFolderView->Refresh();
+				return;
+			case kOSTenArrangeName:
+			case kOSTenCleanUp:
+				if (fFolderView != NULL)
+					fFolderView->Arrange(false);
+				return;
+			case kOSTenArrangeKind:
+				if (fFolderView != NULL)
+					fFolderView->Arrange(true);
+				return;
+			case kOSTenClose:
 			case kOSTenViewAsIcons:
 				return;
 		}
@@ -1130,7 +1294,26 @@ public:
 	}
 
 private:
+
+    void _CreateDesktopFolder()
+    {
+        if (fFolderView == NULL)
+            return;
+        BDirectory desktop("/boot/home/Desktop");
+        if (desktop.InitCheck() != B_OK)
+            return;
+        BString name("untitled folder");
+        for (int32 suffix = 2; desktop.Contains(name.String()); suffix++)
+            name.SetToFormat("untitled folder %ld", (long)suffix);
+        if (desktop.CreateDirectory(name.String(), NULL) == B_OK)
+            fFolderView->Refresh(name.String());
+        else
+            (new BAlert("New Folder", "The folder could not be created.",
+                "OK"))->Go();
+    }
+
 	DesktopView* fView;
+	FolderView* fFolderView;
 };
 
 
@@ -1169,6 +1352,10 @@ public:
 			}
 			return;
 		}
+		if (message->what == kOSTenEmptyTrash) {
+			EmptyFinderTrash();
+			return;
+		}
 		if (message->what == kFinderRefreshAll) {
 			for (int32 index = 0; BWindow* window = WindowAt(index); index++)
 				window->PostMessage(kFinderRefreshFolder);
@@ -1184,7 +1371,12 @@ public:
 			|| message->what == kOSTenOpen
 			|| message->what == kOSTenClose
 			|| message->what == kOSTenSelectAll
-			|| message->what == kOSTenViewAsIcons) {
+			|| message->what == kOSTenViewAsIcons
+			|| message->what == kOSTenRename
+			|| message->what == kOSTenGetInfo
+			|| message->what == kOSTenArrangeName
+			|| message->what == kOSTenArrangeKind
+			|| message->what == kOSTenCleanUp) {
 			if (fCommandTarget.SendMessage(message) != B_OK)
 				fDesktopTarget.SendMessage(message);
 			return;

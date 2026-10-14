@@ -11,7 +11,14 @@ enum {
 	kOSTenClose = 'oscl',
 	kOSTenSelectAll = 'ossa',
 	kOSTenViewAsIcons = 'osvi',
-	kOSTenSystemFolderAccess = 'osfa'
+	kOSTenSystemFolderAccess = 'osfa',
+	kOSTenRename = 'osrn',
+	kOSTenGetInfo = 'osgi',
+	kOSTenEmptyTrash = 'oset',
+	kOSTenArrangeName = 'osan',
+	kOSTenArrangeKind = 'osak',
+	kOSTenCleanUp = 'oscu',
+	kOSTenRefreshAll = 'osrf'
 };
 
 

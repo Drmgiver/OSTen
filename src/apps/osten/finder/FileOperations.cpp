@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <vector>
 
 
 static bool
@@ -42,6 +43,73 @@ MayTransferSystemFolderItem(const BPath& sourcePath,
 	// changes the source, and any write into the folder is protected.
 	return ownerUnlocked || (!IsOSTenSystemFolderPath(destinationPath)
 		&& (copy || !IsOSTenSystemFolderPath(sourcePath)));
+}
+
+
+status_t
+RenameFinderEntry(const entry_ref& sourceRef, const char* newName,
+    bool ownerUnlocked)
+{
+    if (newName == NULL || newName[0] == '\0'
+        || strcmp(newName, ".") == 0 || strcmp(newName, "..") == 0
+        || strchr(newName, '/') != NULL
+        || strlen(newName) >= B_FILE_NAME_LENGTH)
+        return B_BAD_VALUE;
+
+    BEntry source(&sourceRef, false);
+    if (source.InitCheck() != B_OK)
+        return source.InitCheck();
+    if (!source.Exists())
+        return B_ENTRY_NOT_FOUND;
+
+    char oldName[B_FILE_NAME_LENGTH];
+    status_t error = source.GetName(oldName);
+    if (error != B_OK)
+        return error;
+    if (strcmp(oldName, newName) == 0)
+        return B_OK;
+
+    BPath from;
+    BEntry parent;
+    error = source.GetPath(&from);
+    if (error == B_OK)
+        error = source.GetParent(&parent);
+    BPath to;
+    if (error == B_OK)
+        error = parent.GetPath(&to);
+    if (error == B_OK)
+        error = to.Append(newName);
+    if (error != B_OK)
+        return error;
+    if (!MayTransferSystemFolderItem(from, to, false, ownerUnlocked))
+        return B_PERMISSION_DENIED;
+
+    return source.Rename(newName, false);
+}
+
+
+status_t
+EmptyFinderDirectory(BDirectory& directory)
+{
+    if (directory.InitCheck() != B_OK)
+        return directory.InitCheck();
+    // Snapshot refs before removal: deleting while iterating can skip entries.
+    std::vector<entry_ref> refs;
+    directory.Rewind();
+    BEntry entry;
+    while (directory.GetNextEntry(&entry, false) == B_OK) {
+        entry_ref ref;
+        if (entry.GetRef(&ref) == B_OK)
+            refs.push_back(ref);
+    }
+    status_t firstError = B_OK;
+    for (size_t i = 0; i < refs.size(); i++) {
+        BEntry item(&refs[i], false);
+        status_t error = BRemoveEngine().RemoveEntry(item);
+        if (error != B_OK && firstError == B_OK)
+            firstError = error;
+    }
+    return firstError;
 }
 
 
