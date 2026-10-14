@@ -104,7 +104,7 @@ jobs:
               raise SystemExit('Finder window did not appear in boot evidence')
           # The smoke script verifies the title bar before its input tests.
           PY
-          grep -F "OSTEN_TRANSFER_TESTS_PASS 16" preview-boot/serial.log
+          grep -F "OSTEN_TRANSFER_TESTS_PASS 18" preview-boot/serial.log
           cp generated.x86_64/build-manifest.txt preview-boot/build-manifest.txt
 
       - name: Save preview boot evidence
