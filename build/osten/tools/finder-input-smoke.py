@@ -172,11 +172,13 @@ if white_pixels(closed) > white_pixels(opened) + 10000:
 
 screenshot('root-after-close')
 # Applications remains selected in the parent window after Command-W.
-# Double-click its stable icon cell; reverse-video text is unreliable for OCR.
-double_click(215, 135)
+# Open that selection with Enter instead of a hard-coded icon coordinate:
+# the icon position changes when internal folders are hidden.
+key('ret')
 screenshot('applications-reopened')
-# Select the native test app by its visible label, then open it with Command-O.
-x, y = locate_text(output / 'applications-reopened.ppm', 'Finder')
+# Require the native test app's distinctive label suffix. Looking for just
+# 'Finder' could accidentally select the System Folder's Finder placeholder.
+x, y = locate_text(output / 'applications-reopened.ppm', 'Tests')
 click(x, y)
 key('alt-o')
 for attempt in range(30):
