@@ -20,6 +20,7 @@
 #include <WindowPrivate.h>
 
 #include <algorithm>
+#include <atomic>
 #include <math.h>
 #include <string.h>
 #include <vector>
@@ -41,6 +42,9 @@ const char* kWindowFrameAttribute = "OSTen:window_frame";
 const float kCellWidth = 94;
 const float kCellHeight = 86;
 const float kIconTop = 8;
+
+// Finder-local Owner permission. Reset to locked whenever Finder restarts.
+static std::atomic<bool> sSystemFolderUnlocked(false);
 
 
 struct FinderItem {
@@ -73,14 +77,21 @@ TransferEntries(const BMessage* message, const entry_ref& targetRef,
 		if (message->FindRef("refs", index, &sourceRef) != B_OK)
 			break;
 		status_t error = TransferEntry(sourceRef, targetDirectory, targetPath,
-			copy, preserveExisting, &recoveryPath);
+			copy, preserveExisting, &recoveryPath,
+			sSystemFolderUnlocked.load());
 		if (error != B_OK)
 			firstError = error;
 	}
 
 	if (firstError != B_OK) {
-		BString explanation("The item could not be moved or copied.\n\n");
-		explanation << strerror(firstError);
+		BString explanation;
+		if (firstError == B_PERMISSION_DENIED) {
+			explanation = "The System Folder is locked.\n\n"
+				"Use Special > System Folder Access... to unlock it.";
+		} else {
+			explanation = "The item could not be moved or copied.\n\n";
+			explanation << strerror(firstError);
+		}
 		if (!recoveryPath.IsEmpty()) {
 			explanation << "\n\nFiles were kept for recovery in:\n"
 				<< recoveryPath;
@@ -135,21 +146,6 @@ public:
 		if (numBytes == 1 && bytes[0] == B_ENTER) {
 			_OpenSelection();
 			return;
-		}
-		// Route Finder commands to the window that actually has keyboard focus.
-		// The separate System menu bar must not decide which folder owns them.
-		if (numBytes == 1 && (modifiers() & B_COMMAND_KEY) != 0) {
-			uint32 command = 0;
-			switch (bytes[0]) {
-				case 'o': case 'O': command = kOSTenOpen; break;
-				case 'n': case 'N': command = kOSTenNewFolder; break;
-				case 'w': case 'W': command = kOSTenClose; break;
-				case 'a': case 'A': command = kOSTenSelectAll; break;
-			}
-			if (command != 0) {
-				Window()->PostMessage(command);
-				return;
-			}
 		}
 		// Route Finder commands to the window that actually has keyboard focus.
 		// The separate System menu bar must not decide which folder owns them.
@@ -661,6 +657,16 @@ private:
 
 	void _CreateFolder()
 	{
+		BEntry current(&fDirectory);
+		BPath currentPath;
+		if (!sSystemFolderUnlocked.load()
+			&& current.GetPath(&currentPath) == B_OK
+			&& IsOSTenSystemFolderPath(currentPath)) {
+			(new BAlert("System Folder",
+				"The System Folder is locked. Use Special > "
+				"System Folder Access... to unlock it.", "OK"))->Go();
+			return;
+		}
 		BDirectory directory(&fDirectory);
 		BString name("untitled folder");
 		int32 suffix = 2;
@@ -733,6 +739,21 @@ public:
 		if (numBytes == 1 && bytes[0] == B_ENTER) {
 			OpenSelection();
 			return;
+		}
+		// Route Finder commands to the window that actually has keyboard focus.
+		// The separate System menu bar must not decide which folder owns them.
+		if (numBytes == 1 && (modifiers() & B_COMMAND_KEY) != 0) {
+			uint32 command = 0;
+			switch (bytes[0]) {
+				case 'o': case 'O': command = kOSTenOpen; break;
+				case 'n': case 'N': command = kOSTenNewFolder; break;
+				case 'w': case 'W': command = kOSTenClose; break;
+				case 'a': case 'A': command = kOSTenSelectAll; break;
+			}
+			if (command != 0) {
+				Window()->PostMessage(command);
+				return;
+			}
 		}
 		BView::KeyDown(bytes, numBytes);
 	}
@@ -1010,6 +1031,23 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+		if (message->what == kOSTenSystemFolderAccess) {
+			if (!sSystemFolderUnlocked.load()) {
+				BAlert* dialog = new BAlert("System Folder Access",
+					"Owner: Unlock the System Folder for changes in Finder? "
+					"System files affect startup and stability. Finder will "
+					"lock it again when restarted.", "Keep Locked", "Unlock");
+				if (dialog->Go() == 1)
+					sSystemFolderUnlocked.store(true);
+			} else {
+				BAlert* dialog = new BAlert("System Folder Access",
+					"System Folder changes are currently unlocked in Finder. "
+					"Lock them now?", "Keep Unlocked", "Lock");
+				if (dialog->Go() == 1)
+					sSystemFolderUnlocked.store(false);
+			}
+			return;
+		}
 		if (message->what == kFinderRefreshAll) {
 			for (int32 index = 0; BWindow* window = WindowAt(index); index++)
 				window->PostMessage(kFinderRefreshFolder);
