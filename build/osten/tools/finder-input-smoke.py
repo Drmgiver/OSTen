@@ -116,6 +116,7 @@ def locate_text(image_path, target, min_top=60):
 def open_folder_named(name, source_image):
     x, y = locate_text(source_image, name)
     double_click(x, y)
+    return x, y
 
 
 # Open the desktop volume directly. Command-O depends on the floating menu bar
@@ -133,7 +134,7 @@ if mode != 'test':
 click(350, 320, 'right')
 screenshot('context-menu')
 key('esc')
-open_folder_named('Applications', output / 'finder.ppm')
+applications_icon = open_folder_named('Applications', output / 'finder.ppm')
 screenshot('applications')
 
 key('alt-n')
@@ -171,14 +172,15 @@ if white_pixels(closed) > white_pixels(opened) + 10000:
     raise RuntimeError('Command-W did not close the focused Finder window')
 
 screenshot('root-after-close')
-# Applications remains selected in the parent window after Command-W.
-# Open that selection with Enter instead of a hard-coded icon coordinate:
-# the icon position changes when internal folders are hidden.
-key('ret')
+# Command-W returns to the parent folder. Double-click the exact
+# Applications label position that we successfully opened above. This
+# stays valid even when hidden folders shift the icon layout.
+double_click(*applications_icon)
 screenshot('applications-reopened')
-# Require the native test app's distinctive label suffix. Looking for just
-# 'Finder' could accidentally select the System Folder's Finder placeholder.
-x, y = locate_text(output / 'applications-reopened.ppm', 'Tests')
+# Make sure we really reopened Applications rather than System Folder.
+# The native test application label begins with 'Finder' and may have
+# its ' - Tests' suffix split into separate words by text recognition.
+x, y = locate_text(output / 'applications-reopened.ppm', 'Finder')
 click(x, y)
 key('alt-o')
 for attempt in range(30):
