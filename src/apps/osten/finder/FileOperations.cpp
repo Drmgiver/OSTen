@@ -21,6 +21,30 @@ PathContains(const BPath& directory, const BPath& entry)
 }
 
 
+bool
+IsOSTenSystemFolderPath(const BPath& path)
+{
+	if (path.InitCheck() != B_OK)
+		return false;
+	const char* root = "/boot/System Folder";
+	const size_t length = strlen(root);
+	const char* value = path.Path();
+	return strncmp(value, root, length) == 0
+		&& (value[length] == '\\0' || value[length] == '/');
+}
+
+
+bool
+MayTransferSystemFolderItem(const BPath& sourcePath,
+	const BPath& destinationPath, bool copy, bool ownerUnlocked)
+{
+	// Reading or copying a protected item out is permitted. Moving it
+	// changes the source, and any write into the folder is protected.
+	return ownerUnlocked || (!IsOSTenSystemFolderPath(destinationPath)
+		&& (copy || !IsOSTenSystemFolderPath(sourcePath)));
+}
+
+
 static void
 MakeUniqueName(BDirectory& directory, const char* original, BString& name)
 {
@@ -33,7 +57,7 @@ MakeUniqueName(BDirectory& directory, const char* original, BString& name)
 status_t
 TransferEntry(const entry_ref& sourceRef, BDirectory& targetDirectory,
 	const BPath& targetDirectoryPath, bool copy, bool preserveExisting,
-	BString* recoveryPath)
+	BString* recoveryPath, bool ownerUnlocked)
 {
 	if (recoveryPath != NULL)
 		recoveryPath->Truncate(0);
@@ -79,6 +103,10 @@ TransferEntry(const entry_ref& sourceRef, BDirectory& targetDirectory,
 	error = destinationPath.Append(targetName.String());
 	if (error != B_OK)
 		return error;
+	if (!MayTransferSystemFolderItem(sourcePath, destinationPath, copy,
+		ownerUnlocked)) {
+		return B_PERMISSION_DENIED;
+	}
 	BEntry destination(destinationPath.Path(), false);
 	if (destination.InitCheck() != B_OK)
 		return destination.InitCheck();
