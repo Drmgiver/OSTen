@@ -38,7 +38,8 @@ jobs:
             matches=$(jq '(.files | length) < 300 and
               all(.files[]; .filename | startswith(".github/workflows/") or
                 startswith("docs/") or . == "build/osten/tools/boot-smoke" or
-                . == "build/osten/tools/finder-input-smoke.py")' comparison.json)
+                . == "build/osten/tools/finder-input-smoke.py" or
+                . == "build/osten/tools/system-folder-evidence.py")' comparison.json)
             if [ "$matches" != true ]; then
               continue
             fi
@@ -85,6 +86,14 @@ jobs:
           print(log[log.index('PASS move file'):])
           PY
           cp saved-preview/build-manifest.txt preview-boot/build-manifest.txt
+
+      # Screenshot the actual two application files from the saved Run 37 OS.
+      # The existing smoke script tests Applications and never opens System Folder.
+      - name: Capture Finder and System icons in System Folder
+        if: steps.select-image.outputs.skip != 'true'
+        run: |
+          python3 build/osten/tools/system-folder-evidence.py \
+            saved-preview/osten-preview.image preview-boot
 
       - name: Save verified boot evidence
         if: always()
