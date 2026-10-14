@@ -61,7 +61,7 @@ jobs:
         if: steps.select-image.outputs.skip != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-x86 socat python3-pil
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 socat python3-pil tesseract-ocr
           OSTEN_TRANSFER_TESTS=1 bash build/osten/tools/boot-smoke \
             saved-preview/osten-preview.image preview-boot
           python3 - <<'PY'
