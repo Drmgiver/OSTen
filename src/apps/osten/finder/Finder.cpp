@@ -49,6 +49,9 @@ const char* kArrangeAttribute = "OSTen:arrange_kind";
 const float kCellWidth = 94;
 const float kCellHeight = 86;
 const float kIconTop = 8;
+// Client-frame top must also accommodate the MacDecorator's title above it.
+// The global System bar occupies the first 26 screen pixels.
+const float kFinderClientMinTop = 54;
 
 // Finder-local Owner permission. Reset to locked whenever Finder restarts.
 static std::atomic<bool> sSystemFolderUnlocked(false);
@@ -720,7 +723,8 @@ FolderWindowFrame(const entry_ref& directory, int32 depth)
 	}
 
 	BRect screen = BScreen().Frame();
-	screen.top = 26;
+	screen.top = kFinderClientMinTop;
+	screen.bottom -= 8;
 	if (frame.Width() > screen.Width())
 		frame.right = frame.left + screen.Width();
 	if (frame.Height() > screen.Height())
@@ -755,7 +759,9 @@ public:
 			B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS),
 		fDirectory(directory),
 		fDepth(depth),
-		fView(NULL)
+		fView(NULL),
+		fShaded(false),
+		fUnshadedHeight(0)
 	{
 		BEntry folder(&directory);
 		char title[B_FILE_NAME_LENGTH];
@@ -779,6 +785,12 @@ public:
 
 	void FrameMoved(BPoint newPosition) override
 	{
+		// The native MacDecorator draws the title above the client frame.
+		// Do not let it disappear behind the permanent global menu.
+		if (newPosition.y < kFinderClientMinTop) {
+			MoveTo(newPosition.x, kFinderClientMinTop);
+			return;
+		}
 		BWindow::FrameMoved(newPosition);
 		_SaveFrame();
 	}
@@ -787,6 +799,40 @@ public:
 	{
 		BWindow::FrameResized(width, height);
 		_SaveFrame();
+	}
+
+	// The MacDecorator minimize button represents Classic Mac WindowShade.
+	// Unlike standard Haiku minimizing, this keeps the title bar visible and
+	// clickable, and restores the previous folder height on the next click.
+	void Minimize(bool minimize) override
+	{
+		if (!minimize && !fShaded)
+			return;
+		if (fShaded) {
+			fShaded = false;
+			ResizeTo(Frame().Width(), fUnshadedHeight);
+		} else {
+			fUnshadedHeight = Frame().Height();
+			fShaded = true;
+			ResizeTo(Frame().Width(), 1);
+		}
+	}
+
+	// BWindow's default Zoom() makes room for Deskbar, not OSTen's menu.
+	// Clamp the requested client rectangle with 22px for the title bar.
+	void Zoom(BPoint origin, float width, float height) override
+	{
+		if (fShaded)
+			Minimize(false);
+		BRect screen = BScreen(this).Frame();
+		origin.y = std::max(origin.y, screen.top + kFinderClientMinTop);
+		origin.x = std::max(origin.x, screen.left + 7);
+		float allowedWidth = std::max(280.0f,
+			screen.right - origin.x - 8);
+		float allowedHeight = std::max(180.0f,
+			screen.bottom - origin.y - 8);
+		BWindow::Zoom(origin, std::min(width, allowedWidth),
+			std::min(height, allowedHeight));
 	}
 
 	void WindowActivated(bool active) override
@@ -900,6 +946,8 @@ private:
 	{
 		BNode node(&fDirectory);
 		BRect frame = Frame();
+		if (fShaded)
+			frame.bottom = frame.top + fUnshadedHeight;
 		node.WriteAttr(kWindowFrameAttribute, B_RECT_TYPE, 0, &frame,
 			sizeof(BRect));
 	}
@@ -908,6 +956,8 @@ private:
 	entry_ref	fDirectory;
 	int32		fDepth;
 	FolderView*	fView;
+	bool		fShaded;
+	float		fUnshadedHeight;
 };
 
 

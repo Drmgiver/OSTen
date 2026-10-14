@@ -8,6 +8,10 @@
 #include <Message.h>
 #include <Messenger.h>
 #include <Screen.h>
+#include <Roster.h>
+#include <RosterPrivate.h>
+#include <String.h>
+#include <string.h>
 #include <Window.h>
 
 #include "OSTenMessages.h"
@@ -16,6 +20,8 @@
 namespace {
 
 const uint32 kAboutOSTen = 'osab';
+const uint32 kShutDownOSTen = 'ossh';
+const uint32 kRestartOSTen = 'osre';
 
 
 class SystemBar : public BWindow {
@@ -31,6 +37,11 @@ public:
 		BMenu* systemMenu = new BMenu("OSTen");
 		systemMenu->AddItem(new BMenuItem("About OSTen...",
 			new BMessage(kAboutOSTen)));
+		systemMenu->AddSeparatorItem();
+		systemMenu->AddItem(new BMenuItem("Restart...",
+			new BMessage(kRestartOSTen)));
+		systemMenu->AddItem(new BMenuItem("Shut Down...",
+			new BMessage(kShutDownOSTen)));
 		bar->AddItem(systemMenu);
 
 		BMenu* fileMenu = new BMenu("File");
@@ -80,6 +91,26 @@ public:
 	{
 		if (message->what == kAboutOSTen) {
 			(new BAlert("About OSTen", "OSTen preview", "OK"))->Go();
+			return;
+		}
+		if (message->what == kShutDownOSTen
+			|| message->what == kRestartOSTen) {
+			bool restart = message->what == kRestartOSTen;
+			if ((new BAlert(restart ? "Restart OSTen" : "Shut Down OSTen",
+				restart ? "Restart OSTen now? Save your work first."
+					: "Shut down OSTen now? Save your work first.",
+				"Cancel", restart ? "Restart" : "Shut Down"))->Go() != 1)
+				return;
+			// Use Haiku's normal registrar shutdown sequence: running
+			// applications are notified and the filesystem is unmounted.
+			BRoster roster;
+			BRoster::Private privateRoster(roster);
+			status_t error = privateRoster.ShutDown(restart, false, false);
+			if (error != B_OK) {
+				BString explanation("The system could not shut down: ");
+				explanation << strerror(error);
+				(new BAlert("System", explanation.String(), "OK"))->Go();
+			}
 			return;
 		}
 		if (message->what == kOSTenNewFolder

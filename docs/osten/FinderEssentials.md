@@ -25,3 +25,18 @@ claimed by this milestone): user-defined free icon placement, aliases, seven
 labels, spring-loaded folders, pop-up folders, Find File, and full OS-enforced
 Owner permissions. Further QEMU UI interaction validation is required; the
 successful compilation and boot of the milestone must be checked separately.
+
+
+## October 14: local interactive QEMU feedback
+
+- Finder's minimize/windowshade control collapses only the window client area,
+  leaving its Platinum title bar visible; clicking again restores its height.
+  An open shaded folder retains its full-size spatial window frame for the
+  next launch.
+- Finder clamps zoom and dragging to keep its decorative title below the
+  permanent 26-pixel System menu bar.
+- **OSTen > Restart... / Shut Down...** use confirmation and the native Haiku
+  registrar shutdown sequence (BRoster::Private::ShutDown), not a forced quit.
+- Corrected the 21-test QEMU smoke harness's stale 18-case final comparison.
+  Run 38 successfully compiled, booted and produced all 21 PASS records,
+  but that stale check marked the workflow failed.

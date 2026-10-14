@@ -2,6 +2,7 @@
 SubDir HAIKU_TOP src apps osten system ;
 
 SubDirHdrs $(HAIKU_TOP) src apps osten ;
+UsePrivateHeaders app ;
 
 Application OSTenSystem :
 	System.cpp

@@ -189,6 +189,6 @@ for attempt in range(30):
         break
     time.sleep(1)
 screenshot('transfer-tests')
-if 'OSTEN_TRANSFER_TESTS_PASS 18' not in log:
+if 'OSTEN_TRANSFER_TESTS_PASS 21' not in log:
     raise RuntimeError('Native transfer tests did not pass:\n' + log[-8000:])
 connection.close()
