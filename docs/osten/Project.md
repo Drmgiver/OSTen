@@ -1,9 +1,13 @@
 # OSTen project charter
 
-OSTen asks what Classic Macintosh system software might have become if its
-design had evolved beyond System 8. System 8 is the behavioral and visual
-starting point. Later releases can grow outward, but the first release should
-feel immediately familiar to someone who used System 8.
+OSTen explores an alternate history: what if Apple had chosen BeOS instead
+of NeXT as the foundation for its next-generation Macintosh operating system?
+Classic Mac OS 8 remains the behavioral and visual starting point, while BeOS's
+responsiveness, multimedia, and modern threading philosophy shape the system
+underneath. Haiku provides the practical foundation for this design experiment.
+The first release should feel familiar to someone who used System 8 without
+recreating its historical technical limitations. This is a speculative design
+premise, not a claim about what Apple would actually have shipped.
 
 This document records product decisions. It does **not** describe features
 already implemented in the fork. The repository currently contains the Haiku
