@@ -10,7 +10,8 @@ enum {
 	kOSTenOpen = 'osop',
 	kOSTenClose = 'oscl',
 	kOSTenSelectAll = 'ossa',
-	kOSTenViewAsIcons = 'osvi'
+	kOSTenViewAsIcons = 'osvi',
+	kOSTenSystemFolderAccess = 'osfa'
 };
 
 
