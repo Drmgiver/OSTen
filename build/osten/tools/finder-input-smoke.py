@@ -141,12 +141,12 @@ key('alt-n')
 screenshot('new-folder-shortcut')
 image = Image.open(output / 'new-folder-shortcut.ppm').convert('RGB')
 folder_area = image.crop((56, 57, min(562, width), min(438, height)))
-yellow_pixels = sum(
-    red >= 220 and 160 <= green <= 230 and blue <= 130
+blue_pixels = sum(
+    red < 190 and green > 110 and blue > 170 and blue > red + 35
     for red, green, blue in folder_area.getdata()
 )
-if yellow_pixels < 300:
-    raise RuntimeError('Command-N did not create a folder in the focused window')
+if blue_pixels < 200:
+    raise RuntimeError('Command-N did not create a blue folder in the focused window')
 
 key('alt-a')
 screenshot('select-all-shortcut')

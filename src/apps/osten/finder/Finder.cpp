@@ -2,6 +2,7 @@
 
 #include <Alert.h>
 #include <Application.h>
+#include <Bitmap.h>
 #include <Directory.h>
 #include <Entry.h>
 #include <InterfaceDefs.h>
@@ -20,6 +21,7 @@
 #include <WindowPrivate.h>
 
 #include <algorithm>
+#include <mutex>
 #include <atomic>
 #include <math.h>
 #include <string.h>
@@ -27,6 +29,7 @@
 
 #include "OSTenMessages.h"
 #include "FileOperations.h"
+#include "IconArtwork.h"
 
 
 namespace {
@@ -46,6 +49,100 @@ const float kIconTop = 8;
 // Finder-local Owner permission. Reset to locked whenever Finder restarts.
 static std::atomic<bool> sSystemFolderUnlocked(false);
 
+
+
+enum OSTenIcon {
+    kFolderIcon = 0,
+    kFinderIcon = 1,
+    kSystemIcon = 2
+};
+
+
+// Decode the palette and indexed pixels embedded in IconArtwork.h. This
+// keeps approved artwork inside the Finder executable without runtime paths.
+static bool
+DecodeBase64(const char* encoded, uint8* output, size_t expectedSize)
+{
+    uint32 bits = 0;
+    int available = 0;
+    size_t written = 0;
+    for (const char* p = encoded; *p != '\0' && *p != '='; p++) {
+        char value = *p;
+        int digit;
+        if (value >= 'A' && value <= 'Z')
+            digit = value - 'A';
+        else if (value >= 'a' && value <= 'z')
+            digit = value - 'a' + 26;
+        else if (value >= '0' && value <= '9')
+            digit = value - '0' + 52;
+        else if (value == '+')
+            digit = 62;
+        else if (value == '/')
+            digit = 63;
+        else
+            return false;
+        bits = (bits << 6) | digit;
+        available += 6;
+        if (available >= 8) {
+            available -= 8;
+            if (written >= expectedSize)
+                return false;
+            output[written++] = (bits >> available) & 0xff;
+        }
+    }
+    return written == expectedSize;
+}
+
+
+static BBitmap*
+CreateArtworkBitmap(OSTenIcon kind)
+{
+    uint8 palette[kOSTenArtworkColors * 4];
+    uint8 pixels[kOSTenArtworkSize * kOSTenArtworkSize];
+    const OSTenArtwork& artwork = kOSTenArtwork[(int)kind];
+    if (!DecodeBase64(artwork.palette, palette, sizeof(palette))
+        || !DecodeBase64(artwork.pixels, pixels, sizeof(pixels))) {
+        return NULL;
+    }
+
+    BBitmap* bitmap = new BBitmap(BRect(0, 0,
+        kOSTenArtworkSize - 1, kOSTenArtworkSize - 1), B_RGBA32);
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        return NULL;
+    }
+    uint8* data = (uint8*)bitmap->Bits();
+    const int32 stride = bitmap->BytesPerRow();
+    for (int y = 0; y < kOSTenArtworkSize; y++) {
+        for (int x = 0; x < kOSTenArtworkSize; x++) {
+            uint8 index = pixels[y * kOSTenArtworkSize + x];
+            if (index >= kOSTenArtworkColors) {
+                delete bitmap;
+                return NULL;
+            }
+            const uint8* rgba = palette + index * 4;
+            uint8* bgra = data + y * stride + x * 4;
+            bgra[0] = rgba[2];
+            bgra[1] = rgba[1];
+            bgra[2] = rgba[0];
+            bgra[3] = rgba[3];
+        }
+    }
+    return bitmap;
+}
+
+
+static const BBitmap*
+ArtworkBitmap(OSTenIcon kind)
+{
+    static std::once_flag once;
+    static BBitmap* bitmaps[3] = { NULL, NULL, NULL };
+    std::call_once(once, []() {
+        for (int index = 0; index < 3; index++)
+            bitmaps[index] = CreateArtworkBitmap((OSTenIcon)index);
+    });
+    return bitmaps[(int)kind];
+}
 
 struct FinderItem {
 	entry_ref	ref;
@@ -110,6 +207,7 @@ public:
 			B_WILL_DRAW | B_FRAME_EVENTS | B_NAVIGABLE),
 		fDirectory(directory),
 		fIsBootVolumeRoot(false),
+		fIsSystemFolder(false),
 		fTrackingDrag(false),
 		fPressedIndex(-1)
 	{
@@ -117,8 +215,10 @@ public:
 		SetLowColor(255, 255, 255);
 		BEntry folder(&fDirectory);
 		BPath path;
-		fIsBootVolumeRoot = folder.GetPath(&path) == B_OK
-			&& strcmp(path.Path(), "/boot") == 0;
+		if (folder.GetPath(&path) == B_OK) {
+			fIsBootVolumeRoot = strcmp(path.Path(), "/boot") == 0;
+			fIsSystemFolder = strcmp(path.Path(), "/boot/System Folder") == 0;
+		}
 		Refresh();
 	}
 
@@ -407,11 +507,18 @@ private:
 
 	void _DrawItem(const FinderItem& item)
 	{
-		BRect icon(item.cell.left + 25, item.cell.top + kIconTop,
-			item.cell.left + 61, item.cell.top + kIconTop + 34);
-		if (item.isDirectory)
-			_DrawFolderIcon(icon);
-		else
+		BRect icon(item.cell.left + 23, item.cell.top + kIconTop,
+			item.cell.left + 63, item.cell.top + kIconTop + 37);
+		if (item.isDirectory) {
+			if (!_DrawArtworkIcon(icon, kFolderIcon))
+				_DrawFolderIcon(icon);
+		} else if (fIsSystemFolder && item.name == "Finder") {
+			if (!_DrawArtworkIcon(icon, kFinderIcon))
+				_DrawFileIcon(icon);
+		} else if (fIsSystemFolder && item.name == "System") {
+			if (!_DrawArtworkIcon(icon, kSystemIcon))
+				_DrawFileIcon(icon);
+		} else
 			_DrawFileIcon(icon);
 
 		BString display(item.name);
@@ -430,6 +537,19 @@ private:
 		DrawString(display.String(), BPoint(textX, baseline));
 	}
 
+
+    bool _DrawArtworkIcon(BRect rect, OSTenIcon kind)
+    {
+        const BBitmap* bitmap = ArtworkBitmap(kind);
+        if (bitmap == NULL)
+            return false;
+        SetDrawingMode(B_OP_ALPHA);
+        SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
+        DrawBitmap(bitmap, bitmap->Bounds(), rect);
+        SetDrawingMode(B_OP_COPY);
+        return true;
+    }
+
 	// Classic Finder folders use a clear tab, a pale face, and a narrow
 	// shaded edge so the shape stays readable at the small icon size.
 	void _DrawFolderIcon(BRect rect)
@@ -439,29 +559,29 @@ private:
 		BRect tab(rect.left + 3, rect.top + 3, rect.left + 20,
 			rect.top + 11);
 
-		SetHighColor(48, 42, 31);
+		SetHighColor(41, 88, 148);
 		FillRect(body);
 		FillRect(tab);
 
-		SetHighColor(217, 180, 97);
+		SetHighColor(90, 159, 225);
 		FillRect(BRect(rect.left + 4, rect.top + 10, rect.right - 3,
 			rect.bottom - 4));
 		FillRect(BRect(rect.left + 5, rect.top + 5, rect.left + 18,
 			rect.top + 9));
 
-		SetHighColor(248, 226, 166);
+		SetHighColor(205, 235, 255);
 		FillRect(BRect(rect.left + 5, rect.top + 11, rect.right - 5,
 			rect.top + 13));
-		SetHighColor(234, 203, 128);
+		SetHighColor(141, 195, 247);
 		FillRect(BRect(rect.left + 5, rect.top + 14, rect.right - 5,
 			rect.bottom - 7));
-		SetHighColor(190, 145, 66);
+		SetHighColor(66, 134, 210);
 		FillRect(BRect(rect.right - 5, rect.top + 13, rect.right - 3,
 			rect.bottom - 4));
 		FillRect(BRect(rect.left + 4, rect.bottom - 5, rect.right - 3,
 			rect.bottom - 4));
 
-		SetHighColor(72, 59, 37);
+		SetHighColor(55, 107, 176);
 		StrokeLine(BPoint(rect.left + 4, rect.top + 9),
 			BPoint(rect.left + 19, rect.top + 9));
 		StrokeLine(BPoint(rect.left + 20, rect.top + 10),
@@ -500,6 +620,7 @@ private:
 private:
 	entry_ref				fDirectory;
 	bool					fIsBootVolumeRoot;
+	bool					fIsSystemFolder;
 	bool					fTrackingDrag;
 	int32					fPressedIndex;
 	BPoint					fDragStart;
