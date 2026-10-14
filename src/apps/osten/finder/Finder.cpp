@@ -136,6 +136,36 @@ public:
 			_OpenSelection();
 			return;
 		}
+		// Route Finder commands to the window that actually has keyboard focus.
+		// The separate System menu bar must not decide which folder owns them.
+		if (numBytes == 1 && (modifiers() & B_COMMAND_KEY) != 0) {
+			uint32 command = 0;
+			switch (bytes[0]) {
+				case 'o': case 'O': command = kOSTenOpen; break;
+				case 'n': case 'N': command = kOSTenNewFolder; break;
+				case 'w': case 'W': command = kOSTenClose; break;
+				case 'a': case 'A': command = kOSTenSelectAll; break;
+			}
+			if (command != 0) {
+				Window()->PostMessage(command);
+				return;
+			}
+		}
+		// Route Finder commands to the window that actually has keyboard focus.
+		// The separate System menu bar must not decide which folder owns them.
+		if (numBytes == 1 && (modifiers() & B_COMMAND_KEY) != 0) {
+			uint32 command = 0;
+			switch (bytes[0]) {
+				case 'o': case 'O': command = kOSTenOpen; break;
+				case 'n': case 'N': command = kOSTenNewFolder; break;
+				case 'w': case 'W': command = kOSTenClose; break;
+				case 'a': case 'A': command = kOSTenSelectAll; break;
+			}
+			if (command != 0) {
+				Window()->PostMessage(command);
+				return;
+			}
+		}
 		BView::KeyDown(bytes, numBytes);
 	}
 
@@ -331,7 +361,7 @@ private:
 			return true;
 		if (!fIsBootVolumeRoot)
 			return false;
-		return strcmp(name, "_packages") == 0
+		return strcmp(name, "_packages_") == 0
 			|| strcmp(name, "data") == 0
 			|| strcmp(name, "home") == 0
 			|| strcmp(name, "system") == 0
