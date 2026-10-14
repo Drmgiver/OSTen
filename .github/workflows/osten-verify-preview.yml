@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/osten-verify-preview.yml
       - build/osten/tools/finder-input-smoke.py
+      - build/osten/tools/system-folder-evidence.py
 
 permissions:
   actions: read

@@ -46,8 +46,9 @@ def locate_label(path, target, min_top=60):
     return x, y
 
 
-def verify_artwork(path, name):
-    x, y = locate_label(path, name, min_top=80)
+def verify_artwork(path, name, label_position=None):
+    x, y = (label_position if label_position is not None
+        else locate_label(path, name, min_top=80))
     screen = Image.open(path).convert('RGB')
     # Finder places each 40px icon immediately above its label.
     icon = screen.crop((x - 25, y - 59, x + 25, y - 15))
@@ -149,8 +150,18 @@ def main():
         print(f'Opening System Folder at ({x}, {y})', flush=True)
         double_click(x, y, width, height)
         screenshot = capture('system-folder')
-        verify_artwork(output / 'system-folder.png', 'Finder')
-        verify_artwork(output / 'system-folder.png', 'System')
+        folder_image = output / 'system-folder.png'
+        # Confirm both rows are visible. OCR reads the short System label as
+        # gibberish at 40px, although the artwork itself renders correctly.
+        locate_label(folder_image, 'Folder', min_top=60)
+        locate_label(folder_image, 'Startup', min_top=180)
+        finder_label = locate_label(folder_image, 'Finder', min_top=80)
+        verify_artwork(folder_image, 'Finder', finder_label)
+        # Native Finder sorts: Control Panels, Extensions, Finder, Fonts,
+        # Startup Items, System. Its icon grid is 94px wide x 86px high.
+        # Locate System relative to the reliably recognized Finder label.
+        system_label = (finder_label[0] - 94, finder_label[1] + 86)
+        verify_artwork(folder_image, 'System', system_label)
         # Enlarged view makes 40px icons readable on a GitHub artifact page.
         detail = screenshot.crop((40, 30, min(650, width), min(500, height)))
         detail.resize((detail.width * 2, detail.height * 2),
