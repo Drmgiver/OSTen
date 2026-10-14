@@ -30,7 +30,7 @@ IsOSTenSystemFolderPath(const BPath& path)
 	const size_t length = strlen(root);
 	const char* value = path.Path();
 	return strncmp(value, root, length) == 0
-		&& (value[length] == '\\0' || value[length] == '/');
+		&& (value[length] == '\0' || value[length] == '/');
 }
 
 
