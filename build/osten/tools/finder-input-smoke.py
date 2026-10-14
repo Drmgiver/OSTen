@@ -185,10 +185,10 @@ click(x, y)
 key('alt-o')
 for attempt in range(30):
     log = (output / 'serial.log').read_text(errors='replace')
-    if 'OSTEN_TRANSFER_TESTS_PASS 16' in log or 'OSTEN_TRANSFER_TESTS_FAIL' in log:
+    if 'OSTEN_TRANSFER_TESTS_PASS 18' in log or 'OSTEN_TRANSFER_TESTS_FAIL' in log:
         break
     time.sleep(1)
 screenshot('transfer-tests')
-if 'OSTEN_TRANSFER_TESTS_PASS 16' not in log:
+if 'OSTEN_TRANSFER_TESTS_PASS 18' not in log:
     raise RuntimeError('Native transfer tests did not pass:\n' + log[-8000:])
 connection.close()
