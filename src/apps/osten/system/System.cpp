@@ -59,6 +59,9 @@ public:
 		BMenuItem* emptyTrash = new BMenuItem("Empty Trash...", NULL);
 		emptyTrash->SetEnabled(false);
 		specialMenu->AddItem(emptyTrash);
+		specialMenu->AddSeparatorItem();
+		specialMenu->AddItem(new BMenuItem("System Folder Access...",
+			new BMessage(kOSTenSystemFolderAccess)));
 		bar->AddItem(specialMenu);
 		AddChild(bar);
 	}
@@ -73,7 +76,8 @@ public:
 			|| message->what == kOSTenOpen
 			|| message->what == kOSTenClose
 			|| message->what == kOSTenSelectAll
-			|| message->what == kOSTenViewAsIcons) {
+			|| message->what == kOSTenViewAsIcons
+			|| message->what == kOSTenSystemFolderAccess) {
 			BMessenger finder("application/x-vnd.OSTen-Finder");
 			finder.SendMessage(message);
 			return;
