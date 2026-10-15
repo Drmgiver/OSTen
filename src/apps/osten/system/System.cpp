@@ -1,6 +1,12 @@
 /* SPDX-License-Identifier: MIT */
 
 #include <Alert.h>
+#include <MessageRunner.h>
+#include <Notification.h>
+#include <View.h>
+#include <List.h>
+#include <time.h>
+#include <vector>
 #include <Application.h>
 #include <Bitmap.h>
 #include <Menu.h>
@@ -17,6 +23,7 @@
 
 #include "AboutComputer.h"
 #include "OSTenMessages.h"
+#include "SystemExtras.h"
 #include "OSTenWordmark.h"
 
 
@@ -26,6 +33,7 @@ const uint32 kAboutOSTen = 'osab';
 const uint32 kFocusAbout = 'osaf';
 const uint32 kShutDownOSTen = 'ossh';
 const uint32 kRestartOSTen = 'osre';
+const uint32 kClockTick = 'osct';
 
 
 // Draw the complete OSTen wordmark as the system menu's actual clickable item.
@@ -116,7 +124,9 @@ public:
 		BWindow(BRect(0, 0, BScreen().Frame().Width(), 25), "System",
 			B_NO_BORDER_WINDOW_LOOK, B_FLOATING_ALL_WINDOW_FEEL,
 			B_NOT_CLOSABLE | B_NOT_MOVABLE | B_NOT_RESIZABLE
-				| B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE)
+				| B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE),
+		fClock(NULL), fNoticeButton(NULL), fCenter(NULL),
+		fUnread(0), fClockRunner(NULL)
 	{
 		BMenuBar* bar = new BMenuBar(Bounds(), "System menu bar");
 		BMenu* systemMenu = new BMenu("OSTen");
@@ -169,11 +179,123 @@ public:
 		specialMenu->AddItem(new BMenuItem("System Folder Access...",
 			new BMessage(kOSTenSystemFolderAccess)));
 		bar->AddItem(specialMenu);
+		// Application switching, not yet the app-aware global menu.
+		bar->AddItem(CreateOSTenApplicationMenu());
 		AddChild(bar);
+		BRect bounds = Bounds();
+		fNoticeButton = CreateOSTenNoticeButton(BRect(
+			bounds.right - 236, 1, bounds.right - 139, 24));
+		AddChild(fNoticeButton);
+		fClock = CreateOSTenClockView(BRect(
+			bounds.right - 138, 1, bounds.right - 2, 24));
+		AddChild(fClock);
+		BMessage tick(kClockTick);
+		fClockRunner = new BMessageRunner(BMessenger(this), &tick, 15000000);
 	}
+
+	~SystemBar() override { delete fClockRunner; }
 
 	void MessageReceived(BMessage* message) override
 	{
+		if (message->what == kClockTick) {
+			RefreshOSTenClock(fClock);
+			return;
+		}
+		if (message->what == kOSTenShowNotices) {
+			if (fCenter == NULL) {
+				BRect screen = BScreen().Frame();
+				BRect popup(screen.right - 425, 32,
+					screen.right - 14, 379);
+				fCenter = CreateOSTenNotificationCenter(
+					BMessenger(this), popup);
+				UpdateOSTenNotifications(fCenter, fNotices);
+				fCenter->Show();
+			} else {
+				UpdateOSTenNotifications(fCenter, fNotices);
+				if (fCenter->IsHidden())
+					fCenter->Show();
+				fCenter->Activate(true);
+			}
+			fUnread = 0;
+			SetOSTenUnreadCount(fNoticeButton, fUnread);
+			return;
+		}
+		if (message->what == kOSTenClearNotices) {
+			fNotices.clear();
+			fUnread = 0;
+			SetOSTenUnreadCount(fNoticeButton, fUnread);
+			UpdateOSTenNotifications(fCenter, fNotices);
+			return;
+		}
+		if (message->what == kOSTenTestNotice) {
+			BNotification test(B_INFORMATION_NOTIFICATION);
+			test.SetTitle("OSTen Notification Test");
+			test.SetContent("The native notification system is connected.");
+			test.SetGroup("OSTen");
+			if (test.Send() != B_OK)
+				(new BAlert("Notifications",
+					"The notification service is unavailable.",
+					"OK"))->Go(NULL);
+			return;
+		}
+		if (message->what == kOSTenNewNotice) {
+			OSTenNotice notice;
+			const char* value;
+			if (message->FindString("_title", &value) == B_OK)
+				notice.title = value;
+			if (message->FindString("_content", &value) == B_OK)
+				notice.content = value;
+			if (message->FindString("_sourceName", &value) == B_OK)
+				notice.source = value;
+			if (notice.title.IsEmpty())
+				notice.title = "System Notification";
+			notice.when = time(NULL);
+			fNotices.push_back(notice);
+			if (fNotices.size() > 100)
+				fNotices.erase(fNotices.begin());
+			if (fCenter == NULL || fCenter->IsHidden())
+				++fUnread;
+			SetOSTenUnreadCount(fNoticeButton, fUnread);
+			UpdateOSTenNotifications(fCenter, fNotices);
+			return;
+		}
+		if (message->what == kOSTenActivateApplication
+			|| message->what == kOSTenNextApplication) {
+			BRoster roster;
+			team_id team = -1;
+			if (message->what == kOSTenActivateApplication) {
+				int32 requested;
+				if (message->FindInt32("team", &requested) == B_OK)
+					team = requested;
+			} else {
+				BList teams;
+				roster.GetAppList(&teams);
+				app_info current;
+				team_id active = roster.GetActiveAppInfo(&current) == B_OK
+					? current.team : -1;
+				std::vector<team_id> apps;
+				for (int32 i = 0; i < teams.CountItems(); ++i) {
+					team_id id = (team_id)(addr_t)teams.ItemAt(i);
+					app_info info;
+					if (roster.GetRunningAppInfo(id, &info) == B_OK
+						&& !(info.flags & B_BACKGROUND_APP)
+						&& strcmp(info.signature,
+							"application/x-vnd.OSTen-System") != 0)
+						apps.push_back(id);
+				}
+				if (!apps.empty()) {
+					team = apps.front();
+					for (size_t i = 0; i < apps.size(); ++i)
+						if (apps[i] == active) {
+							team = apps[(i + 1) % apps.size()];
+							break;
+						}
+				}
+			}
+			if (team >= 0)
+				roster.ActivateApp(team);
+			return;
+		}
 		if (message->what == kAboutOSTen) {
 			if (fAboutMessenger.IsValid()) {
 				BMessage focus(kFocusAbout);
@@ -229,6 +351,12 @@ public:
 
 private:
 	BMessenger fAboutMessenger;
+	BView* fClock;
+	BView* fNoticeButton;
+	BWindow* fCenter;
+	int32 fUnread;
+	BMessageRunner* fClockRunner;
+	std::vector<OSTenNotice> fNotices;
 };
 
 
@@ -242,8 +370,23 @@ public:
 
 	void ReadyToRun() override
 	{
-		(new SystemBar())->Show();
+		fBar = new SystemBar();
+		fBar->Show();
 	}
+
+	void MessageReceived(BMessage* message) override
+	{
+		if (message->what == kOSTenNewNotice
+			|| message->what == kOSTenNextApplication
+			|| message->what == kOSTenActivateApplication) {
+			if (fBar != NULL)
+				fBar->PostMessage(message);
+			return;
+		}
+		BApplication::MessageReceived(message);
+	}
+private:
+	SystemBar* fBar = NULL;
 };
 
 } // namespace
