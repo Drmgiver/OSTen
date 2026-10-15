@@ -63,6 +63,7 @@ All rights reserved.
 #include "DeskbarMenu.h"
 #include "ExpandoMenuBar.h"
 #include "StatusView.h"
+#include "TimeView.h"
 
 
 #undef B_TRANSLATION_CONTEXT
@@ -222,6 +223,32 @@ TBarWindow::MessageReceived(BMessage* message)
 		case kMsgRemoveItem:
 			RemoveItem(message);
 			break;
+
+		case 'osht':
+		{
+			// Keep the original Deskbar process and its BShelf alive. Real
+			// BDeskbar::AddItem() Replicants are hosted here, not cloned into
+			// OSTen's process.
+			if (!fOSTenTrayHost) {
+				TDragRegion* region = fBarView->DragRegion();
+				region->RemoveSelf();
+				AddChild(region);
+				fBarView->Hide();
+				fBarView->ReplicantTray()->Time()->Hide();
+				region->FindView("Status")->MoveTo(0, 0);
+				region->FindView("Status")->ResizeTo(95, 23);
+				region->ResizeTo(95, 23);
+				SetLook(B_NO_BORDER_WINDOW_LOOK);
+				SetFeel(B_FLOATING_ALL_WINDOW_FEEL);
+				BWindow::SetSizeLimits(95, 95, 23, 23);
+				ResizeTo(95, 23);
+				fOSTenTrayHost = true;
+				fBarView->ReplicantTray()->RealignReplicants();
+			}
+			BRect screen = BScreen(this).Frame();
+			MoveTo(screen.right - 288, screen.top + 1);
+			break;
+		}
 
 		case 'iloc':
 			GetIconFrame(message);
