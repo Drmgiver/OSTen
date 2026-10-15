@@ -983,9 +983,20 @@ public:
 
 		BRect frame = Bounds();
 		frame.InsetBy(7, 7);
+		// Leave a classic Mac footer beneath the vertical scrollbar. Its
+		// lower-right corner belongs to the Platinum window-size box, not
+		// to the scroll view. B_FOLLOW_ALL retains the space while resizing.
+		frame.bottom -= 16;
 		fView = new FolderView(frame, directory);
 		AddChild(new BScrollView("Folder scrolling", fView, B_FOLLOW_ALL,
 			0, false, true, B_NO_BORDER));
+
+		BRect footer(7, frame.bottom + 1, Bounds().right - 7,
+			Bounds().bottom - 7);
+		BView* footerView = new BView(footer, "Finder lower inset",
+			B_FOLLOW_LEFT_RIGHT | B_FOLLOW_BOTTOM, B_WILL_DRAW);
+		footerView->SetViewColor(255, 255, 255);
+		AddChild(footerView);
 
 		AddShortcut('O', B_COMMAND_KEY, new BMessage(kOSTenOpen));
 		AddShortcut('N', B_COMMAND_KEY, new BMessage(kOSTenNewFolder));

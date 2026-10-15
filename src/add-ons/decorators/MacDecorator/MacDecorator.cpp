@@ -222,16 +222,17 @@ MacDecorator::_DoLayout()
 
 	fBorderRect = fFrame.InsetByCopy(-fBorderWidth, -fBorderWidth);
 
-	// The classic Macintosh lower-right size box projects slightly past the
-	// narrow Platinum frame. Keep it entirely outside the client area so
-	// applications do not lose document pixels to their window decoration.
-	// A window lacking either resize axis cannot show a two-axis size box.
+	// Integrate the classic Macintosh size box into the existing Platinum
+	// frame. Its right and bottom edges share the frame's outside edges:
+	// unlike the old position, it cannot hang off the window into desktop.
+	// The 16-pixel box overlaps the inner corner; OSTen Finder reserves this
+	// space below its vertical scroller. Fixed-size windows have no box.
 	fResizeRect.Set(0, 0, -1, -1);
 	if (fTopTab != NULL && hasTab
 		&& (fTopTab->flags & (B_NOT_RESIZABLE | B_NOT_H_RESIZABLE
 			| B_NOT_V_RESIZABLE)) == 0) {
-		fResizeRect.Set(fFrame.right, fFrame.bottom,
-			fFrame.right + 15, fFrame.bottom + 15);
+		fResizeRect.Set(fBorderRect.right - 15, fBorderRect.bottom - 15,
+			fBorderRect.right, fBorderRect.bottom);
 	}
 
 	// calculate our tab rect
