@@ -434,6 +434,7 @@ TBarApp::MessageReceived(BMessage* message)
 		case kMsgAddView:
 		case kMsgRemoveItem:
 		case kMsgAddAddOn:
+		case 'osht': // OSTen native tray host request
 			fBarWindow->PostMessage(message);
 			break;
 
