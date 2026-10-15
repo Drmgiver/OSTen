@@ -740,6 +740,8 @@ TBarView::SaveSettings()
 void
 TBarView::UpdatePlacement()
 {
+	if (fBarWindow != NULL && fBarWindow->IsOSTenTrayHost())
+		return;
 	ChangeState(Vertical(), Left(), Top(), State());
 }
 
