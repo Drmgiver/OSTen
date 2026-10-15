@@ -32,6 +32,7 @@
 #include <FindDirectory.h>
 #include <Message.h>
 #include <MessageFilter.h>
+#include <Messenger.h>
 #include <Path.h>
 #include <PthreadMutexLocker.h>
 #include <Region.h>
@@ -189,6 +190,23 @@ KeyboardFilter::Filter(BMessage* message, EventTarget** _target,
 
 	message->FindInt32("key", &key);
 	message->FindInt32("modifiers", &modifiers);
+
+	if (message->what == B_KEY_DOWN
+		&& (modifiers & B_COMMAND_KEY) != 0
+		&& (modifiers & (B_CONTROL_KEY | B_OPTION_KEY)) == 0) {
+		const char* bytes = NULL;
+		if (message->FindString("bytes", &bytes) == B_OK && bytes != NULL
+			&& bytes[0] == '\t') {
+			// A running OSTen shell owns Command-Tab. Preserve standard
+			// Haiku behavior when the OSTen application is not present.
+			BMessenger osten("application/x-vnd.OSTen-System");
+			if (osten.IsValid()) {
+				BMessage next('osnx');
+				if (osten.SendMessage(&next) == B_OK)
+					return B_SKIP_MESSAGE;
+			}
+		}
+	}
 
 	if ((message->what == B_KEY_DOWN || message->what == B_UNMAPPED_KEY_DOWN)) {
 		// Check for safe video mode (shift + cmd + ctrl + escape)
