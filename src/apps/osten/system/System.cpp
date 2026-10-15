@@ -124,11 +124,19 @@ public:
 		BWindow(BRect(0, 0, BScreen().Frame().Width(), 25), "System",
 			B_NO_BORDER_WINDOW_LOOK, B_FLOATING_ALL_WINDOW_FEEL,
 			B_NOT_CLOSABLE | B_NOT_MOVABLE | B_NOT_RESIZABLE
-				| B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE),
+				| B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE
+				| B_WILL_ACCEPT_FIRST_CLICK),
 		fClock(NULL), fNoticeButton(NULL), fSwitcher(NULL), fCenter(NULL),
 		fUnread(0), fClockRunner(NULL)
 	{
-		BMenuBar* bar = new BMenuBar(Bounds(), "System menu bar");
+		// The bar must not cover the status controls to its right.
+		// Haiku hit-tests sibling views front-to-back (first child first),
+		// so a full-width BMenuBar would steal every Notices/Clock/Switcher
+		// click, even when those controls render over it.
+		BRect menuArea = Bounds();
+		menuArea.right -= 289;
+		BMenuBar* bar = new BMenuBar(menuArea, "System menu bar",
+			B_FOLLOW_LEFT_TOP, B_ITEMS_IN_ROW, false);
 		BMenu* systemMenu = new BMenu("OSTen");
 		systemMenu->AddItem(new BMenuItem("About OSTen...",
 			new BMessage(kAboutOSTen)));
