@@ -2,6 +2,7 @@
 
 #include <Alert.h>
 #include <Application.h>
+#include <Bitmap.h>
 #include <Menu.h>
 #include <MenuBar.h>
 #include <MenuItem.h>
@@ -15,6 +16,7 @@
 #include <Window.h>
 
 #include "OSTenMessages.h"
+#include "OSTenWordmark.h"
 
 
 namespace {
@@ -22,6 +24,87 @@ namespace {
 const uint32 kAboutOSTen = 'osab';
 const uint32 kShutDownOSTen = 'ossh';
 const uint32 kRestartOSTen = 'osre';
+
+
+// Draw the complete OSTen wordmark as the system menu's actual clickable item.
+// The rest of the menu remains a normal BMenu with all of its original actions.
+class OSTenLogoMenuItem : public BMenuItem {
+public:
+    OSTenLogoMenuItem(BMenu* submenu)
+        :
+        BMenuItem(submenu),
+        fLogo(_CreateLogo())
+    {
+    }
+
+    ~OSTenLogoMenuItem() override
+    {
+        delete fLogo;
+    }
+
+protected:
+    void GetContentSize(float* width, float* height) override
+    {
+        if (fLogo == NULL) {
+            BMenuItem::GetContentSize(width, height);
+            return;
+        }
+        *width = kOSTenWordmarkWidth;
+        *height = 18;
+    }
+
+    void DrawContent() override
+    {
+        if (fLogo == NULL) {
+            BMenuItem::DrawContent();
+            return;
+        }
+        BMenu* menu = Menu();
+        if (menu == NULL)
+            return;
+        BPoint where = ContentLocation();
+        menu->SetDrawingMode(B_OP_ALPHA);
+        menu->SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
+        menu->DrawBitmap(fLogo, fLogo->Bounds(),
+            BRect(where.x, where.y, where.x + kOSTenWordmarkWidth - 1,
+                where.y + 17));
+        menu->SetDrawingMode(B_OP_COPY);
+    }
+
+private:
+    static BBitmap* _CreateLogo()
+    {
+        BBitmap* bitmap = new BBitmap(BRect(0, 0,
+            kOSTenWordmarkWidth - 1, kOSTenWordmarkHeight - 1), B_RGBA32);
+        if (bitmap->InitCheck() != B_OK) {
+            delete bitmap;
+            return NULL;
+        }
+        const char* alphabet =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        uint8* pixels = (uint8*)bitmap->Bits();
+        const int32 stride = bitmap->BytesPerRow();
+        for (int y = 0; y < kOSTenWordmarkHeight; y++) {
+            for (int x = 0; x < kOSTenWordmarkWidth; x++) {
+                const char* colorIndex = strchr(alphabet,
+                    kOSTenWordmarkPixels[y][x]);
+                if (colorIndex == NULL) {
+                    delete bitmap;
+                    return NULL;
+                }
+                uint32 rgba = kOSTenWordmarkPalette[colorIndex - alphabet];
+                uint8* bgra = pixels + y * stride + x * 4;
+                bgra[0] = (rgba >> 8) & 255;
+                bgra[1] = (rgba >> 16) & 255;
+                bgra[2] = (rgba >> 24) & 255;
+                bgra[3] = rgba & 255;
+            }
+        }
+        return bitmap;
+    }
+
+    BBitmap* fLogo;
+};
 
 
 class SystemBar : public BWindow {
@@ -42,7 +125,7 @@ public:
 			new BMessage(kRestartOSTen)));
 		systemMenu->AddItem(new BMenuItem("Shut Down...",
 			new BMessage(kShutDownOSTen)));
-		bar->AddItem(systemMenu);
+		bar->AddItem(new OSTenLogoMenuItem(systemMenu));
 
 		BMenu* fileMenu = new BMenu("File");
 		fileMenu->AddItem(new BMenuItem("New Folder",

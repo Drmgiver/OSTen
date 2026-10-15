@@ -18,6 +18,7 @@
 #include <ScrollView.h>
 #include <StorageDefs.h>
 #include <String.h>
+#include <TextView.h>
 #include <View.h>
 #include <Window.h>
 #include <WindowPrivate.h>
@@ -43,6 +44,8 @@ const uint32 kFinderDragEntries = 'osdg';
 const uint32 kFinderMoveToTrash = 'ostr';
 const uint32 kFinderRefreshAll = 'osrf';
 const uint32 kFinderRefreshFolder = 'osrw';
+const uint32 kInlineRenameCommit = 'osic';
+const uint32 kInlineRenameCancel = 'osix';
 const char* kWindowFrameAttribute = "OSTen:window_frame";
 const char* kArrangeAttribute = "OSTen:arrange_kind";
 
@@ -206,6 +209,35 @@ TransferEntries(const BMessage* message, const entry_ref& targetRef,
 }
 
 
+class InlineRenameEditor : public BTextView {
+public:
+    InlineRenameEditor(BRect frame, const char* filename)
+        :
+        BTextView(frame, "Inline filename", BRect(3, 1,
+            frame.Width() - 3, frame.Height() - 1), B_FOLLOW_LEFT_TOP,
+            B_WILL_DRAW | B_NAVIGABLE)
+    {
+        SetViewColor(255, 255, 255);
+        SetLowColor(255, 255, 255);
+        SetWordWrap(false);
+        SetMaxBytes(B_FILE_NAME_LENGTH - 1);
+        SetText(filename);
+        Select(0, TextLength());
+    }
+
+    void KeyDown(const char* bytes, int32 length) override
+    {
+        if (length == 1 && (bytes[0] == B_ENTER || bytes[0] == B_ESCAPE)) {
+            if (Parent() != NULL)
+                BMessenger(Parent()).SendMessage(bytes[0] == B_ENTER
+                    ? kInlineRenameCommit : kInlineRenameCancel);
+            return;
+        }
+        BTextView::KeyDown(bytes, length);
+    }
+};
+
+
 class FolderView : public BView {
 public:
 	FolderView(BRect frame, const entry_ref& directory, bool desktop = false)
@@ -218,7 +250,9 @@ public:
 		fIsDesktop(desktop),
 		fArrangeKind(false),
 		fTrackingDrag(false),
-		fPressedIndex(-1)
+		fPressedIndex(-1),
+		fRenameEditor(NULL),
+		fRenameIndex(-1)
 	{
 		if (fIsDesktop) {
 			SetViewColor(54, 104, 150);
@@ -264,7 +298,7 @@ public:
 	void KeyDown(const char* bytes, int32 numBytes) override
 	{
 		if (numBytes == 1 && bytes[0] == B_ENTER) {
-			_OpenSelection();
+            BeginRenameSelected();
 			return;
 		}
 		// Route Finder commands to the window that actually has keyboard focus.
@@ -287,6 +321,8 @@ public:
 
 	void MouseDown(BPoint where) override
 	{
+        if (fRenameEditor != NULL)
+            _FinishInlineRename(true);
 		MakeFocus(true);
 		int32 hit = _ItemAt(where);
 		int32 buttons = B_PRIMARY_MOUSE_BUTTON;
@@ -307,6 +343,15 @@ public:
 
 		uint32 keyModifiers = modifiers();
 		bool extend = (keyModifiers & (B_COMMAND_KEY | B_SHIFT_KEY)) != 0;
+        int32 clicks = 1;
+        if (Window()->CurrentMessage() != NULL)
+            Window()->CurrentMessage()->FindInt32("clicks", &clicks);
+        if (hit >= 0 && fItems[hit].selected && !extend && clicks == 1
+            && where.y >= fItems[hit].cell.top + 50
+            && where.y <= fItems[hit].cell.top + 70) {
+            _BeginInlineRename(hit);
+            return;
+        }
 
 		if (!extend && (hit < 0 || !fItems[hit].selected))
 			_ClearSelection();
@@ -316,9 +361,6 @@ public:
 			fItems[hit].selected = true;
 		Invalidate();
 
-		int32 clicks = 1;
-		if (Window()->CurrentMessage() != NULL)
-			Window()->CurrentMessage()->FindInt32("clicks", &clicks);
 		if (hit >= 0 && clicks >= 2) {
 			BMessage open(kOpenEntry);
 			open.AddInt32("index", hit);
@@ -359,6 +401,14 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+        if (message->what == kInlineRenameCommit) {
+            _FinishInlineRename(true);
+            return;
+        }
+        if (message->what == kInlineRenameCancel) {
+            _FinishInlineRename(false);
+            return;
+        }
 		if (message->what == kFinderDragEntries && message->WasDropped()) {
 			entry_ref target = fDirectory;
 			BPoint point = message->DropPoint();
@@ -374,6 +424,12 @@ public:
 
 	void Refresh(const char* selectName = NULL)
 	{
+        if (fRenameEditor != NULL) {
+            RemoveChild(fRenameEditor);
+            delete fRenameEditor;
+            fRenameEditor = NULL;
+            fRenameIndex = -1;
+        }
 		fTrackingDrag = false;
 		fPressedIndex = -1;
 		fItems.clear();
@@ -407,6 +463,17 @@ public:
 		_LayoutItems();
 		Invalidate();
 	}
+
+	bool BeginRenameSelected()
+    {
+        if (fRenameEditor != NULL)
+            return true;
+        std::vector<int32> indices = SelectedIndices();
+        if (indices.size() != 1)
+            return false;
+        _BeginInlineRename(indices[0]);
+        return true;
+    }
 
 	void SelectAll()
 	{
@@ -455,6 +522,59 @@ public:
 	}
 
 private:
+    void _BeginInlineRename(int32 index)
+    {
+        if (index < 0 || (size_t)index >= fItems.size())
+            return;
+        const FinderItem& item = fItems[index];
+        fRenameRef = item.ref;
+        fRenameIndex = index;
+        BRect editor(item.cell.left - 10, item.cell.top + 49,
+            item.cell.right + 10, item.cell.top + 73);
+        fRenameEditor = new InlineRenameEditor(editor, item.name.String());
+        AddChild(fRenameEditor);
+        fRenameEditor->MakeFocus(true);
+        Invalidate(item.cell);
+    }
+
+    void _FinishInlineRename(bool save)
+    {
+        if (fRenameEditor == NULL)
+            return;
+        BString filename(fRenameEditor->Text());
+        entry_ref target = fRenameRef;
+        BString previous;
+        if (fRenameIndex >= 0 && (size_t)fRenameIndex < fItems.size())
+            previous = fItems[fRenameIndex].name;
+        RemoveChild(fRenameEditor);
+        delete fRenameEditor;
+        fRenameEditor = NULL;
+        fRenameIndex = -1;
+        MakeFocus(true);
+        if (!save) {
+            Invalidate();
+            return;
+        }
+        status_t error = RenameFinderEntry(target, filename.String(),
+            sSystemFolderUnlocked.load());
+        if (error != B_OK) {
+            BString details("The item could not be renamed.\n\n");
+            if (error == B_BAD_VALUE)
+                details << "Choose a nonempty name without slashes.";
+            else if (error == B_PERMISSION_DENIED)
+                details << "The System Folder is locked. Unlock it first.";
+            else if (error == B_FILE_EXISTS)
+                details << "An item with this name already exists.";
+            else
+                details << strerror(error);
+            (new BAlert("Rename", details.String(), "OK"))->Go();
+            Refresh(previous.String());
+            return;
+        }
+        Refresh(filename.String());
+        be_app->PostMessage(kFinderRefreshAll);
+    }
+
 	void _AddSelectedRefs(BMessage& message) const
 	{
 		for (size_t index = 0; index < fItems.size(); index++) {
@@ -576,6 +696,9 @@ private:
 		} else
 			_DrawFileIcon(icon);
 
+		if (fRenameEditor != NULL && fRenameIndex >= 0
+            && &item == &fItems[fRenameIndex])
+            return;
 		BString display(item.name);
 		TruncateString(&display, B_TRUNCATE_MIDDLE, item.cell.Width() - 6);
 		float textWidth = StringWidth(display.String());
@@ -684,6 +807,9 @@ private:
 	int32					fPressedIndex;
 	BPoint					fDragStart;
 	std::vector<FinderItem>	fItems;
+    InlineRenameEditor* fRenameEditor;
+    int32 fRenameIndex;
+    entry_ref fRenameRef;
 };
 
 
@@ -697,18 +823,6 @@ ShowSelectedInfo(FolderView* view)
     entry_ref ref;
     if (indices.size() == 1 && view->EntryAt(indices[0], ref))
         ShowFinderInfo(ref);
-}
-
-
-static void
-RenameSelected(FolderView* view)
-{
-    if (view == NULL)
-        return;
-    std::vector<int32> indices = view->SelectedIndices();
-    entry_ref ref;
-    if (indices.size() == 1 && view->EntryAt(indices[0], ref))
-        ShowFinderRename(ref, sSystemFolderUnlocked.load());
 }
 
 
@@ -892,7 +1006,7 @@ public:
 				fView->MoveSelectionToTrash();
 				return;
 			case kOSTenRename:
-				RenameSelected(fView);
+				fView->BeginRenameSelected();
 				return;
 			case kOSTenGetInfo:
 				ShowSelectedInfo(fView);
@@ -1344,7 +1458,8 @@ public:
 				_CreateDesktopFolder();
 				return;
 			case kOSTenRename:
-				RenameSelected(fFolderView);
+                if (fFolderView != NULL)
+                    fFolderView->BeginRenameSelected();
 				return;
 			case kOSTenGetInfo:
 				ShowSelectedInfo(fFolderView);
