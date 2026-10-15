@@ -30,8 +30,10 @@ class RenameWindow : public BWindow {
 public:
     RenameWindow(const entry_ref& ref, bool ownerUnlocked)
         :
+        // Use the look/feel constructor: the window_type overload would
+        // mistake our modal feel for flags and our flags for workspaces.
         BWindow(BRect(0, 0, 390, 155), "Rename",
-            B_TITLED_WINDOW, B_MODAL_APP_WINDOW_FEEL,
+            B_TITLED_WINDOW_LOOK, B_MODAL_APP_WINDOW_FEEL,
             B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE),
         fRef(ref),
         fOwnerUnlocked(ownerUnlocked)
