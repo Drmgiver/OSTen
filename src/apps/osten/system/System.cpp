@@ -125,7 +125,7 @@ public:
 			B_NO_BORDER_WINDOW_LOOK, B_FLOATING_ALL_WINDOW_FEEL,
 			B_NOT_CLOSABLE | B_NOT_MOVABLE | B_NOT_RESIZABLE
 				| B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE),
-		fClock(NULL), fNoticeButton(NULL), fCenter(NULL),
+		fClock(NULL), fNoticeButton(NULL), fSwitcher(NULL), fCenter(NULL),
 		fUnread(0), fClockRunner(NULL)
 	{
 		BMenuBar* bar = new BMenuBar(Bounds(), "System menu bar");
@@ -179,18 +179,23 @@ public:
 		specialMenu->AddItem(new BMenuItem("System Folder Access...",
 			new BMessage(kOSTenSystemFolderAccess)));
 		bar->AddItem(specialMenu);
-		// Application switching, not yet the app-aware global menu.
-		bar->AddItem(CreateOSTenApplicationMenu());
+		// The app switcher is a right-side status control, not an ordinary
+		// File/Edit/View menu. Reserve separate space for all three controls.
 		AddChild(bar);
 		BRect bounds = Bounds();
 		fNoticeButton = CreateOSTenNoticeButton(BRect(
-			bounds.right - 236, 1, bounds.right - 139, 24));
+			bounds.right - 355, 1, bounds.right - 259, 24));
 		AddChild(fNoticeButton);
 		fClock = CreateOSTenClockView(BRect(
-			bounds.right - 138, 1, bounds.right - 2, 24));
+			bounds.right - 258, 1, bounds.right - 117, 24));
 		AddChild(fClock);
+		fSwitcher = CreateOSTenApplicationSwitcher(BRect(
+			bounds.right - 116, 1, bounds.right - 2, 24));
+		AddChild(fSwitcher);
 		BMessage tick(kClockTick);
-		fClockRunner = new BMessageRunner(BMessenger(this), &tick, 15000000);
+		// A two-second pulse also refreshes app labels after activations
+		// without requiring a separate background polling thread.
+		fClockRunner = new BMessageRunner(BMessenger(this), &tick, 2000000);
 	}
 
 	~SystemBar() override { delete fClockRunner; }
@@ -199,6 +204,7 @@ public:
 	{
 		if (message->what == kClockTick) {
 			RefreshOSTenClock(fClock);
+			RefreshOSTenApplicationSwitcher(fSwitcher);
 			return;
 		}
 		if (message->what == kOSTenShowNotices) {
@@ -294,6 +300,7 @@ public:
 			}
 			if (team >= 0)
 				roster.ActivateApp(team);
+			RefreshOSTenApplicationSwitcher(fSwitcher);
 			return;
 		}
 		if (message->what == kAboutOSTen) {
@@ -353,6 +360,7 @@ private:
 	BMessenger fAboutMessenger;
 	BView* fClock;
 	BView* fNoticeButton;
+	BView* fSwitcher;
 	BWindow* fCenter;
 	int32 fUnread;
 	BMessageRunner* fClockRunner;

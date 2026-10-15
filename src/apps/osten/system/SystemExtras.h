@@ -27,7 +27,8 @@ struct OSTenNotice {
     time_t when;
 };
 
-BMenu* CreateOSTenApplicationMenu();
+BView* CreateOSTenApplicationSwitcher(BRect frame);
+void RefreshOSTenApplicationSwitcher(BView* view);
 BView* CreateOSTenClockView(BRect frame);
 BView* CreateOSTenNoticeButton(BRect frame);
 void RefreshOSTenClock(BView* clock);

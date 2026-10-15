@@ -10,6 +10,7 @@
 #include <ListView.h>
 #include <Menu.h>
 #include <MenuItem.h>
+#include <PopUpMenu.h>
 #include <Messenger.h>
 #include <Roster.h>
 #include <ScrollView.h>
@@ -66,21 +67,50 @@ GetApplications()
     return apps;
 }
 
-class ApplicationsMenu : public BMenu {
+// Right-most menu-bar status control, initially displaying Finder and then
+// whichever non-background application is in front. The dropdown is built
+// from the live roster, so there are no hardcoded application entries.
+class AppSwitcherView : public BView {
 public:
-    ApplicationsMenu() : BMenu("Applications") {}
-
-    bool AddDynamicItem(add_state state) override
+    AppSwitcherView(BRect frame)
+        : BView(frame, "OSTen App Switcher",
+            B_FOLLOW_RIGHT | B_FOLLOW_TOP, B_WILL_DRAW),
+        fLastName("Finder")
     {
-        if (state != B_INITIAL_ADD)
-            return false;
-        while (CountItems() != 0)
-            delete RemoveItem((int32)0);
+        SetViewColor(ui_color(B_MENU_BACKGROUND_COLOR));
+    }
+
+    void Draw(BRect update) override
+    {
+        SetHighColor(ui_color(B_MENU_BACKGROUND_COLOR));
+        FillRect(Bounds());
+        SetHighColor(120, 120, 120);
+        StrokeLine(BPoint(0, 5), BPoint(0, 21));
+        SetHighColor(24, 24, 24);
+        SetFont(be_plain_font);
+
+        BString title = CurrentAppName();
+        // Keep long third-party application titles inside the allotted
+        // status area without colliding with the downward menu chevron.
+        while (title.Length() > 3 && StringWidth(title.String())
+            > Bounds().Width() - 27)
+            title.Truncate(title.Length() - 1);
+        DrawString(title.String(), BPoint(9, 17));
+        float x = Bounds().right - 13;
+        StrokeLine(BPoint(x - 4, 11), BPoint(x, 15));
+        StrokeLine(BPoint(x, 15), BPoint(x + 4, 11));
+    }
+
+    void MouseDown(BPoint where) override
+    {
+        BPopUpMenu* popup = new BPopUpMenu("Running Applications",
+            false, false);
         std::vector<AppChoice> apps = GetApplications();
         if (apps.empty()) {
-            BMenuItem* empty = new BMenuItem("No running applications", NULL);
+            BMenuItem* empty = new BMenuItem("No running applications",
+                NULL);
             empty->SetEnabled(false);
-            AddItem(empty);
+            popup->AddItem(empty);
         }
         for (size_t i = 0; i < apps.size(); ++i) {
             BMessage* action = new BMessage(kOSTenActivateApplication);
@@ -88,10 +118,32 @@ public:
             BMenuItem* item = new BMenuItem(apps[i].name.String(), action);
             item->SetMarked(apps[i].active);
             item->SetTarget(BMessenger("application/x-vnd.OSTen-System"));
-            AddItem(item);
+            popup->AddItem(item);
         }
-        return false;
+        popup->SetAsyncAutoDestruct(true);
+        BPoint start(Bounds().left, Bounds().bottom + 1);
+        ConvertToScreen(&start);
+        popup->Go(start, true, false, true);
     }
+
+private:
+    BString CurrentAppName()
+    {
+        std::vector<AppChoice> apps = GetApplications();
+        for (size_t i = 0; i < apps.size(); ++i) {
+            if (apps[i].active) {
+                fLastName = apps[i].name;
+                return fLastName;
+            }
+        }
+        // Clicking the floating System bar can temporarily leave no
+        // listed app active. Preserve the previous application label.
+        if (fLastName.IsEmpty() && !apps.empty())
+            fLastName = apps.front().name;
+        return fLastName;
+    }
+
+    BString fLastName;
 };
 
 
@@ -253,7 +305,14 @@ private:
 };
 } // namespace
 
-BMenu* CreateOSTenApplicationMenu() { return new ApplicationsMenu(); }
+BView* CreateOSTenApplicationSwitcher(BRect frame)
+{
+    return new AppSwitcherView(frame);
+}
+void RefreshOSTenApplicationSwitcher(BView* view)
+{
+    if (view != NULL) view->Invalidate();
+}
 BView* CreateOSTenClockView(BRect frame) { return new ClockView(frame); }
 BView* CreateOSTenNoticeButton(BRect frame) { return new NoticeButton(frame); }
 void RefreshOSTenClock(BView* clock) { if (clock) clock->Invalidate(); }
