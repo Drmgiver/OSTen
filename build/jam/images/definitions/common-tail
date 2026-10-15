@@ -62,6 +62,15 @@ if $(HAIKU_BUILD_PROFILE) = nightly-osten-raw {
 	AddDirectoryToHaikuImage "System Folder" Fonts ;
 	AddDirectoryToHaikuImage "System Folder" "Startup Items" ;
 	AddDirectoryToHaikuImage Applications ;
+	# TEMPORARY: external, third-party native Deskbar Replicant smoke test.
+	# The preview workflow stages this HPKG before Jam runs. Keep the package
+	# outside the main Haiku package; remove this block with the next UI commit.
+	if $(OSTEN_MEMOCHIP_TEST) = 1 {
+		local testPackage = <osten-memochip>memochip-1.0-1-x86_64.hpkg ;
+		SEARCH on $(testPackage) =
+			[ FDirName $(HAIKU_TOP) build osten test-packages ] ;
+		AddFilesToHaikuImage home config packages : $(testPackage) ;
+	}
 	if $(OSTEN_TRANSFER_TESTS) = 1 {
 		AddFilesToHaikuImage Applications : OSTenTransferTests
 			: "Finder Transfer Tests" ;
