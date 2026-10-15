@@ -6,8 +6,10 @@
 
 #include "LaunchDaemon.h"
 
+#include <algorithm>
 #include <map>
 #include <set>
+#include <vector>
 
 #include <errno.h>
 #include <grp.h>
@@ -234,6 +236,9 @@ private:
 
 private:
 			Log					fLog;
+			// Tracks jobs entered by recursive _LaunchJob() calls in this
+			// looper, so invalid launch graphs cannot overflow its stack.
+			std::vector<Job*>	fLaunchCallStack;
 			JobMap				fJobs;
 			TargetMap			fTargets;
 			BStringList			fRunTargets;
@@ -1788,8 +1793,34 @@ LaunchDaemon::_LaunchJob(Job* job, uint32 options)
 	if (job != NULL && (job->IsLaunching() || job->IsRunning()))
 		return true;
 
+	// An unmet dynamic condition or pending requirement can cause
+	// _LaunchJob() to re-enter the same job recursively. During restart
+	// this previously exhausted the launch daemon's stack. Reject the
+	// circular path and print its job names for diagnosis.
+	if (job != NULL) {
+		std::vector<Job*>::const_iterator repeat = std::find(
+			fLaunchCallStack.begin(), fLaunchCallStack.end(), job);
+		if (repeat != fLaunchCallStack.end()) {
+			debug_printf("OSTEN_LAUNCH_CYCLE: ");
+			for (std::vector<Job*>::const_iterator it = repeat;
+				it != fLaunchCallStack.end(); ++it) {
+				debug_printf("%s -> ", (*it)->Name());
+			}
+			debug_printf("%s\\n", job->Name());
+			return false;
+		}
+	}
+
 	if (!_CanLaunchJob(job, options))
 		return false;
+
+	// Keep the current recursive path only while this invocation executes.
+	// Destruction pops on every return, including failed dependencies.
+	fLaunchCallStack.push_back(job);
+	struct LaunchCallGuard {
+		std::vector<Job*>& stack;
+		~LaunchCallGuard() { stack.pop_back(); }
+	} guard = { fLaunchCallStack };
 
 	// Test if we can launch all requirements
 	if (!_CanLaunchJobRequirements(job, options | TRIGGER_DEMAND))

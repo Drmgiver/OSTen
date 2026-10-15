@@ -67,3 +67,15 @@ successful compilation and boot of the milestone must be checked separately.
   Root cause is not yet established; obtain the thread list and backtrace
   before changing restart implementation.
 - Home and restart remain unverified until the next interactive test.
+
+
+## Run 40 restart stack recursion diagnostic
+
+- A local restart produced a debugger backtrace with over 4,600 frames of
+  LaunchDaemon::_LaunchJob, alternating between recursive launch paths.
+- Track the active _LaunchJob call chain and reject a repeated job while
+  printing OSTEN_LAUNCH_CYCLE and the job names. This prevents an unbounded
+  stack overflow and provides evidence for the underlying launch graph bug.
+- Keep the ordinary shutdown/restart API. Do not declare restart resolved
+  until a guest-initiated reboot succeeds in QEMU and the subsequent startup
+  confirms that all required OSTen services are running.

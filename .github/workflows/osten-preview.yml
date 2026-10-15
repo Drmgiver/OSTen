@@ -17,6 +17,7 @@ on:
       - src/servers/app/Jamfile
       - src/servers/app/Desktop.cpp
       - src/servers/app/decorator/**
+      - src/servers/launch/LaunchDaemon.cpp
 
 permissions:
   contents: read
