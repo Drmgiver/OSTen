@@ -79,3 +79,17 @@ successful compilation and boot of the milestone must be checked separately.
 - Keep the ordinary shutdown/restart API. Do not declare restart resolved
   until a guest-initiated reboot succeeds in QEMU and the subsequent startup
   confirms that all required OSTen services are running.
+
+
+## Run 40: System Folder Access visibility
+
+- Local alpha feedback: Unlock shows a confirmation but appears to do nothing.
+- On a confirmed Unlock, Finder now verifies /boot/System Folder exists,
+  changes its session-local edit state and opens the folder window.
+- Lock displays explicit confirmation that the Finder protection is restored.
+- This is currently Finder application-level write protection, not full
+  OS-enforced filesystem permissions; retaining the original system directory
+  and its startup contents is important.
+- Validate in a new preview: Unlock should open the folder; New Folder should
+  be permitted while unlocked, refused when locked, and Finder restart should
+  restore locked status.

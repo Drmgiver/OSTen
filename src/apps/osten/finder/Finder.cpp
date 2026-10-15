@@ -1421,14 +1421,30 @@ public:
 					"Owner: Unlock the System Folder for changes in Finder? "
 					"System files affect startup and stability. Finder will "
 					"lock it again when restarted.", "Keep Locked", "Unlock");
-				if (dialog->Go() == 1)
+				if (dialog->Go() == 1) {
+					// Opening the folder makes the access change observable
+					// instead of silently changing a hidden Finder flag.
+					BEntry folder("/boot/System Folder", true);
+					entry_ref ref;
+					if (folder.InitCheck() != B_OK || !folder.IsDirectory()
+						|| folder.GetRef(&ref) != B_OK) {
+						(new BAlert("System Folder Access",
+							"Cannot open the System Folder. It remains locked.",
+							"OK"))->Go();
+						return;
+					}
 					sSystemFolderUnlocked.store(true);
+					(new FinderWindow(ref, 0))->Show();
+				}
 			} else {
 				BAlert* dialog = new BAlert("System Folder Access",
 					"System Folder changes are currently unlocked in Finder. "
 					"Lock them now?", "Keep Unlocked", "Lock");
-				if (dialog->Go() == 1)
+				if (dialog->Go() == 1) {
 					sSystemFolderUnlocked.store(false);
+					(new BAlert("System Folder Access",
+						"The System Folder is locked again.", "OK"))->Go();
+				}
 			}
 			return;
 		}
