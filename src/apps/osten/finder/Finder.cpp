@@ -1297,7 +1297,10 @@ public:
 			BRect files(6, 28, Bounds().right - 117,
 				Bounds().bottom - 14);
 			fFolderView = new FolderView(files, desktopRef, true);
-			AddChild(fFolderView);
+			// The full-screen DesktopView would intercept clicks before a
+			// sibling FolderView, even though the folder icons draw on top.
+			// Nest the folder icons so hit-testing reaches them first.
+			fView->AddChild(fFolderView);
 		}
 	}
 

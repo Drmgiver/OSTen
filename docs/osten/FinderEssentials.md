@@ -55,3 +55,15 @@ successful compilation and boot of the milestone must be checked separately.
   previous QuitRequested() refusal aborted native shutdown and restart.
 - These changes need validation by a fresh OSTen preview build and local QEMU
   interaction. They are not confirmed merely by compiling.
+
+
+## Run 40 local QEMU follow-up
+
+- The shade button, zoom toggle and orderly Shut Down work interactively.
+- The desktop Home folder is drawn but cannot be clicked or selected because
+  the full-screen DesktopView is the first sibling in the hit-test order.
+  Make FolderView a child of DesktopView so icon events reach it.
+- Restart stops in a Haiku debugger reporting a stopped launch_daemon thread.
+  Root cause is not yet established; obtain the thread list and backtrace
+  before changing restart implementation.
+- Home and restart remain unverified until the next interactive test.
