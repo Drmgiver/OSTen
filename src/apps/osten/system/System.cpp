@@ -15,6 +15,7 @@
 #include <string.h>
 #include <Window.h>
 
+#include "AboutComputer.h"
 #include "OSTenMessages.h"
 #include "OSTenWordmark.h"
 
@@ -22,6 +23,7 @@
 namespace {
 
 const uint32 kAboutOSTen = 'osab';
+const uint32 kFocusAbout = 'osaf';
 const uint32 kShutDownOSTen = 'ossh';
 const uint32 kRestartOSTen = 'osre';
 
@@ -173,7 +175,14 @@ public:
 	void MessageReceived(BMessage* message) override
 	{
 		if (message->what == kAboutOSTen) {
-			(new BAlert("About OSTen", "OSTen preview", "OK"))->Go();
+			if (fAboutMessenger.IsValid()) {
+				BMessage focus(kFocusAbout);
+				fAboutMessenger.SendMessage(&focus);
+			} else {
+				BWindow* about = CreateAboutComputerWindow();
+				fAboutMessenger = BMessenger(about);
+				about->Show();
+			}
 			return;
 		}
 		if (message->what == kShutDownOSTen
@@ -214,6 +223,9 @@ public:
 		}
 		BWindow::MessageReceived(message);
 	}
+
+private:
+	BMessenger fAboutMessenger;
 };
 
 
