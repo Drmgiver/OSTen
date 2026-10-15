@@ -8,6 +8,7 @@
 #include <InterfaceDefs.h>
 #include <MenuItem.h>
 #include <MessageFilter.h>
+#include <MessageRunner.h>
 #include <Message.h>
 #include <Messenger.h>
 #include <Node.h>
@@ -48,6 +49,7 @@ const uint32 kFinderRefreshAll = 'osrf';
 const uint32 kFinderRefreshFolder = 'osrw';
 const uint32 kInlineRenameCommit = 'osic';
 const uint32 kInlineRenameCancel = 'osix';
+const uint32 kInlineRenameAfterClick = 'osid';
 const char* kWindowFrameAttribute = "OSTen:window_frame";
 const char* kArrangeAttribute = "OSTen:arrange_kind";
 
@@ -217,9 +219,12 @@ static filter_result
 InlineRenameKeyFilter(BMessage* message, BHandler** target,
     BMessageFilter* filter)
 {
-    int8 key;
-    if (message->FindInt8("byte", &key) != B_OK)
+    const char* bytes = NULL;
+    if (message->FindString("bytes", &bytes) != B_OK
+        || bytes == NULL || bytes[0] == '\0') {
         return B_DISPATCH_MESSAGE;
+    }
+    const char key = bytes[0];
     if (key != B_ENTER && key != B_RETURN && key != B_ESCAPE)
         return B_DISPATCH_MESSAGE;
 
@@ -269,7 +274,11 @@ public:
 		fTrackingDrag(false),
 		fPressedIndex(-1),
 		fRenameEditor(NULL),
-		fRenameIndex(-1)
+		fRenameIndex(-1),
+        fRenameClickRunner(NULL),
+        fPendingRenameIndex(-1),
+        fRenameClickCandidate(-1),
+        fRenameClickGeneration(0)
 	{
 		if (fIsDesktop) {
 			SetViewColor(54, 104, 150);
@@ -291,6 +300,8 @@ public:
 		}
 		Refresh();
 	}
+
+    ~FolderView() override { delete fRenameClickRunner; }
 
 	void AttachedToWindow() override
 	{
@@ -314,6 +325,8 @@ public:
 
 	void KeyDown(const char* bytes, int32 numBytes) override
 	{
+        _CancelPendingRename();
+        fRenameClickCandidate = -1;
 		if (numBytes == 1 && bytes[0] == B_ENTER) {
             BeginRenameSelected();
 			return;
@@ -338,6 +351,9 @@ public:
 
 	void MouseDown(BPoint where) override
 	{
+        // A double-click must outrun a pending single-click rename.
+        _CancelPendingRename();
+        fRenameClickCandidate = -1;
         if (fRenameEditor != NULL)
             _FinishInlineRename(true);
 		MakeFocus(true);
@@ -366,8 +382,9 @@ public:
         if (hit >= 0 && fItems[hit].selected && !extend && clicks == 1
             && where.y >= fItems[hit].cell.top + 50
             && where.y <= fItems[hit].cell.top + 70) {
-            _BeginInlineRename(hit);
-            return;
+            // Wait until the double-click window has passed, allowing
+            // the same label to be used for opening and dragging.
+            fRenameClickCandidate = hit;
         }
 
 		if (!extend && (hit < 0 || !fItems[hit].selected))
@@ -394,6 +411,9 @@ public:
 
 	void MouseUp(BPoint where) override
 	{
+        if (fRenameClickCandidate >= 0)
+            _ScheduleInlineRename(fRenameClickCandidate);
+        fRenameClickCandidate = -1;
 		fTrackingDrag = false;
 		fPressedIndex = -1;
 	}
@@ -408,6 +428,8 @@ public:
 			return;
 		}
 
+        fRenameClickCandidate = -1;
+        _CancelPendingRename();
 		BMessage drag(kFinderDragEntries);
 		_AddSelectedRefs(drag);
 		drag.AddBool("copy", (modifiers() & B_OPTION_KEY) != 0);
@@ -418,6 +440,19 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+        if (message->what == kInlineRenameAfterClick) {
+            int32 generation = -1;
+            if (message->FindInt32("generation", &generation) == B_OK
+                && generation == fRenameClickGeneration) {
+                int32 index = fPendingRenameIndex;
+                _CancelPendingRename();
+                if (index >= 0 && (size_t)index < fItems.size()
+                    && fItems[index].selected) {
+                    _BeginInlineRename(index);
+                }
+            }
+            return;
+        }
         if (message->what == kInlineRenameCommit) {
             _FinishInlineRename(true);
             return;
@@ -441,6 +476,8 @@ public:
 
 	void Refresh(const char* selectName = NULL)
 	{
+        _CancelPendingRename();
+        fRenameClickCandidate = -1;
         if (fRenameEditor != NULL) {
             RemoveChild(fRenameEditor);
             delete fRenameEditor;
@@ -483,6 +520,8 @@ public:
 
 	bool BeginRenameSelected()
     {
+        _CancelPendingRename();
+        fRenameClickCandidate = -1;
         if (fRenameEditor != NULL)
             return true;
         std::vector<int32> indices = SelectedIndices();
@@ -539,10 +578,39 @@ public:
 	}
 
 private:
+    void _CancelPendingRename()
+    {
+        delete fRenameClickRunner;
+        fRenameClickRunner = NULL;
+        fPendingRenameIndex = -1;
+        ++fRenameClickGeneration;
+    }
+
+    void _ScheduleInlineRename(int32 index)
+    {
+        if (index < 0 || (size_t)index >= fItems.size()
+            || !fItems[index].selected || fRenameEditor != NULL) {
+            return;
+        }
+        _CancelPendingRename();
+        fPendingRenameIndex = index;
+        BMessage message(kInlineRenameAfterClick);
+        message.AddInt32("generation", fRenameClickGeneration);
+        bigtime_t clickSpeed = 500000;
+        get_click_speed(&clickSpeed);
+        fRenameClickRunner = new BMessageRunner(BMessenger(this), &message,
+            clickSpeed + 100000, 1);
+        if (fRenameClickRunner->InitCheck() != B_OK)
+            _CancelPendingRename();
+    }
+
     void _BeginInlineRename(int32 index)
     {
-        if (index < 0 || (size_t)index >= fItems.size())
+        _CancelPendingRename();
+        if (fRenameEditor != NULL || index < 0
+            || (size_t)index >= fItems.size()) {
             return;
+        }
         const FinderItem& item = fItems[index];
         fRenameRef = item.ref;
         fRenameIndex = index;
@@ -831,6 +899,10 @@ private:
     InlineRenameEditor* fRenameEditor;
     int32 fRenameIndex;
     entry_ref fRenameRef;
+    BMessageRunner* fRenameClickRunner;
+    int32 fPendingRenameIndex;
+    int32 fRenameClickCandidate;
+    int32 fRenameClickGeneration;
 };
 
 

@@ -148,6 +148,29 @@ blue_pixels = sum(
 if blue_pixels < 200:
     raise RuntimeError('Command-N did not create a blue folder in the focused window')
 
+# Verify that the selected folder can be renamed in place with the keyboard.
+# Compare the text editor before and after a typed replacement, so a visible
+# but non-editable filename (the regression reported in Run 46) fails here.
+key('ret')
+screenshot('rename-editor')
+key('alt-a')
+key('r')
+key('e')
+key('n')
+key('a')
+key('m')
+key('e')
+screenshot('rename-typed')
+before = Image.open(output / 'rename-editor.ppm').convert('RGB')
+after = Image.open(output / 'rename-typed.ppm').convert('RGB')
+area = (100, 50, min(410, width), min(180, height))
+changed = sum(left != right for left, right in zip(
+    before.crop(area).getdata(), after.crop(area).getdata()))
+if changed < 180:
+    raise RuntimeError('Inline Rename did not visibly accept keyboard input')
+key('ret')
+screenshot('rename-committed')
+
 key('alt-a')
 screenshot('select-all-shortcut')
 image = Image.open(output / 'select-all-shortcut.ppm').convert('RGB')
