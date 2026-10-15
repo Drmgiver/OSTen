@@ -89,6 +89,7 @@ public:
 			bool				IsShowingMenu() const;
 
 			void				SetSizeLimits();
+			bool				IsOSTenTrayHost() const { return fOSTenTrayHost; }
 
 private:
 			bool				_IsFocusMessage(BMessage* message);
@@ -98,6 +99,7 @@ private:
 			TBarApp*			fBarApp;
 			TBarView*			fBarView;
 			int32				fMenusShown;
+			bool				fOSTenTrayHost = false;
 };
 
 
