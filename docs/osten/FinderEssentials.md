@@ -40,3 +40,18 @@ successful compilation and boot of the milestone must be checked separately.
 - Corrected the 21-test QEMU smoke harness's stale 18-case final comparison.
   Run 38 successfully compiled, booted and produced all 21 PASS records,
   but that stale check marked the workflow failed.
+
+
+## October 14: local Run 39 follow-up
+
+- Correct MacDecorator's minimize-button hit-testing: the base RegionAt()
+  omitted the minimize rectangle, so the drawn WindowShade button did not
+  deliver any action even though double-click shading worked.
+- Track Finder's actual zoomed frame so pressing Zoom a second time restores
+  its previous size despite reserving the permanent System menu bar.
+- Follow symlinks when classifying and opening Finder directories, including
+  the Home shortcut in the desktop directory.
+- Allow the unclosable desktop window to accept system quit requests; its
+  previous QuitRequested() refusal aborted native shutdown and restart.
+- These changes need validation by a fresh OSTen preview build and local QEMU
+  interaction. They are not confirmed merely by compiling.

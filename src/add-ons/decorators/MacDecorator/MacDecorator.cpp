@@ -110,8 +110,15 @@ MacDecorator::Draw()
 Decorator::Region
 MacDecorator::RegionAt(BPoint where, int32& tab) const
 {
-	// Let the base class version identify hits of the buttons and the tab.
+	// The base decorator tests Close and Zoom but not Minimize. Its
+	// REGION_TAB hit would swallow our right-hand WindowShade button.
 	Region region = Decorator::RegionAt(where, tab);
+	if (region == REGION_TAB && tab >= 0) {
+		Decorator::Tab* hit = fTabList.ItemAt(tab);
+		if ((hit->flags & B_NOT_MINIMIZABLE) == 0
+			&& hit->minimizeRect.Contains(where))
+			return REGION_MINIMIZE_BUTTON;
+	}
 	if (region != REGION_NONE)
 		return region;
 

@@ -390,7 +390,10 @@ public:
 			FinderItem item;
 			item.ref = ref;
 			item.name = name;
-			item.isDirectory = entry.IsDirectory();
+			// The Desktop contains symlinks such as Home. Treat a link to a
+			// folder as a folder, while preserving its original icon label.
+			BEntry resolved(&ref, true);
+			item.isDirectory = resolved.IsDirectory();
 			item.selected = selectName != NULL && item.name == selectName;
 			fItems.push_back(item);
 		}
@@ -761,7 +764,8 @@ public:
 		fDepth(depth),
 		fView(NULL),
 		fShaded(false),
-		fUnshadedHeight(0)
+		fUnshadedHeight(0),
+		fZoomed(false)
 	{
 		BEntry folder(&directory);
 		char title[B_FILE_NAME_LENGTH];
@@ -818,12 +822,24 @@ public:
 		}
 	}
 
-	// BWindow's default Zoom() makes room for Deskbar, not OSTen's menu.
-	// Clamp the requested client rectangle with 22px for the title bar.
+	// BWindow's nonvirtual Zoom() detects the second click by comparing
+	// against its own fullscreen dimensions. Because OSTen reserves space for
+	// the global menu, that comparison never matches our actual zoom frame.
+	// Track the applied frame explicitly so the zoom button can restore it.
 	void Zoom(BPoint origin, float width, float height) override
 	{
 		if (fShaded)
 			Minimize(false);
+		BRect current = Frame();
+		if (fZoomed
+			&& fabsf(current.Width() - fZoomFrame.Width()) < 1.5f
+			&& fabsf(current.Height() - fZoomFrame.Height()) < 1.5f) {
+			fZoomed = false;
+			BWindow::Zoom(fUnzoomFrame.LeftTop(), fUnzoomFrame.Width(),
+				fUnzoomFrame.Height());
+			return;
+		}
+		fUnzoomFrame = current;
 		BRect screen = BScreen(this).Frame();
 		origin.y = std::max(origin.y, screen.top + kFinderClientMinTop);
 		origin.x = std::max(origin.x, screen.left + 7);
@@ -833,6 +849,8 @@ public:
 			screen.bottom - origin.y - 8);
 		BWindow::Zoom(origin, std::min(width, allowedWidth),
 			std::min(height, allowedHeight));
+		fZoomFrame = Frame();
+		fZoomed = true;
 	}
 
 	void WindowActivated(bool active) override
@@ -901,10 +919,12 @@ private:
 		entry_ref ref;
 		if (!fView->EntryAt(index, ref))
 			return;
-		BEntry entry(&ref);
-		if (entry.IsDirectory())
-			(new FinderWindow(ref, fDepth + 1))->Show();
-		else
+		BEntry entry(&ref, true);
+		if (entry.IsDirectory()) {
+			entry_ref resolvedRef;
+			if (entry.GetRef(&resolvedRef) == B_OK)
+				(new FinderWindow(resolvedRef, fDepth + 1))->Show();
+		} else
 			be_roster->Launch(&ref);
 	}
 
@@ -958,6 +978,9 @@ private:
 	FolderView*	fView;
 	bool		fShaded;
 	float		fUnshadedHeight;
+	bool		fZoomed;
+	BRect		fUnzoomFrame;
+	BRect		fZoomFrame;
 };
 
 
@@ -965,10 +988,12 @@ private:
 static void
 OpenFinderEntry(const entry_ref& ref, int32 depth)
 {
-    BEntry entry(&ref);
-    if (entry.IsDirectory())
-        (new FinderWindow(ref, depth))->Show();
-    else {
+    BEntry entry(&ref, true);
+    if (entry.IsDirectory()) {
+        entry_ref resolvedRef;
+        if (entry.GetRef(&resolvedRef) == B_OK)
+            (new FinderWindow(resolvedRef, depth))->Show();
+    } else {
         status_t error = be_roster->Launch(&ref);
         if (error != B_OK) {
             BString reason("The file could not be opened.\n\n");
@@ -1285,7 +1310,9 @@ public:
 
 	bool QuitRequested() override
 	{
-		return false;
+		// The desktop cannot be closed interactively (B_NOT_CLOSABLE),
+		// but it must honor the registrar's orderly shutdown request.
+		return true;
 	}
 
 	void MessageReceived(BMessage* message) override
