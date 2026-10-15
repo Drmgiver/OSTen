@@ -238,11 +238,11 @@ TBarWindow::MessageReceived(BMessage* message)
 				region->FindView("Status")->MoveTo(0, 0);
 				region->FindView("Status")->ResizeTo(95, 23);
 				region->ResizeTo(95, 23);
+				fOSTenTrayHost = true;
 				SetLook(B_NO_BORDER_WINDOW_LOOK);
 				SetFeel(B_FLOATING_ALL_WINDOW_FEEL);
 				BWindow::SetSizeLimits(95, 95, 23, 23);
 				ResizeTo(95, 23);
-				fOSTenTrayHost = true;
 				fBarView->ReplicantTray()->RealignReplicants();
 			}
 			BRect screen = BScreen(this).Frame();
