@@ -121,104 +121,6 @@ private:
 
 
 
-const uint32 kOSTenTrayRegister = 'osir';
-const uint32 kOSTenTrayRemove = 'osix';
-
-// Only applications which register a tray action appear in this view.
-// Native OSTen controls remain in the separate Control Strip.
-class ApplicationTray : public BView {
-public:
-    ApplicationTray(BRect frame)
-        : BView(frame, "Application Tray",
-            B_FOLLOW_RIGHT | B_FOLLOW_TOP, B_WILL_DRAW)
-    {
-        SetViewColor(ui_color(B_MENU_BACKGROUND_COLOR));
-    }
-
-    void Register(const BMessage& message)
-    {
-        const char* signature = NULL;
-        int32 action = 0;
-        if (message.FindString("signature", &signature) != B_OK
-            || signature == NULL || !*signature
-            || message.FindInt32("action", &action) != B_OK)
-            return;
-        const char* label = signature;
-        message.FindString("label", &label);
-        for (size_t i = 0; i < fItems.size(); ++i) {
-            if (fItems[i].signature == signature) {
-                fItems[i].action = action;
-                fItems[i].label = label;
-                Invalidate();
-                return;
-            }
-        }
-        Item item;
-        item.signature = signature;
-        item.label = label;
-        item.action = action;
-        fItems.push_back(item);
-        Invalidate();
-    }
-
-    void Remove(const BMessage& message)
-    {
-        const char* signature = NULL;
-        if (message.FindString("signature", &signature) != B_OK)
-            return;
-        for (size_t i = 0; i < fItems.size(); ++i) {
-            if (fItems[i].signature == signature) {
-                fItems.erase(fItems.begin() + i);
-                Invalidate();
-                return;
-            }
-        }
-    }
-
-    void Draw(BRect) override
-    {
-        SetHighColor(ui_color(B_MENU_BACKGROUND_COLOR));
-        FillRect(Bounds());
-        size_t visible = std::min(fItems.size(), (size_t)4);
-        float start = Bounds().right - visible * 22 + 1;
-        for (size_t i = 0; i < visible; ++i) {
-            BBitmap icon(BRect(0, 0, 15, 15), B_RGBA32);
-            BMimeType mime(fItems[i].signature.String());
-            if (icon.InitCheck() == B_OK && mime.InitCheck() == B_OK
-                && mime.GetIcon(&icon, B_MINI_ICON) == B_OK) {
-                SetDrawingMode(B_OP_ALPHA);
-                SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
-                DrawBitmap(&icon, icon.Bounds(),
-                    BRect(start + i * 22 + 2, 4,
-                        start + i * 22 + 17, 19));
-                SetDrawingMode(B_OP_COPY);
-            } else {
-                SetHighColor(90, 90, 90);
-                StrokeRect(BRect(start + i * 22 + 4, 6,
-                    start + i * 22 + 16, 18));
-            }
-        }
-    }
-
-    void MouseDown(BPoint where) override
-    {
-        size_t visible = std::min(fItems.size(), (size_t)4);
-        float start = Bounds().right - visible * 22 + 1;
-        if (where.x < start || where.x >= start + visible * 22)
-            return;
-        size_t index = (size_t)((where.x - start) / 22);
-        BMessenger app(fItems[index].signature.String());
-        if (app.IsValid()) {
-            BMessage action((uint32)fItems[index].action);
-            app.SendMessage(&action);
-        }
-    }
-
-private:
-    struct Item { BString signature; BString label; int32 action; };
-    std::vector<Item> fItems;
-};
-
 class SystemBar : public BWindow {
 public:
 	SystemBar()
@@ -293,8 +195,11 @@ public:
 		// File/Edit/View menu. Reserve separate space for all three controls.
 		AddChild(bar);
 		BRect bounds = Bounds();
-		fTray = new ApplicationTray(BRect(
-            bounds.right - 288, 1, bounds.right - 192, 24));
+		fTray = new BView(BRect(
+            bounds.right - 288, 1, bounds.right - 192, 24),
+            "Native Application Tray Slot", B_FOLLOW_RIGHT | B_FOLLOW_TOP,
+            B_WILL_DRAW);
+        fTray->SetViewColor(ui_color(B_MENU_BACKGROUND_COLOR));
         AddChild(fTray);
 		fClock = CreateOSTenClockView(BRect(
 			bounds.right - 191, 1, bounds.right - 44, 24));
@@ -326,15 +231,7 @@ public:
             deskbar.SendMessage(&attach);
 			return;
 		}
-		if (message->what == kOSTenTrayRegister) {
-            fTray->Register(*message);
-            return;
-        }
-        if (message->what == kOSTenTrayRemove) {
-            fTray->Remove(*message);
-            return;
-        }
-        if (message->what == kOSTenShowNotices) {
+		if (message->what == kOSTenShowNotices) {
 			if (fCenter == NULL) {
 				BRect screen = BScreen().Frame();
 				BRect popup(screen.right - 425, 32,
@@ -486,7 +383,7 @@ public:
 private:
 	BMessenger fAboutMessenger;
 	BView* fClock;
-	ApplicationTray* fTray;
+	BView* fTray;
 	BView* fSwitcher;
 	BWindow* fCenter;
 	int32 fUnread;
@@ -511,9 +408,7 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
-		if (message->what == kOSTenTrayRegister
-            || message->what == kOSTenTrayRemove
-            || message->what == kOSTenNewNotice
+		if (message->what == kOSTenNewNotice
 			|| message->what == kOSTenNextApplication
 			|| message->what == kOSTenActivateApplication) {
 			if (fBar != NULL)
