@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "AboutComputer.h"
-#include "OSTenWordmark.h"
+#include "OSTenAboutWordmark.h"
 
 
 namespace {
@@ -68,8 +68,10 @@ FormatMemory(uint64 bytes)
 static BBitmap*
 CreateWordmark()
 {
-    BBitmap* bitmap = new BBitmap(BRect(0, 0,
-        kOSTenWordmarkWidth - 1, kOSTenWordmarkHeight - 1), B_RGBA32);
+    const int width = kOSTenAboutWordmarkWidth;
+    const int height = kOSTenAboutWordmarkHeight;
+    BBitmap* bitmap = new BBitmap(BRect(0, 0, width - 1, height - 1),
+        B_RGBA32);
     if (bitmap->InitCheck() != B_OK) {
         delete bitmap;
         return NULL;
@@ -77,22 +79,45 @@ CreateWordmark()
 
     const char* alphabet =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const char* encoded = kOSTenAboutWordmarkData;
     uint8* pixels = (uint8*)bitmap->Bits();
-    int32 stride = bitmap->BytesPerRow();
-    for (int y = 0; y < kOSTenWordmarkHeight; ++y) {
-        for (int x = 0; x < kOSTenWordmarkWidth; ++x) {
-            const char* index = strchr(alphabet, kOSTenWordmarkPixels[y][x]);
-            if (index == NULL) {
-                delete bitmap;
-                return NULL;
-            }
-            uint32 rgba = kOSTenWordmarkPalette[index - alphabet];
+    const int32 stride = bitmap->BytesPerRow();
+    int written = 0;
+    const int expected = width * height;
+
+    while (*encoded != '\0' && written < expected) {
+        int count = 1;
+        if (*encoded == '!') {
+            ++encoded;
+            if (encoded[0] == '\0' || encoded[1] == '\0')
+                break;
+            const char* runIndex = strchr(alphabet, encoded[0]);
+            if (runIndex == NULL)
+                break;
+            count = runIndex - alphabet;
+            ++encoded;
+        }
+        const char* paletteIndex = strchr(alphabet, *encoded++);
+        if (paletteIndex == NULL || count <= 0 || written + count > expected)
+            break;
+
+        const uint32 rgba = kOSTenAboutWordmarkPalette[
+            paletteIndex - alphabet];
+        for (int i = 0; i < count; ++i) {
+            const int y = written / width;
+            const int x = written % width;
             uint8* bgra = pixels + y * stride + x * 4;
             bgra[0] = (rgba >> 8) & 255;
             bgra[1] = (rgba >> 16) & 255;
             bgra[2] = (rgba >> 24) & 255;
             bgra[3] = rgba & 255;
+            ++written;
         }
+    }
+
+    if (written != expected || *encoded != '\0') {
+        delete bitmap;
+        return NULL;
     }
     return bitmap;
 }
@@ -255,7 +280,7 @@ public:
         if (fWordmark != NULL) {
             SetDrawingMode(B_OP_ALPHA);
             SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
-            DrawBitmap(fWordmark, fWordmark->Bounds(), BRect(19, 13, 196, 62));
+            DrawBitmap(fWordmark, fWordmark->Bounds(), BRect(20, 18, 267, 86));
             SetDrawingMode(B_OP_COPY);
         } else {
             BFont title(be_bold_font);
@@ -268,12 +293,13 @@ public:
         caption.SetSize(11);
         SetFont(&caption);
         SetHighColor(kMuted);
-        DrawString("Developer Preview", BPoint(224, 35));
+        DrawString("Developer Preview", BPoint(292, 35));
         DrawString("Classic Macintosh spirit. BeOS foundation.",
-            BPoint(224, 53));
+            BPoint(292, 54));
+        DrawString("Native OSTen desktop", BPoint(292, 74));
 
         SetHighColor(kBorder);
-        StrokeLine(BPoint(18, 78), BPoint(560, 78));
+        StrokeLine(BPoint(18, 112), BPoint(560, 112));
 
         BFont ordinary(be_plain_font);
         ordinary.SetSize(12);
@@ -294,25 +320,25 @@ public:
                 fInfo.max_swap_pages)) * pageSize;
         }
 
-        _Label("Built-in Memory:", 20, 109, bold);
+        _Label("Built-in Memory:", 20, 143, bold);
         _Value(fHasInfo ? FormatMemory(installed) : "Unavailable", 156,
-            109, ordinary);
-        _Label("Memory In Use:", 20, 135, bold);
+            143, ordinary);
+        _Label("Memory In Use:", 20, 169, bold);
         _Value(fHasInfo ? FormatMemory(inUse) : "Unavailable", 156,
-            135, ordinary);
-        _Label("Available Memory:", 20, 161, bold);
+            169, ordinary);
+        _Label("Available Memory:", 20, 195, bold);
         _Value(fHasInfo ? FormatMemory(installed - inUse) : "Unavailable",
-            156, 161, ordinary);
+            156, 195, ordinary);
 
-        _Label("Processors:", 311, 109, bold);
+        _Label("Processors:", 311, 143, bold);
         BString processorCount;
         if (fHasInfo)
             processorCount.SetToFormat("%" B_PRIu32, fInfo.cpu_count);
         else
             processorCount = "Unavailable";
-        _Value(processorCount, 427, 109, ordinary);
+        _Value(processorCount, 427, 143, ordinary);
 
-        _Label("Virtual Memory:", 311, 135, bold);
+        _Label("Virtual Memory:", 311, 169, bold);
         BString swapText;
         if (fHasInfo && swapTotal > 0) {
             swapText = FormatMemory(swapUsed);
@@ -322,13 +348,13 @@ public:
         } else {
             swapText = "Unavailable";
         }
-        _Value(swapText, 427, 135, ordinary);
+        _Value(swapText, 427, 169, ordinary);
 
-        _Label("Swap Capacity:", 311, 161, bold);
+        _Label("Swap Capacity:", 311, 195, bold);
         _Value(fHasInfo ? FormatMemory(swapTotal) : "Unavailable", 427,
-            161, ordinary);
+            195, ordinary);
 
-        BRect usageBar(20, 178, 560, 196);
+        BRect usageBar(20, 212, 560, 230);
         SetHighColor(kWhite);
         FillRect(usageBar);
         SetHighColor(kBorder);
@@ -342,23 +368,23 @@ public:
 
         SetHighColor(kMuted);
         SetFont(&caption);
-        DrawString("Physical memory in use", BPoint(20, 212));
+        DrawString("Physical memory in use", BPoint(20, 246));
 
         SetHighColor(kBorder);
-        StrokeLine(BPoint(18, 222), BPoint(560, 222));
+        StrokeLine(BPoint(18, 256), BPoint(560, 256));
         SetHighColor(kInk);
         SetFont(&bold);
-        DrawString("Running Applications", BPoint(20, 244));
+        DrawString("Running Applications", BPoint(20, 278));
         SetFont(&caption);
         SetHighColor(kMuted);
         DrawString("Relative memory bar / approximate resident memory",
-            BPoint(279, 244));
+            BPoint(279, 278));
 
         SetHighColor(kMuted);
         DrawString("App memory counts shared areas and may not add up to the",
-            BPoint(20, 490));
+            BPoint(20, 524));
         DrawString("system total. Values refresh every two seconds.",
-            BPoint(20, 505));
+            BPoint(20, 539));
     }
 
 private:
@@ -386,7 +412,7 @@ class AboutComputerWindow : public BWindow {
 public:
     AboutComputerWindow()
         :
-        BWindow(BRect(145, 80, 725, 605), "About OSTen",
+        BWindow(BRect(145, 80, 725, 639), "About OSTen",
             B_TITLED_WINDOW, B_NORMAL_WINDOW_FEEL,
             B_NOT_ZOOMABLE | B_NOT_RESIZABLE),
         fOverview(NULL),
@@ -397,7 +423,7 @@ public:
         fOverview = new AboutOverviewView(frame);
         AddChild(fOverview);
 
-        fList = new BListView(BRect(19, 262, 542, 463),
+        fList = new BListView(BRect(19, 296, 542, 497),
             "Running applications", B_SINGLE_SELECTION_LIST,
             B_FOLLOW_LEFT_TOP);
         fList->SetViewColor(kWhite);
