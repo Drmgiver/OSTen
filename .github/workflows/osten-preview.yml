@@ -60,14 +60,24 @@ jobs:
             ../configure -j4 --cross-tools-source ../../buildtools \
             --build-cross-tools x86_64
 
+      - name: Stage temporary MemoChip Replicant package
+        run: |
+          mkdir -p build/osten/test-packages
+          curl --fail --location --retry 4 --retry-delay 3 \
+            --output build/osten/test-packages/memochip-1.0-1-x86_64.hpkg \
+            'https://downloads.sourceforge.net/project/misc-haiku-utilities-and-ports/memochip/memochip-1.0-1-x86_64.hpkg'
+          test -s build/osten/test-packages/memochip-1.0-1-x86_64.hpkg
+          test "$(head -c 4 build/osten/test-packages/memochip-1.0-1-x86_64.hpkg)" = "hpkg"
+          sha256sum build/osten/test-packages/memochip-1.0-1-x86_64.hpkg
+
       - name: Build preview image
         run: |
           cd generated.x86_64
           PATH="$(realpath ../build/osten/tools):$(realpath ../../host-tools/bin):$PATH" \
-            jam -q -j4 -sHAIKU_REVISION=osten-preview-e5a43367 -sOSTEN_TRANSFER_TESTS=1 @nightly-osten-raw
+            jam -q -j4 -sHAIKU_REVISION=osten-preview-e5a43367 -sOSTEN_TRANSFER_TESTS=1 -sOSTEN_MEMOCHIP_TEST=1 @nightly-osten-raw
           test -s osten-preview.image
           sha256sum osten-preview.image
-          printf 'OSTen=%s\nbuildtools=%s\nprofile=nightly-osten-raw\ntransfer-tests=1\n' \
+          printf 'OSTen=%s\nbuildtools=%s\nprofile=nightly-osten-raw\ntransfer-tests=1\nmemochip-test=1\n' \
             "$GITHUB_SHA" "$(git -C ../../buildtools rev-parse HEAD)" \
             > build-manifest.txt
 
