@@ -68,7 +68,11 @@ NotificationServer::MessageReceived(BMessage* message)
 					system_beep(kSoundNames[type]);
 			}
 
-			// Let the notification window handle this message
+			// Forward native notifications to OSTen's history as well as
+			// the usual Haiku popup. Other desktops are unaffected.
+			BMessenger osten("application/x-vnd.OSTen-System");
+			if (osten.IsValid())
+				osten.SendMessage(message);
 			BMessenger(fWindow).SendMessage(message);
 			break;
 		}
