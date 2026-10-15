@@ -1806,7 +1806,7 @@ LaunchDaemon::_LaunchJob(Job* job, uint32 options)
 				it != fLaunchCallStack.end(); ++it) {
 				debug_printf("%s -> ", (*it)->Name());
 			}
-			debug_printf("%s\\n", job->Name());
+			debug_printf("%s\n", job->Name());
 			return false;
 		}
 	}
