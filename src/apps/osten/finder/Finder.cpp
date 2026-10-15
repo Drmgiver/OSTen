@@ -7,6 +7,7 @@
 #include <Entry.h>
 #include <InterfaceDefs.h>
 #include <MenuItem.h>
+#include <MessageFilter.h>
 #include <Message.h>
 #include <Messenger.h>
 #include <Node.h>
@@ -18,6 +19,7 @@
 #include <ScrollView.h>
 #include <StorageDefs.h>
 #include <String.h>
+#include <TextControl.h>
 #include <TextView.h>
 #include <View.h>
 #include <Window.h>
@@ -209,31 +211,46 @@ TransferEntries(const BMessage* message, const entry_ref& targetRef,
 }
 
 
-class InlineRenameEditor : public BTextView {
+// Use the same native text-entry control as the working Rename dialog.
+// Its embedded BTextView gets keyboard focus through BTextControl::MakeFocus.
+static filter_result
+InlineRenameKeyFilter(BMessage* message, BHandler** target,
+    BMessageFilter* filter)
+{
+    int8 key;
+    if (message->FindInt8("byte", &key) != B_OK)
+        return B_DISPATCH_MESSAGE;
+    if (key != B_ENTER && key != B_RETURN && key != B_ESCAPE)
+        return B_DISPATCH_MESSAGE;
+
+    BView* input = target != NULL ? dynamic_cast<BView*>(*target) : NULL;
+    BView* control = input != NULL ? input->Parent() : NULL;
+    BView* folder = control != NULL ? control->Parent() : NULL;
+    if (folder != NULL && folder->Window() != NULL) {
+        // Do not synchronously SendMessage to our own window looper.
+        folder->Window()->PostMessage(key == B_ESCAPE
+            ? kInlineRenameCancel : kInlineRenameCommit, folder);
+    }
+    return B_SKIP_MESSAGE;
+}
+
+
+class InlineRenameEditor : public BTextControl {
 public:
     InlineRenameEditor(BRect frame, const char* filename)
         :
-        BTextView(frame, "Inline filename", BRect(3, 1,
-            frame.Width() - 3, frame.Height() - 1), B_FOLLOW_LEFT_TOP,
-            B_WILL_DRAW | B_NAVIGABLE)
+        BTextControl(frame, "Inline filename", NULL, filename, NULL)
     {
+        SetDivider(0);
         SetViewColor(255, 255, 255);
-        SetLowColor(255, 255, 255);
-        SetWordWrap(false);
-        SetMaxBytes(B_FILE_NAME_LENGTH - 1);
-        SetText(filename);
-        Select(0, TextLength());
-    }
-
-    void KeyDown(const char* bytes, int32 length) override
-    {
-        if (length == 1 && (bytes[0] == B_ENTER || bytes[0] == B_ESCAPE)) {
-            if (Parent() != NULL)
-                BMessenger(Parent()).SendMessage(bytes[0] == B_ENTER
-                    ? kInlineRenameCommit : kInlineRenameCancel);
-            return;
-        }
-        BTextView::KeyDown(bytes, length);
+        BTextView* input = TextView();
+        input->SetViewColor(255, 255, 255);
+        input->SetLowColor(255, 255, 255);
+        input->SetHighColor(0, 0, 0);
+        input->SetWordWrap(false);
+        input->SetMaxBytes(B_FILE_NAME_LENGTH - 1);
+        input->AddFilter(new BMessageFilter(B_KEY_DOWN,
+            InlineRenameKeyFilter));
     }
 };
 
@@ -533,6 +550,10 @@ private:
             item.cell.right + 10, item.cell.top + 73);
         fRenameEditor = new InlineRenameEditor(editor, item.name.String());
         AddChild(fRenameEditor);
+        if (!Window()->IsActive())
+            Window()->Activate(true);
+        // BTextControl focuses its embedded editable text view and selects
+        // the current filename, as in Haiku's standard text-entry dialogs.
         fRenameEditor->MakeFocus(true);
         Invalidate(item.cell);
     }
