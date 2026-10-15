@@ -6,6 +6,7 @@ UsePrivateHeaders app ;
 
 Application OSTenSystem :
 	System.cpp
+	SystemExtras.cpp
 	AboutComputer.cpp
 	: be [ TargetLibstdc++ ]
 	: System.rdef
