@@ -3,8 +3,15 @@
 
 #include "SystemExtras.h"
 
+#include "FinderSwitcherIcon.h"
+
 #include <Alert.h>
+#include <AppFileInfo.h>
+#include <Bitmap.h>
 #include <Button.h>
+#include <File.h>
+#include <MimeType.h>
+#include <Node.h>
 #include <Font.h>
 #include <List.h>
 #include <ListView.h>
@@ -30,6 +37,130 @@ struct AppChoice {
     team_id team;
     bool active;
 };
+// Bitmap uses BGRA byte order; palette entries are 0xRRGGBBAA.
+// Keep a distinct copy for each menu item so ownership is unambiguous.
+static BBitmap*
+FinderFaceIcon()
+{
+    BBitmap* bitmap = new BBitmap(
+        BRect(0, 0, kOSTenFinderSwitcherSize - 1,
+            kOSTenFinderSwitcherSize - 1), B_RGBA32);
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        return NULL;
+    }
+
+    const char* alphabet =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    uint8* pixels = (uint8*)bitmap->Bits();
+    int32 stride = bitmap->BytesPerRow();
+    for (int32 y = 0; y < kOSTenFinderSwitcherSize; ++y) {
+        for (int32 x = 0; x < kOSTenFinderSwitcherSize; ++x) {
+            const char* c = strchr(alphabet, kOSTenFinderSwitcherRows[y][x]);
+            if (c == NULL) {
+                delete bitmap;
+                return NULL;
+            }
+            uint32 rgba = kOSTenFinderSwitcherPalette[c - alphabet];
+            uint8* bgra = pixels + y * stride + x * 4;
+            bgra[0] = (rgba >> 8) & 255;
+            bgra[1] = (rgba >> 16) & 255;
+            bgra[2] = (rgba >> 24) & 255;
+            bgra[3] = rgba & 255;
+        }
+    }
+    return bitmap;
+}
+
+
+// The Finder artwork is an OSTen-owned resource. Every other application
+// supplies its own icon through Haiku's existing AppFileInfo/MIME database.
+static BBitmap*
+IconForApplication(team_id team, bool finder)
+{
+    if (finder)
+        return FinderFaceIcon();
+
+    BBitmap* bitmap = new BBitmap(BRect(0, 0, 15, 15), B_RGBA32);
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        return NULL;
+    }
+
+    BRoster roster;
+    app_info app;
+    if (roster.GetRunningAppInfo(team, &app) == B_OK) {
+        BFile file(&app.ref, B_READ_ONLY);
+        if (file.InitCheck() == B_OK) {
+            BAppFileInfo fileInfo(&file);
+            if (fileInfo.GetIcon(bitmap, B_MINI_ICON) == B_OK)
+                return bitmap;
+        }
+        BMimeType mime(app.signature);
+        if (mime.InitCheck() == B_OK
+            && mime.GetIcon(bitmap, B_MINI_ICON) == B_OK)
+            return bitmap;
+    }
+
+    delete bitmap;
+    return NULL;
+}
+
+
+// An actual icon to the left of each application name in the dropdown.
+class AppIconMenuItem : public BMenuItem {
+public:
+    AppIconMenuItem(const char* name, BMessage* message, BBitmap* icon)
+        : BMenuItem(name, message), fIcon(icon)
+    {
+    }
+
+    ~AppIconMenuItem() override
+    {
+        delete fIcon;
+    }
+
+protected:
+    void GetContentSize(float* width, float* height) override
+    {
+        BMenuItem::GetContentSize(width, height);
+        if (width != NULL)
+            *width += 24;
+        if (height != NULL && *height < 18)
+            *height = 18;
+    }
+
+    void DrawContent() override
+    {
+        BMenu* menu = Menu();
+        if (menu == NULL)
+            return;
+        BPoint where = ContentLocation();
+        if (fIcon != NULL) {
+            menu->SetDrawingMode(B_OP_ALPHA);
+            menu->SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
+            menu->DrawBitmap(fIcon, fIcon->Bounds(),
+                BRect(where.x + 1, where.y,
+                    where.x + 17, where.y + 16));
+        } else {
+            // Neutral fallback for apps without registered artwork.
+            menu->SetDrawingMode(B_OP_COPY);
+            menu->StrokeRect(BRect(where.x + 2, where.y + 2,
+                where.x + 15, where.y + 14));
+        }
+        menu->SetDrawingMode(B_OP_OVER);
+        BFont font;
+        menu->GetFont(&font);
+        font_height metrics;
+        font.GetHeight(&metrics);
+        menu->DrawString(Label(), BPoint(where.x + 24,
+            where.y + metrics.ascent));
+    }
+
+private:
+    BBitmap* fIcon;
+};
+
 
 static std::vector<AppChoice>
 GetApplications()
@@ -75,30 +206,40 @@ public:
     AppSwitcherView(BRect frame)
         : BView(frame, "OSTen App Switcher",
             B_FOLLOW_RIGHT | B_FOLLOW_TOP, B_WILL_DRAW),
-        fLastName("Finder")
+        fLastTeam(-1), fIcon(FinderFaceIcon())
     {
         SetViewColor(ui_color(B_MENU_BACKGROUND_COLOR));
     }
 
+    ~AppSwitcherView() override
+    {
+        delete fIcon;
+    }
+
     void Draw(BRect update) override
     {
+        _UpdateActiveIcon();
         SetHighColor(ui_color(B_MENU_BACKGROUND_COLOR));
         FillRect(Bounds());
         SetHighColor(120, 120, 120);
         StrokeLine(BPoint(0, 5), BPoint(0, 21));
-        SetHighColor(24, 24, 24);
-        SetFont(be_plain_font);
 
-        BString title = CurrentAppName();
-        // Keep long third-party application titles inside the allotted
-        // status area without colliding with the downward menu chevron.
-        while (title.Length() > 3 && StringWidth(title.String())
-            > Bounds().Width() - 27)
-            title.Truncate(title.Length() - 1);
-        DrawString(title.String(), BPoint(9, 17));
-        float x = Bounds().right - 13;
-        StrokeLine(BPoint(x - 4, 11), BPoint(x, 15));
-        StrokeLine(BPoint(x, 15), BPoint(x + 4, 11));
+        if (fIcon != NULL) {
+            SetDrawingMode(B_OP_ALPHA);
+            SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
+            DrawBitmap(fIcon, fIcon->Bounds(), BRect(4, 1, 25, 22));
+            SetDrawingMode(B_OP_COPY);
+        } else {
+            // An unregistered third-party app still gets a selectable icon.
+            SetHighColor(85, 85, 85);
+            StrokeRect(BRect(6, 4, 23, 20));
+            StrokeLine(BPoint(7, 8), BPoint(22, 8));
+        }
+
+        // Small drop arrow, no text label beside the icon.
+        SetHighColor(50, 50, 50);
+        StrokeLine(BPoint(29, 11), BPoint(33, 15));
+        StrokeLine(BPoint(33, 15), BPoint(37, 11));
     }
 
     void MouseDown(BPoint where) override
@@ -115,11 +256,15 @@ public:
         for (size_t i = 0; i < apps.size(); ++i) {
             BMessage* action = new BMessage(kOSTenActivateApplication);
             action->AddInt32("team", apps[i].team);
-            BMenuItem* item = new BMenuItem(apps[i].name.String(), action);
+            BBitmap* icon = IconForApplication(apps[i].team,
+                apps[i].name == "Finder");
+            BMenuItem* item = new AppIconMenuItem(
+                apps[i].name.String(), action, icon);
             item->SetMarked(apps[i].active);
             item->SetTarget(BMessenger("application/x-vnd.OSTen-System"));
             popup->AddItem(item);
         }
+
         popup->SetAsyncAutoDestruct(true);
         BPoint start(Bounds().left, Bounds().bottom + 1);
         ConvertToScreen(&start);
@@ -127,23 +272,30 @@ public:
     }
 
 private:
-    BString CurrentAppName()
+    void _UpdateActiveIcon()
     {
         std::vector<AppChoice> apps = GetApplications();
         for (size_t i = 0; i < apps.size(); ++i) {
-            if (apps[i].active) {
-                fLastName = apps[i].name;
-                return fLastName;
-            }
+            if (!apps[i].active)
+                continue;
+            if (apps[i].team == fLastTeam)
+                return;
+            // Cache while the same app is active. The menu bar receives
+            // a short periodic repaint, not a fresh icon read every tick.
+            BBitmap* icon = IconForApplication(apps[i].team,
+                apps[i].name == "Finder");
+            delete fIcon;
+            fIcon = icon;
+            fLastTeam = apps[i].team;
+            return;
         }
-        // Clicking the floating System bar can temporarily leave no
-        // listed app active. Preserve the previous application label.
-        if (fLastName.IsEmpty() && !apps.empty())
-            fLastName = apps.front().name;
-        return fLastName;
+
+        // Floating OSTen System and alert windows can temporarily own
+        // focus. Don't replace the last application's face with nothing.
     }
 
-    BString fLastName;
+    team_id fLastTeam;
+    BBitmap* fIcon;
 };
 
 

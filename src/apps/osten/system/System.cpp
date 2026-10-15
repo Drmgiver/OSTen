@@ -184,13 +184,14 @@ public:
 		AddChild(bar);
 		BRect bounds = Bounds();
 		fNoticeButton = CreateOSTenNoticeButton(BRect(
-			bounds.right - 355, 1, bounds.right - 259, 24));
+			bounds.right - 288, 1, bounds.right - 192, 24));
 		AddChild(fNoticeButton);
 		fClock = CreateOSTenClockView(BRect(
-			bounds.right - 258, 1, bounds.right - 117, 24));
+			bounds.right - 191, 1, bounds.right - 44, 24));
 		AddChild(fClock);
+		// Classic Mac-style icon-only switcher at the far right.
 		fSwitcher = CreateOSTenApplicationSwitcher(BRect(
-			bounds.right - 116, 1, bounds.right - 2, 24));
+			bounds.right - 43, 1, bounds.right - 2, 24));
 		AddChild(fSwitcher);
 		BMessage tick(kClockTick);
 		// A two-second pulse also refreshes app labels after activations
