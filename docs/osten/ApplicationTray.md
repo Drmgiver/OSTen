@@ -1,73 +1,45 @@
-# OSTen application tray — native Replicant integration
+# OSTen application tray: native Deskbar integration preview
 
-## Required end state
+Source branch: `osten/main`.
 
-The menu bar order, left to right, is **Application Tray → Clock → Application Switcher**.
+## Implemented source changes
 
-The application tray contains externally supplied application UI only. OSTen's
-Volume, Display, Network, Power, Bluetooth, Drives, and Settings belong in the
-**Control Strip**, not the application tray. A tray with no app Replicants
-should consume no icon slots. Never show a generic "Notices" launcher in it.
+The **existing Haiku Deskbar process remains the native BShelf host**. OSTen
+System sends an `osht` message to Deskbar at startup and periodically.
+Deskbar moves its **actual interactive Replicant tray** to a small borderless
+floating window over OSTen's reserved tray slot. It retains the established
+`BDeskbar::AddItem()`, removal, loading, and native view behavior. The
+proprietary `osir` / `osix` API from the first attempt was removed.
 
-## Current implementation status
+The panel order is **Application Tray → Clock → Application Switcher**.
+The OSTen Control Strip is responsible for volume, display, network,
+power, Bluetooth, drives, and settings.
 
-The preview OSTen System window in `src/apps/osten/system/System.cpp`
-has a limited OSTen-specific registration protocol (`osir` / `osix`).
-**This is not native Deskbar Replicant compatibility.** It displays MIME mini-icons
-and forwards one click action; existing apps that use `BDeskbar::AddItem()`
-do not reach it. Its four-icon cap, static allocation, and lack of liveness
-tracking are temporary preview limitations. Do not describe this as a
-complete system tray.
+## Outstanding issues — not a finished or verified integration
 
-## Haiku integration facts
+- This change has **not been built or boot-tested**. Verify Deskbar's window
+  look/feel, native input, view reparenting, and desktop startup timing.
+- The tray slot is temporarily fixed at 96 pixels. Overflow, resizing and
+  screen-resolution changes require testing and further work.
+- **Filtering native system-setting Replicants is NOT YET IMPLEMENTED.**
+  They may appear in the tray if installed in Deskbar. Do not claim the
+  Control Strip separation is completed. Implement identity-based exclusion
+  with an explicit rule for third-party Replicants; do not filter generic
+  names such as "Network Monitor".
+- Empty-state visual behavior and persistence need verification.
+- While in OSTen-host mode, Deskbar's original menus are hidden intentionally;
+  ensure no background features depend on their visibility.
 
-- Native Replicants are actual `BView` instances hosted in a `BShelf`.
-- Existing applications target the Deskbar API, serviced by the **Deskbar
-  process**, including its `TReplicantTray` and `TReplicantShelf` in
-  `src/apps/deskbar/StatusView.*` and `StatusViewShelf.*`.
-- OSTen System is a **different process**. Reading the running-app roster,
-  copying icons, or drawing a `BView` of the same name does not transfer
-  ownership or native input handling of a Deskbar Replicant.
-- A production integration must arrange for the native registration endpoint
-  and the displayed `BShelf` to agree. Do not simultaneously host the same
-  add-on in Deskbar and System.
+## Required checks
 
-## Integration sequence
+1. Compile Deskbar and OSTenSystem using the normal OSTen Haiku image build.
+2. Open a fresh boot and verify the three controls' position and hit testing.
+3. Install an unchanged third-party Deskbar Replicant and exercise its native
+   context menu and behavior. Remove and re-add it.
+4. Check with multiple icons, a restart, a screen-size change, and no icons.
+5. Check native PowerStatus, NetworkStatus, Bluetooth, etc. Do not sign off
+   until system settings are only presented in Control Strip.
+6. Fix any regressions before calling this production-ready.
 
-1. Establish the actual lifecycle of Deskbar in the OSTen image (whether
-   replaced, launched hidden, or still running). Confirm boot scripts and
-   packaging before changing it.
-2. Reuse native `TReplicantTray` / `TReplicantShelf` hosting behavior,
-   persistence, loading/unloading, and API registration semantics. Decide
-   whether to consolidate the OSTen panel into the Deskbar process or bridge
-   registered messages and instantiate views in OSTen's process. Never
-   attempt to reparent live `BView` objects across processes.
-3. Separate placement policy from native registration. Exclude OSTen-owned
-   Control Strip components and recognized native system-setting Replicants
-   by **verified component identity**, not merely by labels. Keep a documented
-   exception/allow-list mechanism for third-party apps using similar names;
-   arbitrary application Replicants should remain accepted. Unknown items
-   must not be discarded solely because they lack OSTen metadata.
-4. Make layout dynamic while reserving fixed space on the right for the clock
-   and active-app switcher. Handle app removal, resize, multiple Replicants,
-   loading at boot, context menus, and cleanup reliably.
-5. Remove the temporary `osir` / `osix` interface once native routing has
-   been verified. Existing applications must require **no OSTen-specific
-   code changes**.
-
-## Acceptance tests
-
-- Install a third-party Deskbar Replicant using unchanged Haiku instructions:
-  its **real interactive view** appears in OSTen's tray and remains operable.
-- Remove and reinstall it through the native API; verify no duplicate and no
-  stale slot.
-- Restart the desktop with persistent add-ons and verify behavior.
-- Launch an OSTen Control Strip module and confirmed system-setting Replicants;
-  neither duplicates volume/display/network/power/Bluetooth/drives/settings
-  in the application tray.
-- Verify a third-party item with a name similar to a system setting is not
-  erroneously suppressed.
-- With zero application Replicants verify the visual layout remains
-  tray → clock → app switcher and the empty tray has no placeholder.
-- Confirm that this native implementation has been compiled and tested
-  **before marking compatibility complete**.
+Commit history records the implementation, but no successful build evidence
+has yet been attached.
