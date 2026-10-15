@@ -52,6 +52,9 @@ const uint32 kInlineRenameCancel = 'osix';
 const uint32 kInlineRenameAfterClick = 'osid';
 const char* kWindowFrameAttribute = "OSTen:window_frame";
 const char* kArrangeAttribute = "OSTen:arrange_kind";
+// Store desktop icon locations on their filesystem nodes, not by filename.
+// Renaming an icon therefore does not reset its position.
+const char* kDesktopPositionAttribute = "OSTen:desktop_position";
 
 const float kCellWidth = 94;
 const float kCellHeight = 86;
@@ -433,6 +436,12 @@ public:
 		BMessage drag(kFinderDragEntries);
 		_AddSelectedRefs(drag);
 		drag.AddBool("copy", (modifiers() & B_OPTION_KEY) != 0);
+		// A drag that returns to this desktop rearranges icons instead of
+		// attempting to move their files back into the same directory.
+		if (fIsDesktop) {
+			drag.AddBool("osten:desktop-drag", true);
+			drag.AddPoint("osten:drag-origin", fDragStart);
+		}
 		BRect dragRect = fItems[fPressedIndex].cell;
 		fTrackingDrag = false;
 		DragMessage(&drag, dragRect, this);
@@ -466,8 +475,14 @@ public:
 			BPoint point = message->DropPoint();
 			ConvertFromScreen(&point);
 			int32 hit = _ItemAt(point);
-			if (hit >= 0 && fItems[hit].isDirectory)
+			// Dropping onto a different folder still transfers the files.
+			// Dropping onto a dragged icon, or empty desktop, is a move.
+			if (hit >= 0 && fItems[hit].isDirectory
+				&& !_IsDraggedItem(message, fItems[hit].ref))
 				target = fItems[hit].ref;
+			if (fIsDesktop && target == fDirectory
+				&& RepositionDroppedIcons(message))
+				return;
 			TransferEntries(message, target);
 			return;
 		}
@@ -540,12 +555,68 @@ public:
 
 	void Arrange(bool byKind)
 	{
+		// "Clean Up" / "Arrange" really restores the desktop grid, instead
+		// of simply refreshing icons that were never free to move.
+		if (fIsDesktop) {
+			for (size_t i = 0; i < fItems.size(); ++i) {
+				BNode node(&fItems[i].ref);
+				if (node.InitCheck() == B_OK)
+					node.RemoveAttr(kDesktopPositionAttribute);
+			}
+		}
 		fArrangeKind = byKind;
 		int32 value = byKind ? 1 : 0;
 		BNode folder(&fDirectory);
 		folder.WriteAttr(kArrangeAttribute, B_INT32_TYPE, 0,
 			&value, sizeof(value));
 		Refresh();
+	}
+
+
+	// Called both by this desktop FolderView and its parent DesktopView,
+	// which receives drops in the reserved OSTen-volume / Trash column.
+	bool RepositionDroppedIcons(BMessage* message)
+	{
+		bool fromDesktop = false;
+		BPoint dragOrigin;
+		if (!fIsDesktop || !message->WasDropped()
+			|| message->FindBool("osten:desktop-drag", &fromDesktop) != B_OK
+			|| !fromDesktop
+			|| message->FindPoint("osten:drag-origin", &dragOrigin) != B_OK)
+			return false;
+		bool copy = false;
+		message->FindBool("copy", &copy);
+		if (copy)
+			return false;
+
+		BPoint dropped = message->DropPoint();
+		ConvertFromScreen(&dropped);
+		BPoint delta = dropped - dragOrigin;
+		bool changed = false;
+		for (int32 i = 0; ; ++i) {
+			entry_ref ref;
+			if (message->FindRef("refs", i, &ref) != B_OK)
+				break;
+			for (size_t index = 0; index < fItems.size(); ++index) {
+				FinderItem& item = fItems[index];
+				if (item.ref != ref)
+					continue;
+				BPoint position(item.cell.left + delta.x,
+					item.cell.top + delta.y);
+				position = _ConstrainDesktopPosition(position);
+				BNode node(&item.ref);
+				if (node.InitCheck() == B_OK
+					&& node.WriteAttr(kDesktopPositionAttribute, B_POINT_TYPE,
+						0, &position, sizeof(position)) == (ssize_t)sizeof(position)) {
+					item.cell.OffsetTo(position);
+					changed = true;
+				}
+				break;
+			}
+		}
+		if (changed)
+			Invalidate();
+		return true;
 	}
 
 	void MoveSelectionToTrash()
@@ -717,18 +788,93 @@ private:
 			|| strcmp(name, "trash") == 0;
 	}
 
+	BPoint _ConstrainDesktopPosition(BPoint point) const
+	{
+		// Positions are relative to the desktop icon field. The system disk
+		// and Trash keep their reserved column on the right.
+		float maxX = std::max(0.0f, Bounds().Width() - (kCellWidth - 8));
+		float maxY = std::max(0.0f, Bounds().Height() - (kCellHeight - 6));
+		point.x = std::max(0.0f, std::min(point.x, maxX));
+		point.y = std::max(0.0f, std::min(point.y, maxY));
+		return point;
+	}
+
+	bool _IsDraggedItem(const BMessage* message, const entry_ref& ref) const
+	{
+		for (int32 i = 0; ; ++i) {
+			entry_ref dragged;
+			if (message->FindRef("refs", i, &dragged) != B_OK)
+				return false;
+			if (dragged == ref)
+				return true;
+		}
+	}
+
 	void _LayoutItems()
 	{
 		int32 columns = (int32)((Bounds().Width() - 12) / kCellWidth);
 		if (columns < 1)
 			columns = 1;
-		for (size_t index = 0; index < fItems.size(); index++) {
-			int32 column = (int32)index % columns;
-			int32 row = (int32)index / columns;
-			float left = 10 + column * kCellWidth;
-			float top = 8 + row * kCellHeight;
-			fItems[index].cell.Set(left, top, left + kCellWidth - 8,
-				top + kCellHeight - 6);
+
+		if (fIsDesktop) {
+			// Place manually arranged icons first. Unpositioned/new folders
+			// take the first vacant grid cells, left-to-right, top-to-bottom.
+			std::vector<BRect> occupied;
+			std::vector<bool> positioned(fItems.size(), false);
+			for (size_t i = 0; i < fItems.size(); ++i) {
+				BPoint point;
+				BNode node(&fItems[i].ref);
+				if (node.InitCheck() != B_OK
+					|| node.ReadAttr(kDesktopPositionAttribute, B_POINT_TYPE,
+						0, &point, sizeof(point)) != (ssize_t)sizeof(point))
+					continue;
+				// Ignore corrupted coordinates; never draw an icon offscreen.
+				if (!isfinite(point.x) || !isfinite(point.y))
+					continue;
+				point = _ConstrainDesktopPosition(point);
+				BRect cell(point.x, point.y, point.x + kCellWidth - 8,
+					point.y + kCellHeight - 6);
+				fItems[i].cell = cell;
+				occupied.push_back(cell);
+				positioned[i] = true;
+			}
+			int32 slot = 0;
+			for (size_t i = 0; i < fItems.size(); ++i) {
+				if (positioned[i])
+					continue;
+				for (;;) {
+					int32 column = slot % columns;
+					int32 row = slot / columns;
+					++slot;
+					BPoint p(10 + column * kCellWidth,
+						8 + row * kCellHeight);
+					p = _ConstrainDesktopPosition(p);
+					BRect cell(p.x, p.y, p.x + kCellWidth - 8,
+						p.y + kCellHeight - 6);
+					bool taken = false;
+					for (size_t j = 0; j < occupied.size(); ++j) {
+						if (cell.Intersects(occupied[j])) {
+							taken = true;
+							break;
+						}
+					}
+					// A packed desktop still needs to display every entry.
+					if (!taken || slot > (int32)fItems.size() + columns * 2) {
+						fItems[i].cell = cell;
+						occupied.push_back(cell);
+						break;
+					}
+				}
+			}
+		} else {
+			for (size_t index = 0; index < fItems.size(); index++) {
+				int32 column = (int32)index % columns;
+				int32 row = (int32)index / columns;
+				float left = 10 + column * kCellWidth;
+				float top = 8 + row * kCellHeight;
+				fItems[index].cell.Set(left, top, left + kCellWidth - 8,
+					top + kCellHeight - 6);
+			}
 		}
 		BScrollBar* scrollbar = ScrollBar(B_VERTICAL);
 		if (scrollbar != NULL) {
@@ -1343,6 +1489,17 @@ public:
 				entry_ref targetRef;
 				if (target.GetRef(&targetRef) == B_OK)
 					TransferEntries(message, targetRef, preserveExisting);
+			} else {
+				// Drops to the rest of the desktop (outside FolderView) should
+				// still permit repositioning. Only disk/Trash remain targets.
+				FolderView* icons = dynamic_cast<FolderView*>(
+					FindView("Folder icons"));
+				if (icons == NULL || !icons->RepositionDroppedIcons(message)) {
+					BEntry desktop("/boot/home/Desktop");
+					entry_ref desktopRef;
+					if (desktop.GetRef(&desktopRef) == B_OK)
+						TransferEntries(message, desktopRef);
+				}
 			}
 			return;
 		}
