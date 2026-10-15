@@ -89,6 +89,7 @@ MacDecorator::Draw(BRect updateRect)
 	fDrawingEngine->SetDrawState(&fDrawState);
 
 	_DrawFrame(updateRect & fBorderRect);
+	_DrawResizeCorner(updateRect);
 	_DrawTabs(updateRect & fTitleBarRect);
 }
 
@@ -100,6 +101,7 @@ MacDecorator::Draw()
 	fDrawingEngine->SetDrawState(&fDrawState);
 
 	_DrawFrame(fBorderRect);
+	_DrawResizeCorner(fResizeRect);
 	_DrawTabs(fTitleBarRect);
 }
 
@@ -122,8 +124,10 @@ MacDecorator::RegionAt(BPoint where, int32& tab) const
 	if (region != REGION_NONE)
 		return region;
 
-	// check the resize corner
-	if (fTopTab->look == B_DOCUMENT_WINDOW_LOOK && fResizeRect.Contains(where))
+	// The visible classic Mac size box must also be the clickable resize area.
+	// It is available for normal titled Finder windows as well as document
+	// windows; the OS must never offer it on a fixed-size window.
+	if (fResizeRect.IsValid() && fResizeRect.Contains(where))
 		return REGION_RIGHT_BOTTOM_CORNER;
 
 	// hit-test the borders
@@ -217,6 +221,18 @@ MacDecorator::_DoLayout()
 		fBorderWidth = 0;
 
 	fBorderRect = fFrame.InsetByCopy(-fBorderWidth, -fBorderWidth);
+
+	// The classic Macintosh lower-right size box projects slightly past the
+	// narrow Platinum frame. Keep it entirely outside the client area so
+	// applications do not lose document pixels to their window decoration.
+	// A window lacking either resize axis cannot show a two-axis size box.
+	fResizeRect.Set(0, 0, -1, -1);
+	if (fTopTab != NULL && hasTab
+		&& (fTopTab->flags & (B_NOT_RESIZABLE | B_NOT_H_RESIZABLE
+			| B_NOT_V_RESIZABLE)) == 0) {
+		fResizeRect.Set(fFrame.right, fFrame.bottom,
+			fFrame.right + 15, fFrame.bottom + 15);
+	}
 
 	// calculate our tab rect
 	if (hasTab) {
@@ -495,6 +511,46 @@ MacDecorator::_DrawFrame(BRect invalid)
 
 
 void
+MacDecorator::_DrawResizeCorner(BRect invalid)
+{
+	if (!fResizeRect.IsValid() || !invalid.Intersects(fResizeRect))
+		return;
+
+	// Platinum-style recessed size box. A distinct footprint allows a
+	// usable 16 x 16 pixel hit target without widening every window border.
+	BRect box(fResizeRect);
+	const bool focused = fTopTab != NULL && IsFocus(fTopTab);
+	const rgb_color background = focused
+		? (rgb_color){ 216, 216, 216, 255 }
+		: (rgb_color){ 224, 224, 224, 255 };
+	const rgb_color dark = focused
+		? (rgb_color){ 71, 71, 71, 255 }
+		: (rgb_color){ 139, 139, 139, 255 };
+	const rgb_color light = { 255, 255, 255, 255 };
+
+	fDrawingEngine->FillRect(box, background);
+	fDrawingEngine->StrokeLine(box.LeftTop(), box.RightTop(),
+		fFrameLowColor);
+	fDrawingEngine->StrokeLine(box.LeftTop(), box.LeftBottom(),
+		fFrameLowColor);
+	fDrawingEngine->StrokeLine(box.RightTop(), box.RightBottom(),
+		fFrameLowerColor);
+	fDrawingEngine->StrokeLine(box.LeftBottom(), box.RightBottom(),
+		fFrameLowerColor);
+
+	for (int32 step = 4; step <= 12; step += 4) {
+		// Paired diagonal scratches give the familiar raised grip texture.
+		BPoint start(box.right - step, box.bottom - 3);
+		BPoint end(box.right - 3, box.bottom - step);
+		fDrawingEngine->StrokeLine(start, end, dark);
+		start.y++;
+		end.y++;
+		fDrawingEngine->StrokeLine(start, end, light);
+	}
+}
+
+
+void
 MacDecorator::_DrawTab(Decorator::Tab* tab, BRect invalid)
 {
 	// If a window has a tab, this will draw it and any buttons which are
@@ -734,7 +790,11 @@ MacDecorator::_MoveBy(BPoint offset)
 void
 MacDecorator::_ResizeBy(BPoint offset, BRegion* dirty)
 {
-	// Move all internal rectangles the appropriate amount
+	// Include the previous size box so its old pixels are cleared when
+	// the frame grows or shrinks, not only the new frame border.
+	if (dirty != NULL && fResizeRect.IsValid())
+		dirty->Include(fResizeRect);
+
 	fFrame.right += offset.x;
 	fFrame.bottom += offset.y;
 
@@ -748,8 +808,11 @@ MacDecorator::_ResizeBy(BPoint offset, BRegion* dirty)
 		dirty->Include(fBorderRect);
 	}
 
-	// TODO probably some other layouting stuff here
+	// Recompute the size-box location after each resize, and repaint both
+	// endpoints. Its hit-testing follows the new bounds immediately.
 	_DoLayout();
+	if (dirty != NULL && fResizeRect.IsValid())
+		dirty->Include(fResizeRect);
 }
 
 
@@ -843,6 +906,10 @@ MacDecorator::_GetFootprint(BRegion* region)
 
 	region->Set(fBorderRect);
 	region->Exclude(fFrame);
+	// Keep the protruding size box in the server window's visible footprint
+	// so its drawn pixels also accept actual pointer events.
+	if (fResizeRect.IsValid())
+		region->Include(fResizeRect);
 
 	if (fTopTab->look == B_BORDERED_WINDOW_LOOK)
 		return;

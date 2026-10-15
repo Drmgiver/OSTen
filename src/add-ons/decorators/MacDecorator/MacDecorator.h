@@ -45,6 +45,7 @@ protected:
 			void				_DoLayout();
 
 	virtual	void				_DrawFrame(BRect invalid);
+			void				_DrawResizeCorner(BRect invalid);
 
 	virtual	void				_DrawTab(Decorator::Tab* tab, BRect invalid);
 	virtual	void				_DrawButtons(Decorator::Tab* tab,
