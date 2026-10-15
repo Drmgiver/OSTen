@@ -116,7 +116,8 @@ public:
 		BWindow(BRect(0, 0, BScreen().Frame().Width(), 25), "System",
 			B_NO_BORDER_WINDOW_LOOK, B_FLOATING_ALL_WINDOW_FEEL,
 			B_NOT_CLOSABLE | B_NOT_MOVABLE | B_NOT_RESIZABLE
-				| B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE)
+				| B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE
+				| B_WILL_ACCEPT_FIRST_CLICK)
 	{
 		BMenuBar* bar = new BMenuBar(Bounds(), "System menu bar");
 		BMenu* systemMenu = new BMenu("OSTen");
@@ -182,6 +183,9 @@ public:
 				BWindow* about = CreateAboutComputerWindow();
 				fAboutMessenger = BMessenger(about);
 				about->Show();
+				// Show() makes the window visible; an explicit activation also
+				// ensures the first About request does not leave it behind Finder.
+				about->Activate(true);
 			}
 			return;
 		}
