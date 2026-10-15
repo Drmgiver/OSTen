@@ -307,6 +307,11 @@ public:
 		// A two-second pulse also refreshes app labels after activations
 		// without requiring a separate background polling thread.
 		fClockRunner = new BMessageRunner(BMessenger(this), &tick, 2000000);
+        // Native Deskbar owns the Replicant BShelf. Position its actual
+        // interactive tray over this reserved menu-bar area.
+        BMessenger deskbar("application/x-vnd.Be-TSKB");
+        BMessage attach('osht');
+        deskbar.SendMessage(&attach);
 	}
 
 	~SystemBar() override { delete fClockRunner; }
@@ -316,6 +321,9 @@ public:
 		if (message->what == kClockTick) {
 			RefreshOSTenClock(fClock);
 			RefreshOSTenApplicationSwitcher(fSwitcher);
+            BMessenger deskbar("application/x-vnd.Be-TSKB");
+            BMessage attach('osht');
+            deskbar.SendMessage(&attach);
 			return;
 		}
 		if (message->what == kOSTenTrayRegister) {
