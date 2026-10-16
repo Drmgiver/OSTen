@@ -450,6 +450,31 @@ TBarApp::MessageReceived(BMessage* message)
 					? tray->ReplicantCount() : -1);
 				reply.AddInt32("attempts", gOSTenTrayAddAttempts);
 				reply.AddInt32("result", gOSTenTrayLastResult);
+				reply.AddBool("window_hidden", fBarWindow->IsHidden());
+				BRect windowFrame = fBarWindow->Frame();
+				reply.AddRect("window_frame", windowFrame);
+				// Parent and visibility are more useful than window-level
+				// guesses when a registered Replicant cannot be seen.
+				if (tray != NULL) {
+					reply.AddBool("tray_hidden", tray->IsHidden());
+					reply.AddRect("tray_frame", tray->Frame());
+					BView* parent = tray->Parent();
+					reply.AddBool("parent_present", parent != NULL);
+					if (parent != NULL) {
+						reply.AddBool("parent_hidden", parent->IsHidden());
+						reply.AddRect("parent_frame", parent->Frame());
+					}
+					for (int32 i = 0; i < tray->CountChildren(); ++i) {
+						BView* child = tray->ChildAt(i);
+						if (child == tray->Time())
+							continue;
+						reply.AddBool("replicant_hidden", child->IsHidden());
+						reply.AddRect("replicant_frame", child->Frame());
+						BPoint position = child->ConvertToScreen(BPoint(0, 0));
+						reply.AddPoint("replicant_screen", position);
+						break;
+					}
+				}
 				fBarWindow->Unlock();
 			}
 			message->SendReply(&reply);
