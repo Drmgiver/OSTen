@@ -310,7 +310,9 @@ public:
 					if (roster.GetRunningAppInfo(id, &info) == B_OK
 						&& !(info.flags & B_BACKGROUND_APP)
 						&& strcmp(info.signature,
-							"application/x-vnd.OSTen-System") != 0)
+							"application/x-vnd.OSTen-System") != 0
+						&& strcmp(info.signature,
+							"application/x-vnd.Be-TSKB") != 0)
 						apps.push_back(id);
 				}
 				if (!apps.empty()) {
