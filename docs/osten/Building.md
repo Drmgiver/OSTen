@@ -120,8 +120,10 @@ creates `osten-preview.image`. It adds an ordinary `System Folder` at the root
 of the boot volume with `Control Panels`, `Extensions`, `Fonts`, and
 `Startup Items`, plus a root `Applications` folder. The visible `System` and
 `Finder` applications in `System Folder` select the OSTen shell at login.
-Tracker and Deskbar remain available as recovery fallbacks but are not started
-when those OSTen components are present. `System` supplies the global menu bar;
+Tracker remains available as a recovery fallback when OSTen Finder is absent.
+Deskbar continues running as OSTen's hidden native Replicant host; OSTen
+System relocates its tray into the menu bar instead of showing the stock
+Deskbar interface. `System` supplies the global menu bar;
 `Finder` owns the desktop, displays the OSTen boot disk and Trash, and opens
 folders in separate spatial windows.
 
