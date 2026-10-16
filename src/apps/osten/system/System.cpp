@@ -260,6 +260,38 @@ public:
 				else
 					report << "Failed / incomplete (" << result << ")";
 			}
+			if (error == B_OK) {
+				bool value = false;
+				BRect frame;
+				BPoint point;
+				if (reply.FindBool("window_hidden", &value) == B_OK)
+					report << "\nWindow hidden: " << (value ? "Yes" : "No");
+				if (reply.FindRect("window_frame", &frame) == B_OK)
+					report << "\nWindow at: " << (int)frame.left << ", "
+						<< (int)frame.top << " size " << (int)frame.Width()
+						<< "x" << (int)frame.Height();
+				if (reply.FindBool("parent_present", &value) == B_OK)
+					report << "\nTray has parent: " << (value ? "Yes" : "No");
+				if (reply.FindBool("parent_hidden", &value) == B_OK)
+					report << "\nParent hidden: " << (value ? "Yes" : "No");
+				if (reply.FindBool("tray_hidden", &value) == B_OK)
+					report << "\nTray hidden: " << (value ? "Yes" : "No");
+				if (reply.FindRect("tray_frame", &frame) == B_OK)
+					report << "\nTray frame: " << (int)frame.left << ", "
+						<< (int)frame.top << " " << (int)frame.Width()
+						<< "x" << (int)frame.Height();
+				if (reply.FindBool("replicant_hidden", &value) == B_OK)
+					report << "\nReplicant hidden: " << (value ? "Yes" : "No");
+				else
+					report << "\nReplicant child: Not found";
+				if (reply.FindRect("replicant_frame", &frame) == B_OK)
+					report << "\nReplicant frame: " << (int)frame.left << ", "
+						<< (int)frame.top << " " << (int)frame.Width()
+						<< "x" << (int)frame.Height();
+				if (reply.FindPoint("replicant_screen", &point) == B_OK)
+					report << "\nReplicant screen: " << (int)point.x
+						<< ", " << (int)point.y;
+			}
 			(new BAlert("System Tray Diagnostics", report.String(), "OK"))->Go(NULL);
 			return;
 		}
