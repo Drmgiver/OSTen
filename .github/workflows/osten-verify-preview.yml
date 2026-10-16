@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Select a saved image with unchanged runtime sources
         id: select-image
@@ -98,7 +98,7 @@ jobs:
 
       - name: Save verified boot evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: osten-verified-boot-${{ github.sha }}
           path: preview-boot/
