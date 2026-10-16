@@ -229,6 +229,7 @@ TBarWindow::MessageReceived(BMessage* message)
 			// Keep the original Deskbar process and its BShelf alive. Real
 			// BDeskbar::AddItem() Replicants are hosted here, not cloned into
 			// OSTen's process.
+			const bool firstAttachment = !fOSTenTrayHost;
 			if (!fOSTenTrayHost) {
 				TDragRegion* region = fBarView->DragRegion();
 				region->RemoveSelf();
@@ -259,6 +260,12 @@ TBarWindow::MessageReceived(BMessage* message)
 			}
 			BRect screen = BScreen(this).Frame();
 			MoveTo(screen.right - 288, screen.top + 1);
+			// Diagnostic: OSTen's full-width floating System window may
+			// obscure this correctly-positioned native Replicant host.
+			// Raise it only on the first attachment, not on each periodic
+			// 'osht' heartbeat, to avoid repeatedly stealing focus.
+			if (firstAttachment)
+				Activate(true);
 			break;
 		}
 
