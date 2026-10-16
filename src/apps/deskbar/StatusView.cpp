@@ -234,6 +234,14 @@ TReplicantTray::DetachedFromWindow()
 void
 TReplicantTray::GetPreferredSize(float* preferredWidth, float* preferredHeight)
 {
+	// In OSTen mode the native shelf occupies the fixed system-tray slot.
+	// Stock Deskbar's minimum six-icon width and orientation don't apply.
+	if (fBarView->Window() != NULL
+		&& static_cast<TBarWindow*>(fBarView->Window())->IsOSTenTrayHost()) {
+		*preferredWidth = 95;
+		*preferredHeight = 23;
+		return;
+	}
 	float width = 0;
 	float height = fMinTrayHeight;
 
@@ -284,6 +292,14 @@ TReplicantTray::GetPreferredSize(float* preferredWidth, float* preferredHeight)
 void
 TReplicantTray::AdjustPlacement()
 {
+	// Deskbar's normal layout would resize the detached native shelf using
+	// its old vertical/expanded dimensions. Keep OSTen's menu-bar host stable.
+	if (fBarView->Window() != NULL
+		&& static_cast<TBarWindow*>(fBarView->Window())->IsOSTenTrayHost()) {
+		RealignReplicants();
+		Invalidate();
+		return;
+	}
 	// called when an add-on has been added or removed
 	// need to resize the parent of this accordingly
 
@@ -982,8 +998,13 @@ TReplicantTray::AddIcon(BMessage* archive, int32* id, const entry_ref* addOn)
 
 	// TODO: check for name collisions?
 	status = fShelf->AddReplicant(archive, BPoint(1, 1));
-	if (status != B_OK)
+	if (status != B_OK) {
+		fprintf(stderr, "OSTen system tray: BShelf rejected Replicant: %s\\n",
+			strerror(status));
 		return status;
+	}
+	fprintf(stderr, "OSTen system tray: Replicant registered (count %ld)\\n",
+			(long)ReplicantCount());
 
 	int32 count = ReplicantCount();
 	BView* view;
