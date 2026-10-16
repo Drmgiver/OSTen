@@ -901,12 +901,21 @@ MacDecorator::_SetTabLocation(Decorator::Tab* tab, float location,
 	float maximum = std::max(0.0f,
 		fTitleBarRect.Width() - tab->tabRect.Width());
 	float offset = std::min(maximum, std::max(0.0f, location));
-	if (updateRegion != NULL)
-		updateRegion->Include(fTitleBarRect);
+	// A shifted tab changes the window's visible footprint. Repaint both
+	// its old and new positions, plus the seam where the tab joins the
+	// Platinum border. Otherwise fragments of the old tab can survive.
+	BRect oldTab = tab->tabRect;
+	BRect oldSeam(fBorderRect.left, fFrame.top - 4,
+		fBorderRect.right, fFrame.top + 4);
 	tab->tabOffset = (uint32)offset;
 	_DoLayout();
-	if (updateRegion != NULL)
-		updateRegion->Include(fTitleBarRect);
+	if (updateRegion != NULL) {
+		updateRegion->Include(oldTab);
+		updateRegion->Include(tab->tabRect);
+		updateRegion->Include(oldSeam);
+		updateRegion->Include(BRect(fBorderRect.left, fFrame.top - 4,
+			fBorderRect.right, fFrame.top + 4));
+	}
 	return true;
 }
 
