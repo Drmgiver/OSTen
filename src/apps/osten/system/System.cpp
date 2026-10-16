@@ -37,6 +37,7 @@ const uint32 kFocusAbout = 'osaf';
 const uint32 kShutDownOSTen = 'ossh';
 const uint32 kRestartOSTen = 'osre';
 const uint32 kClockTick = 'osct';
+const uint32 kTrayDiagnostics = 'osdg';
 
 
 // Draw the complete OSTen wordmark as the system menu's actual clickable item.
@@ -185,6 +186,8 @@ public:
 		bar->AddItem(viewMenu);
 
 		BMenu* specialMenu = new BMenu("Special");
+		specialMenu->AddItem(new BMenuItem("System Tray Diagnostics...",
+			new BMessage(kTrayDiagnostics)));
 		specialMenu->AddItem(new BMenuItem("Empty Trash...",
 			new BMessage(kOSTenEmptyTrash)));
 		specialMenu->AddSeparatorItem();
@@ -229,6 +232,35 @@ public:
             BMessenger deskbar("application/x-vnd.Be-TSKB");
             BMessage attach('osht');
             deskbar.SendMessage(&attach);
+			return;
+		}
+		if (message->what == kTrayDiagnostics) {
+			BMessenger deskbar("application/x-vnd.Be-TSKB");
+			BMessage query('osdq');
+			BMessage reply;
+			BString report("Native Deskbar System Tray\\n\\n");
+			status_t error = deskbar.SendMessage(&query, &reply, 500000, 500000);
+			if (error != B_OK) {
+				report << "Deskbar did not respond: " << strerror(error);
+			} else {
+				bool hosted = false;
+				int32 count = -1, attempts = 0, result = B_ERROR;
+				reply.FindBool("host", &hosted);
+				reply.FindInt32("count", &count);
+				reply.FindInt32("attempts", &attempts);
+				reply.FindInt32("result", &result);
+				report << "OSTen host active: " << (hosted ? "Yes" : "No")
+					<< "\\nReplicants: " << count
+					<< "\\nRegistration attempts: " << attempts
+					<< "\\nLast attempt: ";
+				if (attempts == 0)
+					report << "None observed";
+				else if (result == B_OK)
+					report << "Accepted";
+				else
+					report << "Failed / incomplete (" << result << ")";
+			}
+			(new BAlert("System Tray Diagnostics", report.String(), "OK"))->Go(NULL);
 			return;
 		}
 		if (message->what == kOSTenShowNotices) {
