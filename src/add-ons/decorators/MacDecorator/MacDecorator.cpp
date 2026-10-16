@@ -14,6 +14,7 @@
 
 #include "MacDecorator.h"
 
+#include <algorithm>
 #include <new>
 #include <stdio.h>
 
