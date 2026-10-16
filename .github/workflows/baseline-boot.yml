@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Wait for baseline image and download it
         env:
@@ -75,7 +75,7 @@ jobs:
 
       - name: Save boot evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: osten-baseline-boot-${{ github.sha }}
           path: baseline-boot/
