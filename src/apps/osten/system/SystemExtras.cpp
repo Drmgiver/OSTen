@@ -177,7 +177,8 @@ GetApplications()
         app_info info;
         if (roster.GetRunningAppInfo(id, &info) != B_OK
             || (info.flags & B_BACKGROUND_APP)
-            || strcmp(info.signature, "application/x-vnd.OSTen-System") == 0)
+            || strcmp(info.signature, "application/x-vnd.OSTen-System") == 0
+            || strcmp(info.signature, "application/x-vnd.Be-TSKB") == 0)
             continue;
         AppChoice choice;
         choice.team = id;
