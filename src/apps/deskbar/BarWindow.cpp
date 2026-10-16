@@ -240,13 +240,13 @@ TBarWindow::MessageReceived(BMessage* message)
 				fBarView->ReplicantTray()->Time()->Hide();
 				TReplicantTray* tray = fBarView->ReplicantTray();
 				tray->MoveTo(0, 0);
-				tray->ResizeTo(95, 23);
+				tray->ResizeTo(32, 23);
 				// The detached drag region retains its old Deskbar offset.
 				// Diagnostics showed a Replicant at screen Y=25 although
 				// its window begins at Y=1 and its local Y is only 4.
 				// Reset the parent origin, not the Replicant's local frame.
 				region->MoveTo(0, 0);
-				region->ResizeTo(95, 23);
+				region->ResizeTo(32, 23);
 				// The stock Deskbar drag region can be hidden in mini mode.
 				// The detached host and its native BShelf must stay visible.
 				if (region->IsHidden())
@@ -264,26 +264,29 @@ TBarWindow::MessageReceived(BMessage* message)
 				SetLook(B_NO_BORDER_WINDOW_LOOK);
 				SetFeel(B_FLOATING_ALL_WINDOW_FEEL);
 				// The native tray grows and shrinks with its Replicants.
-				BWindow::SetSizeLimits(95, 8192, 23, 23);
-				ResizeTo(95, 23);
+				BWindow::SetSizeLimits(32, 8192, 23, 23);
+				ResizeTo(32, 23);
 				fBarView->ReplicantTray()->RealignReplicants();
 			}
 			// Recompute on each heartbeat as well as after AddItem/RemoveItem.
 			// Keep the clock and application switcher fixed at the right.
 			TReplicantTray* tray = fBarView->ReplicantTray();
 			tray->RealignReplicants();
+			// Sum native Replicant widths rather than trusting a stale
+			// rightmost frame from the old Deskbar layout. This also avoids
+			// retaining a giant empty tray around a single small icon.
 			float used = 0;
 			for (int32 i = 0; i < tray->ReplicantCount(); ++i) {
 				BRect icon = tray->IconFrame(i, true);
-				if (icon.IsValid() && icon.right > used)
-					used = icon.right;
+				if (icon.IsValid())
+					used += icon.Width() + 2;
 			}
 			BRect screen = BScreen(this).Frame();
 			// Leave at least 360 pixels for the OSTen global menus.
-			const float available = std::max(95.0f,
+			const float available = std::max(32.0f,
 				screen.Width() - 360.0f - 193.0f);
 			const float width = std::min(available,
-				std::max(95.0f, ceilf(used + 6)));
+				std::max(32.0f, ceilf(used + 6)));
 			if (Bounds().Width() != width) {
 				ResizeTo(width, 23);
 				fBarView->DragRegion()->ResizeTo(width, 23);
