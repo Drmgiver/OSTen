@@ -199,7 +199,7 @@ public:
 		AddChild(bar);
 		BRect bounds = Bounds();
 		fTray = new BView(BRect(
-            bounds.right - 288, 1, bounds.right - 192, 24),
+            bounds.right - 225, 1, bounds.right - 193, 24),
             "Native Application Tray Slot", B_FOLLOW_RIGHT | B_FOLLOW_TOP,
             B_WILL_DRAW);
         fTray->SetViewColor(ui_color(B_MENU_BACKGROUND_COLOR));
@@ -230,8 +230,8 @@ public:
 	// Resize the reserved background and the menu area together.
 	void _UpdateTrayWidth(float width)
 	{
-		if (width < 95)
-			width = 95;
+		if (width < 32)
+			width = 32;
 		BRect bounds = Bounds();
 		float left = bounds.right - 193 - width;
 		if (fTray != NULL) {
