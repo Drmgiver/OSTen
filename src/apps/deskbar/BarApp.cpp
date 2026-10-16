@@ -434,6 +434,24 @@ TBarApp::MessageReceived(BMessage* message)
 		case kMsgAddView:
 		case kMsgRemoveItem:
 		case kMsgAddAddOn:
+		case 'osdq': // OSTen System Tray diagnostics
+		{
+			BMessage reply('osdr');
+			if (fBarWindow->Lock()) {
+				TReplicantTray* tray = static_cast<TReplicantTray*>(
+					fBarWindow->FindView("Status"));
+				extern int32 gOSTenTrayAddAttempts;
+				extern status_t gOSTenTrayLastResult;
+				reply.AddBool("host", fBarWindow->IsOSTenTrayHost());
+				reply.AddInt32("count", tray != NULL
+					? tray->ReplicantCount() : -1);
+				reply.AddInt32("attempts", gOSTenTrayAddAttempts);
+				reply.AddInt32("result", gOSTenTrayLastResult);
+				fBarWindow->Unlock();
+			}
+			message->SendReply(&reply);
+			break;
+		}
 		case 'osht': // OSTen native tray host request
 			fBarWindow->PostMessage(message);
 			break;
