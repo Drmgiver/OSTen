@@ -252,6 +252,13 @@ TBarWindow::MessageReceived(BMessage* message)
 				if (tray->IsHidden())
 					tray->Show();
 				fOSTenTrayHost = true;
+				// Both sides of the native BShelf use the same menu-bar color
+				// as OSTen System; never recolor the third-party Replicant.
+				const rgb_color menuColor = ui_color(B_MENU_BACKGROUND_COLOR);
+				region->SetViewColor(menuColor);
+				tray->SetViewColor(menuColor);
+				region->Invalidate();
+				tray->Invalidate();
 				SetLook(B_NO_BORDER_WINDOW_LOOK);
 				SetFeel(B_FLOATING_ALL_WINDOW_FEEL);
 				BWindow::SetSizeLimits(95, 95, 23, 23);
