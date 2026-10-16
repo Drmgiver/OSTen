@@ -242,52 +242,61 @@ MacDecorator::_DoLayout()
 		font_height fontHeight;
 		fDrawState.Font().GetHeight(fontHeight);
 
-		// TODO the tab is drawn in a fixed height for now
+		// OSTen's Platinum-colored BeOS tabs have their own footprint,
+		// rather than painting one full-width title bar for every window.
+		// Keep the title-bar region as the maximum available tab strip.
 		fTitleBarRect.Set(fFrame.left - fBorderWidth,
-			fFrame.top - 22,
-			((fFrame.right - fFrame.left) < 32.0 ?
-				fFrame.left + 32.0 : fFrame.right) + fBorderWidth,
+			fFrame.top - 22, fFrame.right + fBorderWidth,
 			fFrame.top - 3);
 
-		for (int32 i = 0; i < fTabList.CountItems(); i++) {
+		const int32 count = fTabList.CountItems();
+		const float available = fTitleBarRect.Width() + 1;
+		const float slotWidth = count > 0 ? available / count : available;
+		float tabLeft = fTitleBarRect.left;
+		for (int32 i = 0; i < count; i++) {
 			Decorator::Tab* tab = fTabList.ItemAt(i);
+			const char* title = Title(tab);
+			float titleWidth = 0;
+			if (title != NULL && fDrawingEngine != NULL) {
+				fDrawingEngine->SetFont(fDrawState.Font());
+				titleWidth = fDrawingEngine->StringWidth(title,
+					strlen(title));
+			}
+			// Reserve room for the three original Platinum controls.
+			// Grouped windows share the available width instead of overlapping.
+			float tabWidth = std::min(240.0f,
+				std::max(105.0f, titleWidth + 80.0f));
+			if (count > 1)
+				tabWidth = std::min(tabWidth, slotWidth);
+			else
+				tabWidth = std::min(tabWidth, available);
+			float right = std::min(fTitleBarRect.right,
+				tabLeft + tabWidth - 1);
+			tab->tabRect.Set(tabLeft, fTitleBarRect.top,
+				right, fTitleBarRect.bottom);
+			tab->tabOffset = uint32(std::max(0.0f,
+				tabLeft - fTitleBarRect.left));
+			tabLeft = right + 1;
 
-			tab->tabRect = fTitleBarRect;
-				// TODO actually handle multiple tabs
-
-			tab->zoomRect = fTitleBarRect;
+			tab->zoomRect = tab->tabRect;
 			tab->zoomRect.left = tab->zoomRect.right - 12;
 			tab->zoomRect.bottom = tab->zoomRect.top + 12;
 			tab->zoomRect.OffsetBy(-4, 4);
-
 			tab->closeRect = tab->zoomRect;
 			tab->minimizeRect = tab->zoomRect;
+			tab->closeRect.OffsetTo(tab->tabRect.left + 4,
+				tab->tabRect.top + 4);
+			tab->zoomRect.OffsetBy(-(tab->zoomRect.Width() + 4), 0);
 
-			tab->closeRect.OffsetTo(fTitleBarRect.left + 4,
-				fTitleBarRect.top + 4);
-
-			tab->zoomRect.OffsetBy(0 - (tab->zoomRect.Width() + 4), 0);
-			if (Title(tab) != NULL && fDrawingEngine != NULL) {
-				tab->truncatedTitle = Title(tab);
-				fDrawingEngine->SetFont(fDrawState.Font());
-				tab->truncatedTitleLength
-					= (int32)fDrawingEngine->StringWidth(Title(tab),
-						strlen(Title(tab)));
-
-				if (tab->truncatedTitleLength < (tab->zoomRect.left
-						- tab->closeRect.right - 10)) {
-					// start with offset from closerect.right
-					tab->textOffset = int(((tab->zoomRect.left - 5)
-						- (tab->closeRect.right + 5)) / 2);
-					tab->textOffset -= int(tab->truncatedTitleLength / 2);
-
-					// now make it the offset from fTabRect.left
-					tab->textOffset += int(tab->closeRect.right + 5
-						- fTitleBarRect.left);
-				} else
-					tab->textOffset = int(tab->closeRect.right) + 5;
-			} else
-				tab->textOffset = 0;
+			tab->truncatedTitle = title != NULL ? title : "";
+			tab->truncatedTitleLength = (int32)titleWidth;
+			const float textStart = tab->closeRect.right + 5;
+			const float textEnd = tab->zoomRect.left - 5;
+			if (titleWidth < textEnd - textStart)
+				tab->textOffset = int((textStart + textEnd
+				- titleWidth) / 2 - tab->tabRect.left);
+			else
+				tab->textOffset = int(textStart - tab->tabRect.left);
 		}
 	} else {
 		for (int32 i = 0; i < fTabList.CountItems(); i++) {
@@ -864,32 +873,19 @@ bool
 MacDecorator::_MoveTab(int32 from, int32 to, bool isMoving,
 	BRegion* updateRegion)
 {
-	return false;
-
-#if 0
-	MacDecorator::Tab* toTab = _TabAt(to);
-	if (toTab == NULL)
+	// The native Stack & Tile machinery manages the tab order. Our job is
+	// to lay out the resulting tabs and invalidate the old title strip.
+	if (from < 0 || to < 0 || from >= fTabList.CountItems()
+		|| to >= fTabList.CountItems())
 		return false;
-
-	if (from < to) {
-		fOldMovingTab.OffsetBy(toTab->tabRect.Width(), 0);
-		toTab->tabRect.OffsetBy(-fOldMovingTab.Width(), 0);
-	} else {
-		fOldMovingTab.OffsetBy(-toTab->tabRect.Width(), 0);
-		toTab->tabRect.OffsetBy(fOldMovingTab.Width(), 0);
-	}
-
-	toTab->tabOffset = uint32(toTab->tabRect.left - fLeftBorder.left);
-	_LayoutTabItems(toTab, toTab->tabRect);
-
-	_CalculateTabsRegion();
-
-	if (updateRegion != NULL)
+	BRect oldRegion = fTitleBarRect;
+	_DoLayout();
+	if (updateRegion != NULL) {
+		updateRegion->Include(oldRegion);
 		updateRegion->Include(fTitleBarRect);
+	}
 	return true;
-#endif
 }
-
 
 void
 MacDecorator::_GetFootprint(BRegion* region)
