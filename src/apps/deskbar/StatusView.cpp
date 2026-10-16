@@ -185,6 +185,10 @@ TReplicantTray::AttachedToWindow()
 	BView::AttachedToWindow();
 
 	AdoptParentColors();
+	// The floating native shelf must match OSTen's adjacent menu-bar views.
+	if (fBarView->Window() != NULL
+		&& static_cast<TBarWindow*>(fBarView->Window())->IsOSTenTrayHost())
+		SetViewColor(ui_color(B_MENU_BACKGROUND_COLOR));
 	SetDrawingMode(B_OP_COPY);
 
 	Window()->SetPulseRate(1000000);
@@ -1468,6 +1472,10 @@ TDragRegion::GetPreferredSize(float* width, float* height)
 void
 TDragRegion::Draw(BRect updateRect)
 {
+	// The OSTen host is a menu-bar slot, not a draggable Deskbar panel.
+	if (Window() != NULL
+		&& static_cast<TBarWindow*>(Window())->IsOSTenTrayHost())
+		return;
 	rgb_color menuColor = ViewColor();
 	rgb_color hilite = tint_color(menuColor, B_DARKEN_1_TINT);
 	rgb_color ldark = tint_color(menuColor, 1.02);
@@ -1502,6 +1510,10 @@ TDragRegion::Draw(BRect updateRect)
 void
 TDragRegion::DrawAfterChildren(BRect updateRect)
 {
+	// Do not paint the old Deskbar grip over native Replicants.
+	if (Window() != NULL
+		&& static_cast<TBarWindow*>(Window())->IsOSTenTrayHost())
+		return;
 	if (fDragLocation != kDontDrawDragRegion || fDragLocation != kNoDragRegion)
 		DrawDragger();
 }
