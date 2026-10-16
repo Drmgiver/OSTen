@@ -261,12 +261,37 @@ TBarWindow::MessageReceived(BMessage* message)
 				tray->Invalidate();
 				SetLook(B_NO_BORDER_WINDOW_LOOK);
 				SetFeel(B_FLOATING_ALL_WINDOW_FEEL);
-				BWindow::SetSizeLimits(95, 95, 23, 23);
+				// The native tray grows and shrinks with its Replicants.
+				BWindow::SetSizeLimits(95, 8192, 23, 23);
 				ResizeTo(95, 23);
 				fBarView->ReplicantTray()->RealignReplicants();
 			}
+			// Recompute on each heartbeat as well as after AddItem/RemoveItem.
+			// Keep the clock and application switcher fixed at the right.
+			TReplicantTray* tray = fBarView->ReplicantTray();
+			tray->RealignReplicants();
+			float used = 0;
+			for (int32 i = 0; i < tray->ReplicantCount(); ++i) {
+				BRect icon = tray->IconFrame(i, true);
+				if (icon.IsValid() && icon.right > used)
+					used = icon.right;
+			}
 			BRect screen = BScreen(this).Frame();
-			MoveTo(screen.right - 288, screen.top + 1);
+			// Leave at least 360 pixels for the OSTen global menus.
+			const float available = std::max(95.0f,
+				screen.Width() - 360.0f - 193.0f);
+			const float width = std::min(available,
+				std::max(95.0f, ceilf(used + 6)));
+			if (Bounds().Width() != width) {
+				ResizeTo(width, 23);
+				fBarView->DragRegion()->ResizeTo(width, 23);
+				tray->ResizeTo(width, 23);
+			}
+			MoveTo(screen.right - 193 - width, screen.top + 1);
+			BMessage reply('oshr');
+			reply.AddFloat("width", width);
+			reply.AddBool("overflow", used + 6 > width);
+			message->SendReply(&reply);
 			// Diagnostic: OSTen's full-width floating System window may
 			// obscure this correctly-positioned native Replicant host.
 			// Raise it only on the first attachment, not on each periodic
