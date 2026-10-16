@@ -270,6 +270,9 @@ MacDecorator::_DoLayout()
 				tabWidth = std::min(tabWidth, slotWidth);
 			else
 				tabWidth = std::min(tabWidth, available);
+			if (count == 1)
+				tabLeft = fTitleBarRect.left + std::min((float)tab->tabOffset,
+					std::max(0.0f, available - tabWidth));
 			float right = std::min(fTitleBarRect.right,
 				tabLeft + tabWidth - 1);
 			tab->tabRect.Set(tabLeft, fTitleBarRect.top,
@@ -884,6 +887,25 @@ MacDecorator::_MoveTab(int32 from, int32 to, bool isMoving,
 		updateRegion->Include(oldRegion);
 		updateRegion->Include(fTitleBarRect);
 	}
+	return true;
+}
+
+bool
+MacDecorator::_SetTabLocation(Decorator::Tab* tab, float location,
+	bool isShifting, BRegion* updateRegion)
+{
+	if (tab == NULL || !tab->tabRect.IsValid()
+		|| fTabList.CountItems() != 1)
+		return false;
+	float maximum = std::max(0.0f,
+		fTitleBarRect.Width() - tab->tabRect.Width());
+	float offset = std::min(maximum, std::max(0.0f, location));
+	if (updateRegion != NULL)
+		updateRegion->Include(fTitleBarRect);
+	tab->tabOffset = (uint32)offset;
+	_DoLayout();
+	if (updateRegion != NULL)
+		updateRegion->Include(fTitleBarRect);
 	return true;
 }
 
