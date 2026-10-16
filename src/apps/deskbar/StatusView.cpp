@@ -80,6 +80,10 @@ All rights reserved.
 
 static const float kVerticalMiniMultiplier = 2.9f;
 
+// Temporary OSTen diagnostics, maintained by Deskbar's window thread.
+int32 gOSTenTrayAddAttempts = 0;
+status_t gOSTenTrayLastResult = B_ERROR;
+
 float sIconGap = 0.0f;
 float gDragWidth, gDragRegionWidth = 0.0f;
 float gMinReplicantHeight, gMinReplicantWidth = 0.0f;
@@ -950,6 +954,8 @@ TReplicantTray::ReplicantCount() const
 status_t
 TReplicantTray::AddIcon(BMessage* archive, int32* id, const entry_ref* addOn)
 {
+	++gOSTenTrayAddAttempts;
+	gOSTenTrayLastResult = B_ERROR;
 	if (archive == NULL || id == NULL)
 		return B_BAD_VALUE;
 
@@ -1000,10 +1006,12 @@ TReplicantTray::AddIcon(BMessage* archive, int32* id, const entry_ref* addOn)
 	// TODO: check for name collisions?
 	status = fShelf->AddReplicant(archive, BPoint(1, 1));
 	if (status != B_OK) {
+		gOSTenTrayLastResult = status;
 		fprintf(stderr, "OSTen system tray: BShelf rejected Replicant: %s\\n",
 			strerror(status));
 		return status;
 	}
+	gOSTenTrayLastResult = B_OK;
 	fprintf(stderr, "OSTen system tray: Replicant registered (count %ld)\\n",
 			(long)ReplicantCount());
 
