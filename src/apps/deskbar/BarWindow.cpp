@@ -37,6 +37,8 @@ All rights reserved.
 #include "BarWindow.h"
 
 #include <stdio.h>
+#include <algorithm>
+#include <cmath>
 
 #include <Application.h>
 #include <AutoDeleter.h>
