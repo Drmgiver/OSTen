@@ -717,7 +717,7 @@ MacDecorator::_DrawTitle(Decorator::Tab* tab, BRect rect)
 	fDrawingEngine->SetFont(fDrawState.Font());
 
 	fDrawingEngine->DrawString(tab->truncatedTitle, tab->truncatedTitle.Length(),
-		BPoint(fTitleBarRect.left + tab->textOffset,
+		BPoint(tab->tabRect.left + tab->textOffset,
 			tab->closeRect.bottom - 1));
 }
 
@@ -933,7 +933,13 @@ MacDecorator::_GetFootprint(BRegion* region)
 
 	if (fTopTab->look == B_BORDERED_WINDOW_LOOK)
 		return;
-	region->Include(fTitleBarRect);
+	// Only actual tabs protrude above the window. The old full-width
+	// footprint obscured neighboring windows even when the tab was compact.
+	for (int32 i = 0; i < fTabList.CountItems(); ++i) {
+		Decorator::Tab* tab = fTabList.ItemAt(i);
+		if (tab != NULL && tab->tabRect.IsValid())
+			region->Include(tab->tabRect);
+	}
 }
 
 
