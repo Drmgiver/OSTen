@@ -69,6 +69,7 @@ All rights reserved.
 #include "icons.h"
 
 #include "BarApp.h"
+#include "BarWindow.h"
 #include "BarMenuBar.h"
 #include "DeskbarUtils.h"
 #include "ExpandoMenuBar.h"
