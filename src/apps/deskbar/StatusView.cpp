@@ -192,7 +192,11 @@ TReplicantTray::AttachedToWindow()
 	fTime->SetShowDayOfWeek(clock->showDayOfWeek);
 	fTime->SetShowTimeZone(clock->showTimeZone);
 
-	AddChild(fTime);
+	// OSTen re-parents the native tray into its menu-bar host. On that
+	// second window attachment the clock is already our child; AddChild()
+	// would enter the debugger with "the view already has a parent".
+	if (fTime->Parent() == NULL)
+		AddChild(fTime);
 
 	fTime->MoveTo(Bounds().right - fTime->Bounds().Width() - fTrayPadding, 2);
 		// will be moved into place later
