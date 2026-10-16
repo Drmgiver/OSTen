@@ -235,9 +235,16 @@ TBarWindow::MessageReceived(BMessage* message)
 				AddChild(region);
 				fBarView->Hide();
 				fBarView->ReplicantTray()->Time()->Hide();
-				region->FindView("Status")->MoveTo(0, 0);
-				region->FindView("Status")->ResizeTo(95, 23);
+				TReplicantTray* tray = fBarView->ReplicantTray();
+				tray->MoveTo(0, 0);
+				tray->ResizeTo(95, 23);
 				region->ResizeTo(95, 23);
+				// The stock Deskbar drag region can be hidden in mini mode.
+				// The detached host and its native BShelf must stay visible.
+				if (region->IsHidden())
+					region->Show();
+				if (tray->IsHidden())
+					tray->Show();
 				fOSTenTrayHost = true;
 				SetLook(B_NO_BORDER_WINDOW_LOOK);
 				SetFeel(B_FLOATING_ALL_WINDOW_FEEL);
