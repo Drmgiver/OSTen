@@ -1208,6 +1208,31 @@ TReplicantTray::AcceptAddon(BRect replicantFrame, BMessage* message)
 BPoint
 TReplicantTray::LocationForReplicant(int32 index, float replicantWidth)
 {
+	// OSTen displays the real Deskbar BShelf in a compact horizontal
+	// system-tray slot, independent of Deskbar's saved orientation.
+	// The original vertical-mode calculation can place icons outside
+	// the 23-pixel-high host and clip them completely.
+	if (fBarView->Window() != NULL
+		&& static_cast<TBarWindow*>(fBarView->Window())->IsOSTenTrayHost()) {
+		float x = fTrayPadding;
+		if (index > 0) {
+			BView* previous = NULL;
+			fShelf->ReplicantAt(index - 1, &previous);
+			if (previous != NULL)
+				x = previous->Frame().right + sIconGap + 1;
+		}
+		float y = std::max(0.0f,
+			(23.0f - fMaxReplicantHeight) / 2.0f);
+		BPoint loc(x, y);
+		if (loc.x > fRightBottomReplicant.left
+			|| fRightBottomReplicant.top != y) {
+			fRightBottomReplicant.Set(loc.x, loc.y,
+				loc.x + replicantWidth, loc.y + fMaxReplicantHeight);
+			fLastReplicant = index;
+		}
+		return loc;
+	}
+
 	BPoint loc(fTrayPadding, 0);
 	if (fBarView->Vertical() || fBarView->MiniState()) {
 		if (fBarView->Vertical() && !fBarView->Left())
