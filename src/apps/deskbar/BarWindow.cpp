@@ -238,6 +238,11 @@ TBarWindow::MessageReceived(BMessage* message)
 				TReplicantTray* tray = fBarView->ReplicantTray();
 				tray->MoveTo(0, 0);
 				tray->ResizeTo(95, 23);
+				// The detached drag region retains its old Deskbar offset.
+				// Diagnostics showed a Replicant at screen Y=25 although
+				// its window begins at Y=1 and its local Y is only 4.
+				// Reset the parent origin, not the Replicant's local frame.
+				region->MoveTo(0, 0);
 				region->ResizeTo(95, 23);
 				// The stock Deskbar drag region can be hidden in mini mode.
 				// The detached host and its native BShelf must stay visible.
