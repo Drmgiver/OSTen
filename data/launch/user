@@ -25,9 +25,12 @@ target desktop {
 		on initial_volumes_mounted
 	}
 
+	# Deskbar must always run: its native BShelf hosts third-party
+	# Replicants for OSTen's Application Tray. OSTen System relocates the
+	# Deskbar status area into its own menu bar using the 'osht' message.
+	# The full Deskbar interface remains a fallback on non-OSTen images.
 	service x-vnd.Be-TSKB {
 		launch /system/Deskbar
-		if not file_exists /boot/System\ Folder/System
 		on initial_volumes_mounted
 	}
 
