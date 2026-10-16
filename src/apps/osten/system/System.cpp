@@ -219,7 +219,28 @@ public:
         // interactive tray over this reserved menu-bar area.
         BMessenger deskbar("application/x-vnd.Be-TSKB");
         BMessage attach('osht');
-        deskbar.SendMessage(&attach);
+        BMessage reply;
+        if (deskbar.SendMessage(&attach, &reply, 250000, 250000) == B_OK) {
+            float width;
+            if (reply.FindFloat("width", &width) == B_OK)
+                _UpdateTrayWidth(width);
+        }
+	}
+
+	// Resize the reserved background and the menu area together.
+	void _UpdateTrayWidth(float width)
+	{
+		if (width < 95)
+			width = 95;
+		BRect bounds = Bounds();
+		float left = bounds.right - 193 - width;
+		if (fTray != NULL) {
+			fTray->MoveTo(left, 1);
+			fTray->ResizeTo(width, 23);
+		}
+		BView* menus = FindView("System menu bar");
+		if (menus != NULL)
+			menus->ResizeTo(left, menus->Bounds().Height());
 	}
 
 	~SystemBar() override { delete fClockRunner; }
@@ -231,7 +252,12 @@ public:
 			RefreshOSTenApplicationSwitcher(fSwitcher);
             BMessenger deskbar("application/x-vnd.Be-TSKB");
             BMessage attach('osht');
-            deskbar.SendMessage(&attach);
+            BMessage reply;
+            if (deskbar.SendMessage(&attach, &reply, 250000, 250000) == B_OK) {
+                float width;
+                if (reply.FindFloat("width", &width) == B_OK)
+                    _UpdateTrayWidth(width);
+            }
 			return;
 		}
 		if (message->what == kTrayDiagnostics) {
