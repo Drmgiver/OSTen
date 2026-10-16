@@ -434,6 +434,9 @@ TBarApp::MessageReceived(BMessage* message)
 		case kMsgAddView:
 		case kMsgRemoveItem:
 		case kMsgAddAddOn:
+			fBarWindow->PostMessage(message);
+			break;
+
 		case 'osdq': // OSTen System Tray diagnostics
 		{
 			BMessage reply('osdr');
