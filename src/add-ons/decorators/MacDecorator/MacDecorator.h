@@ -62,6 +62,10 @@ protected:
 	virtual	void				_SetTitle(Tab* tab, const char* string,
 									BRegion* updateRegion = NULL);
 
+	virtual	bool				_SetTabLocation(Decorator::Tab* tab,
+									float location, bool isShifting,
+									BRegion* updateRegion = NULL);
+
 	virtual	void				_MoveBy(BPoint offset);
 	virtual	void				_ResizeBy(BPoint offset, BRegion* dirty);
 
