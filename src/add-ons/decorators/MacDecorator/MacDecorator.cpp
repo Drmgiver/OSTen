@@ -942,6 +942,16 @@ MacDecorator::_GetFootprint(BRegion* region)
 
 	region->Set(fBorderRect);
 	region->Exclude(fFrame);
+	// The inactive frame painter extends its top edge three pixels above
+	// fBorderRect (see _DrawFrame's r.top -= 3). Report those pixels as
+	// part of the window footprint too: otherwise vertical window moves
+	// leave the untracked horizontal strokes behind on the desktop.
+	if (fTopTab->look == B_TITLED_WINDOW_LOOK
+		|| fTopTab->look == B_DOCUMENT_WINDOW_LOOK
+		|| fTopTab->look == B_MODAL_WINDOW_LOOK) {
+		region->Include(BRect(fBorderRect.left, fBorderRect.top - 3,
+			fBorderRect.right, fBorderRect.top));
+	}
 	// Keep the protruding size box in the server window's visible footprint
 	// so its drawn pixels also accept actual pointer events.
 	if (fResizeRect.IsValid())
