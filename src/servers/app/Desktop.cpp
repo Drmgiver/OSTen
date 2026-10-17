@@ -1578,6 +1578,13 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	copyRegion.IntersectWith(&newDirtyRegion);
 		// newDirtyRegion == the windows old visible region
 
+	// OSTen diagnostic: disable the upstream screen-copy fast path while
+	// investigating desktop trails that predate the compact window tabs.
+	// An empty copy region makes the normal dirty/redraw path responsible
+	// for both the moved window and its newly exposed desktop area.
+	// Restore the fast path after the test if it is not the cause.
+	copyRegion.MakeEmpty();
+
 	// include the the new visible region of the window being
 	// moved into the dirty region (for now)
 	newDirtyRegion.Include(&window->VisibleRegion());
