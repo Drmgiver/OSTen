@@ -1553,11 +1553,10 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 
 	// the dirty region starts with the visible area of the window being moved
 	BRegion newDirtyRegion(window->VisibleRegion());
-	// Compact OSTen tabs extend above the client frame. Save the complete
-	// old decorator footprint separately: relying only on VisibleRegion()
-	// can miss exposed pixels from the raised tab when the window moves.
-	BRegion oldDecorator;
-	window->GetBorderRegion(&oldDecorator);
+
+	// OSTen diagnostic: record the full old window area for a front-buffer
+	// refresh when testing the vertical ghost trails.
+	BRegion oldVisibleRegion(newDirtyRegion);
 
 	// stop direct frame buffer access
 	bool direct = false;
@@ -1578,14 +1577,9 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	copyRegion.IntersectWith(&newDirtyRegion);
 		// newDirtyRegion == the windows old visible region
 
-
 	// include the the new visible region of the window being
 	// moved into the dirty region (for now)
 	newDirtyRegion.Include(&window->VisibleRegion());
-	BRegion newDecorator;
-	window->GetBorderRegion(&newDecorator);
-	newDirtyRegion.Include(&oldDecorator);
-	newDirtyRegion.Include(&newDecorator);
 
 	// NOTE: Having all windows locked should prevent any
 	// problems with locking the drawing engine here.
@@ -1599,15 +1593,24 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	copyRegion.OffsetBy((int32)x, (int32)y);
 	newDirtyRegion.Exclude(&copyRegion);
 
-	// The background cache must also forget old decorator pixels before
-	// _SetBackground() computes newly exposed areas. Otherwise thin
-	// remnants of tab decorations may survive repeated window drags.
-	fBackgroundRegion.Exclude(&oldDecorator);
 	MarkDirty(newDirtyRegion);
-
-
 	_SetBackground(background);
 	_WindowChanged(window);
+
+	// OSTen diagnostic: the old cursor area is repaired by a back-to-front
+	// transfer when the pointer crosses the trails. Try that same transfer
+	// for both window positions on vertical moves. This is deliberately
+	// temporary; remove it after confirming whether the front buffer is
+	// the source of the stale horizontal strips.
+	if ((int32)y != 0) {
+		BRegion refreshRegion(oldVisibleRegion);
+		refreshRegion.Include(&window->VisibleRegion());
+		refreshRegion.IntersectWith(&fScreenRegion);
+		if (GetDrawingEngine()->LockParallelAccess()) {
+			GetDrawingEngine()->CopyToFront(refreshRegion);
+			GetDrawingEngine()->UnlockParallelAccess();
+		}
+	}
 
 	// resume direct frame buffer access
 	if (direct) {
