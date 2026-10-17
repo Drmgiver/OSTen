@@ -324,10 +324,6 @@ MacDecorator::_DrawFrame(BRect invalid)
 	if (fBorderWidth <= 0)
 		return;
 
-	// TEMPORARY OSTen diagnostic (remove after one boot test): leave the
-	// tab painter intact but skip frame-border strokes. If vertical window
-	// trails remain, they are not produced by this border painter.
-	return;
 
 	BRect r = fBorderRect;
 	switch (fTopTab->look) {
