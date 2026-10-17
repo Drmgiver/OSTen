@@ -1554,10 +1554,6 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	// the dirty region starts with the visible area of the window being moved
 	BRegion newDirtyRegion(window->VisibleRegion());
 
-	// OSTen diagnostic: record the full old window area for a front-buffer
-	// refresh when testing the vertical ghost trails.
-	BRegion oldVisibleRegion(newDirtyRegion);
-
 	// stop direct frame buffer access
 	bool direct = false;
 	if (window->ServerWindow()->IsDirectlyAccessing()) {
@@ -1596,21 +1592,6 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	MarkDirty(newDirtyRegion);
 	_SetBackground(background);
 	_WindowChanged(window);
-
-	// OSTen diagnostic: the old cursor area is repaired by a back-to-front
-	// transfer when the pointer crosses the trails. Try that same transfer
-	// for both window positions on vertical moves. This is deliberately
-	// temporary; remove it after confirming whether the front buffer is
-	// the source of the stale horizontal strips.
-	if ((int32)y != 0) {
-		BRegion refreshRegion(oldVisibleRegion);
-		refreshRegion.Include(&window->VisibleRegion());
-		refreshRegion.IntersectWith(&fScreenRegion);
-		if (GetDrawingEngine()->LockParallelAccess()) {
-			GetDrawingEngine()->CopyToFront(refreshRegion);
-			GetDrawingEngine()->UnlockParallelAccess();
-		}
-	}
 
 	// resume direct frame buffer access
 	if (direct) {
