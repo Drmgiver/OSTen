@@ -426,18 +426,25 @@ MacDecorator::_DrawFrame(BRect invalid)
 
 					fDrawingEngine->StrokeLine(offset, pt2, fFrameLowerColor);
 				} else {
-					// Some odd stuff here where the title bar is melded into the
-					// window border so that the sides are drawn into the title
-					// so we draw this bottom up 
-					offset = topleftpt;
-					pt2 = toprightpt;
-
-					fDrawingEngine->StrokeLine(offset, pt2, fFrameLowerColor);
-					offset.y--;
-					offset.x++;
-					pt2.y--;
-
-					fDrawingEngine->StrokeLine(offset, pt2, fFrameLowColor);
+					// A compact BeOS tab no longer fills the entire title
+					// strip. Draw the exposed frame seam as an opaque, stable
+					// horizontal band instead of repeatedly tracing the old
+					// full-width title-bar join. The tab ends above this band.
+					const float seamLeft = r.left + 5;
+					const float seamRight = r.right - 5;
+					if (seamLeft <= seamRight) {
+						BRect seam(seamLeft, fFrame.top - 3,
+							seamRight, fFrame.top - 1);
+						fDrawingEngine->FillRect(seam, fFrameMidColor);
+						fDrawingEngine->StrokeLine(
+							BPoint(seamLeft, fFrame.top - 2),
+							BPoint(seamRight, fFrame.top - 2),
+							fFrameLowColor);
+						fDrawingEngine->StrokeLine(
+							BPoint(seamLeft, fFrame.top - 1),
+							BPoint(seamRight, fFrame.top - 1),
+							fFrameLowerColor);
+					}
 				}
 
 				// Draw the bottom side of the frame
