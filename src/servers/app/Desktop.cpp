@@ -1604,6 +1604,22 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	// remnants of tab decorations may survive repeated window drags.
 	fBackgroundRegion.Exclude(&oldDecorator);
 	MarkDirty(newDirtyRegion);
+
+	// OSTen: the Finder desktop is a real desktop window, not the bare
+	// workspace-color background. Explicitly expose its newly uncovered
+	// pixels after moving a window so the desktop view can repaint them.
+	// This also includes the old title/decorator footprint, which is where
+	// the persistent horizontal drag trails have been observed.
+	Window* desktopWindow = CurrentWindows().FirstWindow();
+	if (desktopWindow != NULL && !desktopWindow->IsHidden()
+		&& desktopWindow->Feel() == kDesktopWindowFeel) {
+		BRegion exposedDesktop(newDirtyRegion);
+		exposedDesktop.Include(&oldDecorator);
+		exposedDesktop.IntersectWith(&desktopWindow->VisibleContentRegion());
+		if (exposedDesktop.CountRects() > 0)
+			desktopWindow->ProcessDirtyRegion(exposedDesktop);
+	}
+
 	_SetBackground(background);
 	_WindowChanged(window);
 
