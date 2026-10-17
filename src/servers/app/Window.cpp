@@ -202,6 +202,13 @@ Window::SetClipping(BRegion* stillAvailableOnScreen)
 
 	fVisibleContentRegionValid = false;
 	fEffectiveDrawingRegionValid = false;
+
+	// OSTen: a real Finder desktop window sits below the moving windows.
+	// Its child views cache screen clipping derived from the window's
+	// previously visible region. Recalculate that clipping when windows
+	// above it move so newly exposed strips can actually be repainted.
+	if (fFeel == kDesktopWindowFeel && fTopView.IsSet())
+		fTopView->InvalidateScreenClipping();
 }
 
 
