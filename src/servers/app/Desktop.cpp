@@ -1701,8 +1701,22 @@ Desktop::SetWindowTabLocation(Window* window, float location, bool isShifting)
 
 	BRegion dirty;
 	bool changed = window->SetTabLocation(location, isShifting, dirty);
-	if (changed)
+	if (changed) {
+		// Moving a compact tab exposes pixels which belonged to the old
+		// decorator footprint. RebuildClipping updates visibility, but the
+		// background may already consider that area clean and retain an
+		// old sliver of the tab. Explicitly repaint the newly exposed
+		// workspace background after the normal window redraw.
+		BRegion oldTabDamage(dirty);
 		RebuildAndRedrawAfterWindowChange(window, dirty);
+		oldTabDamage.IntersectWith(&fBackgroundRegion);
+		if (oldTabDamage.CountRects() > 0
+			&& GetDrawingEngine()->LockParallelAccess()) {
+			GetDrawingEngine()->FillRegion(oldTabDamage,
+				fWorkspaces[fCurrentWorkspace].Color());
+			GetDrawingEngine()->UnlockParallelAccess();
+		}
+	}
 
 	NotifyWindowTabLocationChanged(window, location, isShifting);
 
