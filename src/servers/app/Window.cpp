@@ -786,6 +786,21 @@ Window::RedrawDirtyRegion()
 
 		_TriggerContentRedraw(*dirtyContentRegion, *exposeContentRegion);
 
+		// OSTen diagnostic: cursor movement clears ghost trails, while a
+		// front-buffer refresh in Desktop::MoveWindowBy() did not. That
+		// refresh ran before the desktop window repainted its exposed views.
+		// Test transferring the completed desktop backing buffer only after
+		// the synchronous exposed-background redraw above. Refresh the full
+		// visible desktop for this one test so missing dirty rectangles cannot
+		// hide a front/back-buffer discrepancy. Remove after diagnosis.
+		if (fFeel == kDesktopWindowFeel
+			&& exposeContentRegion->CountRects() > 0
+			&& fDrawingEngine->LockParallelAccess()) {
+			BRegion visibleDesktop(VisibleContentRegion());
+			fDrawingEngine->CopyToFront(visibleDesktop);
+			fDrawingEngine->UnlockParallelAccess();
+		}
+
 		fRegionPool.Recycle(dirtyContentRegion);
 		fRegionPool.Recycle(exposeContentRegion);
 	}
