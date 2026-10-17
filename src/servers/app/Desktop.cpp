@@ -1553,6 +1553,11 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 
 	// the dirty region starts with the visible area of the window being moved
 	BRegion newDirtyRegion(window->VisibleRegion());
+	// Compact OSTen tabs extend above the client frame. Save the complete
+	// old decorator footprint separately: relying only on VisibleRegion()
+	// can miss exposed pixels from the raised tab when the window moves.
+	BRegion oldDecorator;
+	window->GetBorderRegion(&oldDecorator);
 
 	// stop direct frame buffer access
 	bool direct = false;
@@ -1576,6 +1581,10 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	// include the the new visible region of the window being
 	// moved into the dirty region (for now)
 	newDirtyRegion.Include(&window->VisibleRegion());
+	BRegion newDecorator;
+	window->GetBorderRegion(&newDecorator);
+	newDirtyRegion.Include(&oldDecorator);
+	newDirtyRegion.Include(&newDecorator);
 
 	// NOTE: Having all windows locked should prevent any
 	// problems with locking the drawing engine here.
@@ -1589,6 +1598,10 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	copyRegion.OffsetBy((int32)x, (int32)y);
 	newDirtyRegion.Exclude(&copyRegion);
 
+	// The background cache must also forget old decorator pixels before
+	// _SetBackground() computes newly exposed areas. Otherwise thin
+	// remnants of tab decorations may survive repeated window drags.
+	fBackgroundRegion.Exclude(&oldDecorator);
 	MarkDirty(newDirtyRegion);
 	_SetBackground(background);
 	_WindowChanged(window);
