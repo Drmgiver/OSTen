@@ -1589,6 +1589,32 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	copyRegion.OffsetBy((int32)x, (int32)y);
 	newDirtyRegion.Exclude(&copyRegion);
 
+	// OSTen diagnostic: directly paint the exposed area with the desktop
+	// view's actual color before requesting its content redraw. Unlike
+	// CopyToFront(), FillRegion() updates the drawing buffer even in
+	// single-buffered display modes. This tests whether the horizontal
+	// trails come from missing exposed-background paint, not from blitting
+	// or from the Platinum decorator. Limit this test to vertical moves.
+	if ((int32)y != 0) {
+		Window* desktopWindow = CurrentWindows().FirstWindow();
+		if (desktopWindow != NULL && !desktopWindow->IsHidden()
+			&& desktopWindow->Feel() == kDesktopWindowFeel) {
+			View* rootView = desktopWindow->TopView();
+			View* desktopView = rootView != NULL ? rootView->FirstChild() : NULL;
+			if (desktopView != NULL && desktopView->ViewBitmap() == NULL) {
+				BRegion exposedDesktop(newDirtyRegion);
+				exposedDesktop.IntersectWith(
+					&desktopWindow->VisibleContentRegion());
+				if (exposedDesktop.CountRects() > 0
+					&& GetDrawingEngine()->LockParallelAccess()) {
+					GetDrawingEngine()->FillRegion(exposedDesktop,
+						desktopView->ViewColor());
+					GetDrawingEngine()->UnlockParallelAccess();
+				}
+			}
+		}
+	}
+
 	MarkDirty(newDirtyRegion);
 	_SetBackground(background);
 	_WindowChanged(window);
