@@ -67,6 +67,10 @@ const float kIconTop = 8;
 // Client-frame top must also accommodate the MacDecorator's title above it.
 // The global System bar occupies the first 26 screen pixels.
 const float kFinderClientMinTop = 54;
+// Compact three-icon-wide classic Mac pop-up drawer, independent of its
+// regular Finder window geometry.
+const float kPopupDrawerWidth = 314;
+const float kPopupDrawerHeight = 252;
 
 // Finder-local Owner permission. Reset to locked whenever Finder restarts.
 static std::atomic<bool> sSystemFolderUnlocked(false);
@@ -1214,7 +1218,7 @@ public:
 			return;
 		}
 		BWindow::FrameMoved(newPosition);
-		if (!fPopupDocked)
+		if (!fPopupDocked && !fPopupMoving)
 			_SaveFrame();
 	}
 
@@ -1424,8 +1428,11 @@ private:
 		if (docked) {
 			if (fShaded)
 				Minimize(false);
-			fPopupNormalFrame = Frame();
+				fPopupNormalFrame = Frame();
 			fPopupDocked = true;
+			fPopupMoving = true;
+			ResizeTo(kPopupDrawerWidth, kPopupDrawerHeight);
+			fPopupMoving = false;
 			fPopupTab = new FinderPopupTab(Title(), BMessenger(this));
 			fPopupTab->Show();
 			_AnchorPopupWindow();
@@ -1435,8 +1442,12 @@ private:
 			if (fPopupTab != NULL && fPopupTab->Lock())
 				fPopupTab->Quit();
 			fPopupTab = NULL;
-			if (fPopupNormalFrame.IsValid())
+			if (fPopupNormalFrame.IsValid()) {
+				fPopupMoving = true;
+				ResizeTo(fPopupNormalFrame.Width(), fPopupNormalFrame.Height());
 				MoveTo(fPopupNormalFrame.LeftTop());
+				fPopupMoving = false;
+			}
 			if (IsHidden())
 				Show();
 			Activate(true);
