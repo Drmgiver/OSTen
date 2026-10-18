@@ -100,6 +100,9 @@ All rights reserved.
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "ContainerWindow"
 
+// OSTen Finder pop-up folder docking (Mac OS 8/9 inspired).
+static const uint32 kToggleOstenPopupFolder = 'opfd';
+
 
 #ifdef _IMPEXP_BE
 _IMPEXP_BE
@@ -421,6 +424,9 @@ BContainerWindow::BContainerWindow(LockingList<BWindow>* list, uint32 openFlags,
 	fStateNeedsSaving(false),
 	fBackgroundImage(NULL),
 	fSavedZoomRect(0, 0, -1, -1),
+	fPopupNormalFrame(0, 0, -1, -1),
+	fPopupDocked(false),
+	fPopupAdjusting(false),
 	fSaveStateIsEnabled(true),
 	fIsWatchingPath(false)
 {
@@ -1048,6 +1054,35 @@ BContainerWindow::UpdateBackgroundImage()
 
 
 void
+BContainerWindow::SetPopupDocked(bool docked)
+{
+	if (fPopupDocked == docked || PoseView() == NULL
+		|| PoseView()->IsDesktopView() || TargetModel() == NULL
+		|| TargetModel()->IsRoot())
+		return;
+
+	fPopupAdjusting = true;
+	if (docked) {
+		fPopupNormalFrame = Frame();
+		fPopupDocked = true;
+		BRect screen = BScreen(this).Frame();
+		BRect frame = Frame();
+		float left = std::max(screen.left,
+			std::min(frame.left, screen.right - frame.Width()));
+		MoveTo(left, screen.bottom - frame.Height());
+	} else {
+		fPopupDocked = false;
+		if (fPopupNormalFrame.IsValid()) {
+			MoveTo(fPopupNormalFrame.LeftTop());
+			ResizeTo(fPopupNormalFrame.Width(), fPopupNormalFrame.Height());
+		}
+	}
+	fPopupAdjusting = false;
+	fStateNeedsSaving = true;
+}
+
+
+void
 BContainerWindow::FrameResized(float, float)
 {
 	if (PoseView() != NULL && !PoseView()->IsDesktopView()) {
@@ -1078,6 +1113,13 @@ BContainerWindow::FrameResized(float, float)
 	}
 
 	fPreviousBounds = Bounds();
+	if (fPopupDocked && !fPopupAdjusting) {
+		// Keep the bottom edge anchored as WindowShade changes height.
+		BRect screen = BScreen(this).Frame();
+		fPopupAdjusting = true;
+		MoveTo(Frame().left, screen.bottom - Frame().Height());
+		fPopupAdjusting = false;
+	}
 	if (IsActive())
 		fStateNeedsSaving = true;
 }
@@ -1340,6 +1382,10 @@ void
 BContainerWindow::MessageReceived(BMessage* message)
 {
 	switch (message->what) {
+		case kToggleOstenPopupFolder:
+			SetPopupDocked(!fPopupDocked);
+			break;
+
 		case B_CUT:
 		case B_COPY:
 		case B_PASTE:
@@ -1788,6 +1834,15 @@ BContainerWindow::AddWindowMenu(BMenu* menu)
 	menu->AddSeparatorItem();
 
 	menu->AddItem(Shortcuts()->ResizeToFitItem());
+	if (PoseView() != NULL && !PoseView()->IsDesktopView()
+		&& TargetModel() != NULL && !TargetModel()->IsRoot()) {
+		BMenuItem* popup = new BMenuItem(fPopupDocked
+			? "Remove Pop-Up Folder" : "Dock as Pop-Up Folder",
+			new BMessage(kToggleOstenPopupFolder));
+		popup->SetTarget(this);
+		menu->AddItem(popup);
+	}
+
 	// "Arrange by >" menu inserted here,
 	// see UpdateMenu() and SetupArrangeByMenu()
 	menu->AddItem(Shortcuts()->SelectItem());
@@ -3864,6 +3919,11 @@ BContainerWindow::RestoreWindowState(AttributeStreamNode* node)
 
 	fPreviousBounds = Bounds();
 
+	uint8 popup = 0;
+	if (node->Read("OSTen:popup_folder", 0, B_BOOL_TYPE, sizeof(popup),
+			&popup) == sizeof(popup) && popup != 0)
+		SetPopupDocked(true);
+
 	uint32 workspace;
 	if (((fOpenFlags & kRestoreWorkspace) != 0)
 		&& node->Read(workspaceAttributeName, 0, B_INT32_TYPE, sizeof(uint32),
@@ -3919,6 +3979,10 @@ BContainerWindow::RestoreWindowState(const BMessage& message)
 	} else
 		sNewWindRect.OffsetBy(sWindowStaggerBy, sWindowStaggerBy);
 
+	bool popup = false;
+	if (message.FindBool("osten:popup_folder", &popup) == B_OK && popup)
+		SetPopupDocked(true);
+
 	uint32 workspace;
 	if (((fOpenFlags & kRestoreWorkspace) != 0)
 		&& message.FindInt32(workspaceAttributeName,
@@ -3962,7 +4026,10 @@ BContainerWindow::SaveWindowState(AttributeStreamNode* node)
 	}
 
 	// node is null if it already got deleted
-	BRect frame(Frame());
+	BRect frame(fPopupDocked && fPopupNormalFrame.IsValid()
+		? fPopupNormalFrame : Frame());
+	const uint8 popup = fPopupDocked ? 1 : 0;
+	node->Write("OSTen:popup_folder", 0, B_BOOL_TYPE, sizeof(popup), &popup);
 	const float scalingFactor = be_plain_font->Size() / 12.0f;
 	frame.left /= scalingFactor;
 	frame.top /= scalingFactor;
@@ -4000,7 +4067,9 @@ BContainerWindow::SaveWindowState(BMessage& message) const
 	}
 
 	// node is null if it already got deleted
-	BRect frame(Frame());
+	BRect frame(fPopupDocked && fPopupNormalFrame.IsValid()
+		? fPopupNormalFrame : Frame());
+	message.AddBool("osten:popup_folder", fPopupDocked);
 	const float scalingFactor = be_plain_font->Size() / 12.0f;
 	frame.left /= scalingFactor;
 	frame.top /= scalingFactor;
