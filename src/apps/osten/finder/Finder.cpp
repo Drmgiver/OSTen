@@ -3,6 +3,7 @@
 #include <Alert.h>
 #include <Application.h>
 #include <Bitmap.h>
+#include <Button.h>
 #include <Directory.h>
 #include <Entry.h>
 #include <InterfaceDefs.h>
@@ -47,6 +48,9 @@ const uint32 kFinderDragEntries = 'osdg';
 const uint32 kFinderMoveToTrash = 'ostr';
 const uint32 kFinderRefreshAll = 'osrf';
 const uint32 kFinderRefreshFolder = 'osrw';
+const uint32 kFinderPopupTabClicked = 'ospt';
+const uint32 kFinderRestorePopup = 'ospr';
+static int32 sNextPopupSlot = 0;
 const uint32 kInlineRenameCommit = 'osic';
 const uint32 kInlineRenameCancel = 'osix';
 const uint32 kInlineRenameAfterClick = 'osid';
@@ -1107,6 +1111,45 @@ NotifyFinderWindowActivated(BWindow* window)
 }
 
 
+// Pop-up folders have an independent, clickable bottom tab. Keeping the
+// actual folder at its normal dimensions avoids WindowShade's long frame.
+class FinderPopupTab : public BWindow {
+public:
+	FinderPopupTab(const char* title, const BMessenger& folder)
+		:
+		BWindow(BRect(0, 0, 183, 23), title, B_NO_BORDER_WINDOW_LOOK,
+			B_FLOATING_APP_WINDOW_FEEL,
+			B_NOT_ZOOMABLE | B_NOT_RESIZABLE | B_NOT_MINIMIZABLE
+				| B_ASYNCHRONOUS_CONTROLS),
+		fFolder(folder)
+	{
+		BButton* button = new BButton(Bounds(), "popup-folder-tab", title,
+			new BMessage(kFinderPopupTabClicked), B_FOLLOW_ALL);
+		button->SetTarget(this);
+		AddChild(button);
+		BRect screen = BScreen(this).Frame();
+		int32 slot = sNextPopupSlot++;
+		int32 columns = std::max(1, (int32)(screen.Width() / 190));
+		int32 column = slot % columns;
+		int32 row = slot / columns;
+		MoveTo(screen.left + 6 + column * 190,
+			screen.bottom - 28 - row * 29);
+	}
+
+	void MessageReceived(BMessage* message) override
+	{
+		if (message->what == kFinderPopupTabClicked) {
+			fFolder.SendMessage(kFinderPopupTabClicked);
+			return;
+		}
+		BWindow::MessageReceived(message);
+	}
+
+private:
+	BMessenger fFolder;
+};
+
+
 class FinderWindow : public BWindow {
 public:
 	FinderWindow(const entry_ref& directory, int32 depth,
@@ -1121,6 +1164,7 @@ public:
 		fUnshadedHeight(0),
 		fPopupDocked(false),
 		fPopupMoving(false),
+		fPopupTab(NULL),
 		fZoomed(false)
 	{
 		BEntry folder(&directory);
@@ -1158,22 +1202,13 @@ public:
 		if (state.ReadAttr(kPopupFolderAttribute, B_BOOL_TYPE, 0,
 				&docked, sizeof(docked)) == (ssize_t)sizeof(docked)
 			&& docked != 0)
-			_SetPopupDocked(true, false);
+			PostMessage(kFinderRestorePopup);
 	}
 
 	void FrameMoved(BPoint newPosition) override
 	{
 		// The native MacDecorator draws the title above the client frame.
 		// Do not let it disappear behind the permanent global menu.
-		if (!fPopupMoving && fPopupDocked) {
-			BRect screen = BScreen(this).Frame();
-			float bottom = screen.bottom - 7;
-			if (fabsf(Frame().bottom - bottom) > 1) {
-				fPopupMoving = true;
-				MoveTo(newPosition.x, bottom - Frame().Height());
-				fPopupMoving = false;
-			}
-		}
 		if (!fPopupDocked && newPosition.y < kFinderClientMinTop) {
 			MoveTo(newPosition.x, kFinderClientMinTop);
 			return;
@@ -1185,12 +1220,6 @@ public:
 	void FrameResized(float width, float height) override
 	{
 		BWindow::FrameResized(width, height);
-		if (fPopupDocked && !fPopupMoving) {
-			BRect screen = BScreen(this).Frame();
-			fPopupMoving = true;
-			MoveTo(Frame().left, screen.bottom - 7 - Frame().Height());
-			fPopupMoving = false;
-		}
 		_SaveFrame();
 	}
 
@@ -1252,6 +1281,9 @@ public:
 	bool QuitRequested() override
 	{
 		_SaveFrame();
+		if (fPopupTab != NULL && fPopupTab->Lock())
+			fPopupTab->Quit();
+		fPopupTab = NULL;
 		return true;
 	}
 
@@ -1267,6 +1299,18 @@ public:
 			}
 			case kOSTenOpen:
 				_OpenSelection();
+				return;
+			case kFinderRestorePopup:
+				_SetPopupDocked(true, false);
+				return;
+			case kFinderPopupTabClicked:
+				if (fPopupDocked) {
+					if (IsHidden()) {
+						Show();
+						Activate(true);
+					} else
+						Hide();
+				}
 				return;
 			case kOSTenTogglePopupFolder:
 				_SetPopupDocked(!fPopupDocked, true);
@@ -1358,25 +1402,23 @@ private:
 	{
 		if (fPopupDocked == docked)
 			return;
-		fPopupMoving = true;
 		if (docked) {
+			if (fShaded)
+				Minimize(false);
 			fPopupNormalFrame = Frame();
-			if (fShaded)
-				Minimize(false);
 			fPopupDocked = true;
-			Minimize(true);
-			BRect screen = BScreen(this).Frame();
-			MoveTo(std::max(screen.left, std::min(Frame().left,
-				screen.right - Frame().Width())),
-				screen.bottom - 7 - Frame().Height());
+			fPopupTab = new FinderPopupTab(Title(), BMessenger(this));
+			fPopupTab->Show();
+			Hide();
 		} else {
-			if (fShaded)
-				Minimize(false);
 			fPopupDocked = false;
-			if (fPopupNormalFrame.IsValid())
-				MoveTo(fPopupNormalFrame.LeftTop());
+			if (fPopupTab != NULL && fPopupTab->Lock())
+				fPopupTab->Quit();
+			fPopupTab = NULL;
+			if (IsHidden())
+				Show();
+			Activate(true);
 		}
-		fPopupMoving = false;
 		if (persist) {
 			BNode node(&fDirectory);
 			uint8 value = fPopupDocked ? 1 : 0;
@@ -1405,6 +1447,7 @@ private:
 	float		fUnshadedHeight;
 	bool		fPopupDocked;
 	bool		fPopupMoving;
+	FinderPopupTab* fPopupTab;
 	BRect		fPopupNormalFrame;
 	bool		fZoomed;
 	BRect		fUnzoomFrame;
