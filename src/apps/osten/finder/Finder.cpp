@@ -1117,7 +1117,7 @@ class FinderPopupTab : public BWindow {
 public:
 	FinderPopupTab(const char* title, const BMessenger& folder)
 		:
-		BWindow(BRect(0, 0, 183, 23), title, B_NO_BORDER_WINDOW_LOOK,
+		BWindow(BRect(0, 0, 139, 21), title, B_NO_BORDER_WINDOW_LOOK,
 			B_FLOATING_APP_WINDOW_FEEL,
 			B_NOT_ZOOMABLE | B_NOT_RESIZABLE | B_NOT_MINIMIZABLE
 				| B_ASYNCHRONOUS_CONTROLS),
@@ -1129,11 +1129,11 @@ public:
 		AddChild(button);
 		BRect screen = BScreen(this).Frame();
 		int32 slot = sNextPopupSlot++;
-		int32 columns = std::max(1, (int32)(screen.Width() / 190));
+		int32 columns = std::max(1, (int32)(screen.Width() / 146));
 		int32 column = slot % columns;
 		int32 row = slot / columns;
-		MoveTo(screen.left + 6 + column * 190,
-			screen.bottom - 28 - row * 29);
+		MoveTo(screen.left + 6 + column * 146,
+			screen.bottom - 24 - row * 25);
 	}
 
 	void MessageReceived(BMessage* message) override
@@ -1214,13 +1214,15 @@ public:
 			return;
 		}
 		BWindow::FrameMoved(newPosition);
-		_SaveFrame();
+		if (!fPopupDocked)
+			_SaveFrame();
 	}
 
 	void FrameResized(float width, float height) override
 	{
 		BWindow::FrameResized(width, height);
-		_SaveFrame();
+		if (!fPopupDocked)
+			_SaveFrame();
 	}
 
 	// The MacDecorator minimize button represents Classic Mac WindowShade.
@@ -1306,6 +1308,7 @@ public:
 			case kFinderPopupTabClicked:
 				if (fPopupDocked) {
 					if (IsHidden()) {
+						_AnchorPopupWindow();
 						Show();
 						Activate(true);
 					} else
@@ -1398,6 +1401,22 @@ private:
 		}
 	}
 
+	void _AnchorPopupWindow()
+	{
+		if (fPopupTab == NULL || !fPopupTab->Lock())
+			return;
+		BRect tab = fPopupTab->Frame();
+		fPopupTab->Unlock();
+		BRect screen = BScreen(this).Frame();
+		float left = std::max(screen.left + 7,
+			std::min(tab.left, screen.right - Frame().Width() - 7));
+		float top = std::max(kFinderClientMinTop,
+			tab.top - Frame().Height() - 1);
+		fPopupMoving = true;
+		MoveTo(left, top);
+		fPopupMoving = false;
+	}
+
 	void _SetPopupDocked(bool docked, bool persist)
 	{
 		if (fPopupDocked == docked)
@@ -1409,12 +1428,15 @@ private:
 			fPopupDocked = true;
 			fPopupTab = new FinderPopupTab(Title(), BMessenger(this));
 			fPopupTab->Show();
+			_AnchorPopupWindow();
 			Hide();
 		} else {
 			fPopupDocked = false;
 			if (fPopupTab != NULL && fPopupTab->Lock())
 				fPopupTab->Quit();
 			fPopupTab = NULL;
+			if (fPopupNormalFrame.IsValid())
+				MoveTo(fPopupNormalFrame.LeftTop());
 			if (IsHidden())
 				Show();
 			Activate(true);
