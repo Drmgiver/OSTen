@@ -124,6 +124,7 @@ public:
 	virtual void MessageReceived(BMessage*);
 	virtual void FrameResized(float, float);
 	virtual void FrameMoved(BPoint);
+	void SetPopupDocked(bool docked);
 	virtual void Zoom(BPoint, float, float);
 	virtual void WorkspacesChanged(uint32, uint32);
 
@@ -346,6 +347,9 @@ protected:
 
 private:
 	BRect fSavedZoomRect;
+	BRect fPopupNormalFrame;
+	bool fPopupDocked;
+	bool fPopupAdjusting;
 	BRect fPreviousBounds;
 
 	static BRect sNewWindRect;
