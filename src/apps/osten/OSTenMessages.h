@@ -18,7 +18,8 @@ enum {
 	kOSTenArrangeName = 'osan',
 	kOSTenArrangeKind = 'osak',
 	kOSTenCleanUp = 'oscu',
-	kOSTenRefreshAll = 'osrf'
+	kOSTenRefreshAll = 'osrf',
+	kOSTenTogglePopupFolder = 'ospf'
 };
 
 
