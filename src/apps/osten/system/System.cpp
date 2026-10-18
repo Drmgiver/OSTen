@@ -190,6 +190,8 @@ public:
 			new BMessage(kTrayDiagnostics)));
 		specialMenu->AddItem(new BMenuItem("Empty Trash...",
 			new BMessage(kOSTenEmptyTrash)));
+		specialMenu->AddItem(new BMenuItem("Dock / Undock Pop-Up Folder",
+			new BMessage(kOSTenTogglePopupFolder)));
 		specialMenu->AddSeparatorItem();
 		specialMenu->AddItem(new BMenuItem("System Folder Access...",
 			new BMessage(kOSTenSystemFolderAccess)));
