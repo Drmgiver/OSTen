@@ -20,7 +20,6 @@
 #include "Window.h"
 
 
-static const int32 kRightOptionKey	= 0x67;
 static const int32 kTabKey			= 0x26;
 static const int32 kPageUpKey		= 0x21;
 static const int32 kPageDownKey		= 0x36;
@@ -28,9 +27,6 @@ static const int32 kLeftArrowKey	= 0x61;
 static const int32 kUpArrowKey		= 0x57;
 static const int32 kRightArrowKey	= 0x63;
 static const int32 kDownArrowKey	= 0x62;
-
-static const int32 kModifiers = B_SHIFT_KEY | B_COMMAND_KEY
-	| B_CONTROL_KEY | B_OPTION_KEY | B_MENU_KEY;
 
 
 using namespace std;
@@ -132,14 +128,14 @@ StackAndTile::WindowRemoved(Window* window)
 bool
 StackAndTile::KeyPressed(uint32 what, int32 key, int32 modifiers)
 {
-	if (what == B_MODIFIERS_CHANGED
-		|| (what == B_UNMAPPED_KEY_DOWN && key == kRightOptionKey)
-		|| (what == B_UNMAPPED_KEY_UP && key == kRightOptionKey)) {
-		// switch to and from stacking and snapping mode
+	if (what == B_MODIFIERS_CHANGED) {
+		// OSTen: use physical Left Alt (Haiku's left Command key) for
+		// stacking and tiling. Right Alt and Super/Option do not engage it.
 		bool wasPressed = fSATKeyPressed;
-		fSATKeyPressed = (what == B_MODIFIERS_CHANGED
-				&& (modifiers & kModifiers) == B_OPTION_KEY)
-			|| (what == B_UNMAPPED_KEY_DOWN && key == kRightOptionKey);
+		fSATKeyPressed = (modifiers & B_LEFT_COMMAND_KEY) != 0
+			&& (modifiers & B_RIGHT_COMMAND_KEY) == 0
+			&& (modifiers & (B_SHIFT_KEY | B_CONTROL_KEY
+				| B_OPTION_KEY | B_MENU_KEY)) == 0;
 		if (wasPressed && !fSATKeyPressed)
 			_StopSAT();
 		if (!wasPressed && fSATKeyPressed)
