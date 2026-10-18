@@ -51,6 +51,7 @@ const uint32 kInlineRenameCommit = 'osic';
 const uint32 kInlineRenameCancel = 'osix';
 const uint32 kInlineRenameAfterClick = 'osid';
 const char* kWindowFrameAttribute = "OSTen:window_frame";
+const char* kPopupFolderAttribute = "OSTen:popup_folder";
 const char* kArrangeAttribute = "OSTen:arrange_kind";
 // Store desktop icon locations on their filesystem nodes, not by filename.
 // Renaming an icon therefore does not reset its position.
@@ -1118,6 +1119,8 @@ public:
 		fView(NULL),
 		fShaded(false),
 		fUnshadedHeight(0),
+		fPopupDocked(false),
+		fPopupMoving(false),
 		fZoomed(false)
 	{
 		BEntry folder(&directory);
@@ -1149,13 +1152,29 @@ public:
 		AddShortcut('W', B_COMMAND_KEY, new BMessage(kOSTenClose));
 		AddShortcut('A', B_COMMAND_KEY, new BMessage(kOSTenSelectAll));
 		AddShortcut('I', B_COMMAND_KEY, new BMessage(kOSTenGetInfo));
+		// Restore a previously docked folder in its collapsed state.
+		BNode state(&fDirectory);
+		uint8 docked = 0;
+		if (state.ReadAttr(kPopupFolderAttribute, B_BOOL_TYPE, 0,
+				&docked, sizeof(docked)) == (ssize_t)sizeof(docked)
+			&& docked != 0)
+			_SetPopupDocked(true, false);
 	}
 
 	void FrameMoved(BPoint newPosition) override
 	{
 		// The native MacDecorator draws the title above the client frame.
 		// Do not let it disappear behind the permanent global menu.
-		if (newPosition.y < kFinderClientMinTop) {
+		if (!fPopupMoving && fPopupDocked) {
+			BRect screen = BScreen(this).Frame();
+			float bottom = screen.bottom - 7;
+			if (fabsf(Frame().bottom - bottom) > 1) {
+				fPopupMoving = true;
+				MoveTo(newPosition.x, bottom - Frame().Height());
+				fPopupMoving = false;
+			}
+		}
+		if (!fPopupDocked && newPosition.y < kFinderClientMinTop) {
 			MoveTo(newPosition.x, kFinderClientMinTop);
 			return;
 		}
@@ -1166,6 +1185,12 @@ public:
 	void FrameResized(float width, float height) override
 	{
 		BWindow::FrameResized(width, height);
+		if (fPopupDocked && !fPopupMoving) {
+			BRect screen = BScreen(this).Frame();
+			fPopupMoving = true;
+			MoveTo(Frame().left, screen.bottom - 7 - Frame().Height());
+			fPopupMoving = false;
+		}
 		_SaveFrame();
 	}
 
@@ -1242,6 +1267,9 @@ public:
 			}
 			case kOSTenOpen:
 				_OpenSelection();
+				return;
+			case kOSTenTogglePopupFolder:
+				_SetPopupDocked(!fPopupDocked, true);
 				return;
 			case kOSTenClose:
 				PostMessage(B_QUIT_REQUESTED);
@@ -1326,11 +1354,44 @@ private:
 		}
 	}
 
+	void _SetPopupDocked(bool docked, bool persist)
+	{
+		if (fPopupDocked == docked)
+			return;
+		fPopupMoving = true;
+		if (docked) {
+			fPopupNormalFrame = Frame();
+			if (fShaded)
+				Minimize(false);
+			fPopupDocked = true;
+			Minimize(true);
+			BRect screen = BScreen(this).Frame();
+			MoveTo(std::max(screen.left, std::min(Frame().left,
+				screen.right - Frame().Width())),
+				screen.bottom - 7 - Frame().Height());
+		} else {
+			if (fShaded)
+				Minimize(false);
+			fPopupDocked = false;
+			if (fPopupNormalFrame.IsValid())
+				MoveTo(fPopupNormalFrame.LeftTop());
+		}
+		fPopupMoving = false;
+		if (persist) {
+			BNode node(&fDirectory);
+			uint8 value = fPopupDocked ? 1 : 0;
+			node.WriteAttr(kPopupFolderAttribute, B_BOOL_TYPE, 0,
+				&value, sizeof(value));
+			_SaveFrame();
+		}
+	}
+
 	void _SaveFrame()
 	{
 		BNode node(&fDirectory);
-		BRect frame = Frame();
-		if (fShaded)
+		BRect frame = fPopupDocked && fPopupNormalFrame.IsValid()
+			? fPopupNormalFrame : Frame();
+		if (!fPopupDocked && fShaded)
 			frame.bottom = frame.top + fUnshadedHeight;
 		node.WriteAttr(kWindowFrameAttribute, B_RECT_TYPE, 0, &frame,
 			sizeof(BRect));
@@ -1342,6 +1403,9 @@ private:
 	FolderView*	fView;
 	bool		fShaded;
 	float		fUnshadedHeight;
+	bool		fPopupDocked;
+	bool		fPopupMoving;
+	BRect		fPopupNormalFrame;
 	bool		fZoomed;
 	BRect		fUnzoomFrame;
 	BRect		fZoomFrame;
@@ -1848,7 +1912,8 @@ public:
 			|| message->what == kOSTenGetInfo
 			|| message->what == kOSTenArrangeName
 			|| message->what == kOSTenArrangeKind
-			|| message->what == kOSTenCleanUp) {
+			|| message->what == kOSTenCleanUp
+			|| message->what == kOSTenTogglePopupFolder) {
 			if (fCommandTarget.SendMessage(message) != B_OK)
 				fDesktopTarget.SendMessage(message);
 			return;
