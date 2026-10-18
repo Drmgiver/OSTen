@@ -1117,6 +1117,43 @@ NotifyFinderWindowActivated(BWindow* window)
 
 // Pop-up folders have an independent, clickable bottom tab. Keeping the
 // actual folder at its normal dimensions avoids WindowShade's long frame.
+class FinderPopupTabView : public BView {
+public:
+	FinderPopupTabView(BRect frame, const char* title,
+		const BMessenger& folder)
+		:
+		BView(frame, "popup-folder-tab", B_FOLLOW_ALL, B_WILL_DRAW),
+		fTitle(title), fFolder(folder)
+	{
+		SetViewColor(B_TRANSPARENT_COLOR);
+	}
+
+	void Draw(BRect update) override
+	{
+		BRect r = Bounds();
+		SetHighColor(215, 215, 215);
+		FillRect(r);
+		SetHighColor(40, 40, 40);
+		StrokeLine(r.LeftBottom(), r.LeftTop());
+		StrokeLine(r.LeftTop(), r.RightTop());
+		StrokeLine(r.RightTop(), r.RightBottom());
+		SetHighColor(255, 255, 255);
+		StrokeLine(BPoint(1, r.bottom - 1), BPoint(1, 2));
+		SetHighColor(45, 45, 45);
+		DrawString(fTitle.String(), BPoint(8, 15));
+	}
+
+	void MouseDown(BPoint where) override
+	{
+		fFolder.SendMessage(kFinderPopupTabClicked);
+	}
+
+private:
+	BString fTitle;
+	BMessenger fFolder;
+};
+
+
 class FinderPopupTab : public BWindow {
 public:
 	FinderPopupTab(const char* title, const BMessenger& folder)
@@ -1127,10 +1164,7 @@ public:
 				| B_ASYNCHRONOUS_CONTROLS),
 		fFolder(folder)
 	{
-		BButton* button = new BButton(Bounds(), "popup-folder-tab", title,
-			new BMessage(kFinderPopupTabClicked), B_FOLLOW_ALL);
-		button->SetTarget(this);
-		AddChild(button);
+		AddChild(new FinderPopupTabView(Bounds(), title, fFolder));
 		BRect screen = BScreen(this).Frame();
 		int32 slot = sNextPopupSlot++;
 		int32 columns = std::max(1, (int32)(screen.Width() / 146));
@@ -1430,6 +1464,7 @@ private:
 				Minimize(false);
 				fPopupNormalFrame = Frame();
 			fPopupDocked = true;
+			SetLook(B_BORDERED_WINDOW_LOOK);
 			fPopupMoving = true;
 			ResizeTo(kPopupDrawerWidth, kPopupDrawerHeight);
 			fPopupMoving = false;
@@ -1439,6 +1474,7 @@ private:
 			Hide();
 		} else {
 			fPopupDocked = false;
+			SetLook(B_TITLED_WINDOW_LOOK);
 			if (fPopupTab != NULL && fPopupTab->Lock())
 				fPopupTab->Quit();
 			fPopupTab = NULL;
