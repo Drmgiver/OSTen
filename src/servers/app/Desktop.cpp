@@ -1554,11 +1554,10 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	// the dirty region starts with the visible area of the window being moved
 	BRegion newDirtyRegion(window->VisibleRegion());
 
-	// Keep the pre-move bounds as well as the region: the reported
-	// window footprint can omit a few pixels of decoration strokes.
-	// When moving vertically those untracked edge pixels otherwise
-	// never enter the expose region, leaving one-pixel tab-colored trails.
-	BRect oldWindowBounds = window->VisibleRegion().Frame();
+	// Remember the decoration at the old position. Some border pixels
+	// can escape the normal expose region during vertical moves.
+	BRegion oldBorderRegion;
+	window->GetBorderRegion(&oldBorderRegion);
 
 	// stop direct frame buffer access
 	bool direct = false;
@@ -1595,24 +1594,27 @@ Desktop::MoveWindowBy(Window* window, float x, float y, int32 workspace)
 	copyRegion.OffsetBy((int32)x, (int32)y);
 	newDirtyRegion.Exclude(&copyRegion);
 
-	// Repaint a small margin around both window positions. In particular,
-	// do this *after* excluding the area preserved by the blit; otherwise
-	// the optimization could erase our extra exposure coverage.
+	// Repaint only decoration pixels at the previous and current window
+	// positions, plus a small margin for strokes outside the footprint.
+	// The first test invalidated the full window rectangles; that fixed
+	// vertical trails, but needlessly redrew the contents of other windows.
+	// Do this after the preserved blit region has been excluded.
 	if ((int32)y != 0) {
+		BRegion borderRegion(oldBorderRegion);
+		BRegion movedBorderRegion;
+		window->GetBorderRegion(&movedBorderRegion);
+		borderRegion.Include(&movedBorderRegion);
+
 		BRegion edgeRegion;
-		if (oldWindowBounds.IsValid()) {
-			oldWindowBounds.InsetBy(-3, -3);
-			edgeRegion.Include(oldWindowBounds);
-		}
-		BRect newWindowBounds = window->VisibleRegion().Frame();
-		if (newWindowBounds.IsValid()) {
-			newWindowBounds.InsetBy(-3, -3);
-			edgeRegion.Include(newWindowBounds);
+		for (int32 i = 0; i < borderRegion.CountRects(); i++) {
+			BRect borderRect(borderRegion.RectAt(i));
+			borderRect.InsetBy(-3, -3);
+			edgeRegion.Include(borderRect);
 		}
 		edgeRegion.IntersectWith(&fScreenRegion);
 		newDirtyRegion.Include(&edgeRegion);
-		// Pixels outside the recorded footprint may already be marked as
-		// painted in the bare-workspace background cache.
+		// A few decoration pixels may lie in the cached bare-workspace
+		// background; let _SetBackground repaint those exposed pixels.
 		fBackgroundRegion.Exclude(&edgeRegion);
 	}
 
