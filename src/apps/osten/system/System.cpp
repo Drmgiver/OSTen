@@ -466,6 +466,7 @@ public:
 			|| message->what == kOSTenArrangeName
 			|| message->what == kOSTenArrangeKind
 			|| message->what == kOSTenCleanUp
+			|| message->what == kOSTenTogglePopupFolder
 			|| message->what == kOSTenSystemFolderAccess) {
 			BMessenger finder("application/x-vnd.OSTen-Finder");
 			finder.SendMessage(message);
