@@ -1783,22 +1783,6 @@ public:
 
 	void ReadyToRun() override
 	{
-		// TEMPORARY OSTen diagnostic: isolate the custom Finder desktop
-		// window from Haiku's background renderer. Keep the Finder process
-		// and a draggable Home folder window available for the test.
-		// Set this back to false after recording the ghost-trail result.
-		constexpr bool kTestWithoutFinderDesktop = true;
-		if (kTestWithoutFinderDesktop) {
-			BEntry home("/boot/home", true);
-			entry_ref homeRef;
-			if (home.GetRef(&homeRef) == B_OK) {
-				FinderWindow* testWindow = new FinderWindow(homeRef, 0);
-				fCommandTarget = BMessenger(testWindow);
-				testWindow->Show();
-				return;
-			}
-		}
-
 		DesktopWindow* desktop = new DesktopWindow();
 		fDesktopTarget = BMessenger(desktop);
 		fCommandTarget = fDesktopTarget;
