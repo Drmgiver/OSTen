@@ -19,6 +19,7 @@ on:
       - src/servers/app/Desktop.cpp
       - src/servers/app/decorator/**
       - src/servers/app/stackandtile/**
+      - src/kits/tracker/**
       - src/servers/launch/LaunchDaemon.cpp
 
 permissions:
