@@ -40,6 +40,7 @@
 #include "FileOperations.h"
 #include "FinderActions.h"
 #include "IconArtwork.h"
+#include "DesktopArtwork.h"
 
 
 namespace {
@@ -50,6 +51,7 @@ const uint32 kFinderDragEntries = 'osdg';
 const uint32 kFinderMoveToTrash = 'ostr';
 const uint32 kFinderRefreshAll = 'osrf';
 const uint32 kFinderRefreshFolder = 'osrw';
+const uint32 kDesktopTrashStateCheck = 'otts';
 const uint32 kFinderPopupTabClicked = 'ospt';
 const uint32 kFinderPopupTabPlacement = 'ospp';
 const uint32 kFinderRestorePopup = 'ospr';
@@ -175,6 +177,51 @@ ArtworkBitmap(OSTenIcon kind)
             bitmaps[index] = CreateArtworkBitmap((OSTenIcon)index);
     });
     return bitmaps[(int)kind];
+}
+
+// Decode the approved 24x24 Option D disk and mesh Trash pixel artwork.
+static BBitmap*
+CreateDesktopArtworkBitmap(int kind)
+{
+    uint8 palette[kDesktopArtworkColors * 4];
+    uint8 pixels[kDesktopArtworkSize * kDesktopArtworkSize];
+    const OSTenArtwork& artwork = kDesktopArtwork[kind];
+    if (!DecodeBase64(artwork.palette, palette, sizeof(palette))
+        || !DecodeBase64(artwork.pixels, pixels, sizeof(pixels)))
+        return NULL;
+    BBitmap* bitmap = new BBitmap(BRect(0, 0,
+        kDesktopArtworkSize - 1, kDesktopArtworkSize - 1), B_RGBA32);
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        return NULL;
+    }
+    uint8* bytes = (uint8*)bitmap->Bits();
+    for (int y = 0; y < kDesktopArtworkSize; y++) {
+        for (int x = 0; x < kDesktopArtworkSize; x++) {
+            uint8 i = pixels[y * kDesktopArtworkSize + x];
+            if (i >= kDesktopArtworkColors) {
+                delete bitmap;
+                return NULL;
+            }
+            const uint8* rgba = palette + i * 4;
+            uint8* bgra = bytes + y * bitmap->BytesPerRow() + x * 4;
+            bgra[0] = rgba[2]; bgra[1] = rgba[1];
+            bgra[2] = rgba[0]; bgra[3] = rgba[3];
+        }
+    }
+    return bitmap;
+}
+
+static const BBitmap*
+DesktopArtworkBitmap(int kind)
+{
+    static std::once_flag once;
+    static BBitmap* bitmaps[3] = { NULL, NULL, NULL };
+    std::call_once(once, []() {
+        for (int i = 0; i < 3; i++)
+            bitmaps[i] = CreateDesktopArtworkBitmap(i);
+    });
+    return bitmaps[kind];
 }
 
 struct FinderItem {
@@ -1967,15 +2014,22 @@ public:
 		BView(frame, "OSTen Desktop", B_FOLLOW_ALL,
 			B_WILL_DRAW | B_FRAME_EVENTS | B_NAVIGABLE),
 		fDiskSelected(false),
-		fTrashSelected(false)
+		fTrashSelected(false),
+        fTrashWasFull(false),
+        fTrashCheckRunner(NULL)
 	{
 		SetViewColor(54, 104, 150);
 		_LayoutItems();
 	}
 
+	~DesktopView() override { delete fTrashCheckRunner; }
+
 	void AttachedToWindow() override
 	{
 		MakeFocus(true);
+        fTrashWasFull = _TrashContainsEntries();
+        BMessage tick(kDesktopTrashStateCheck);
+        fTrashCheckRunner = new BMessageRunner(BMessenger(this), &tick, 1500000);
 	}
 
 	void Draw(BRect updateRect) override
@@ -2058,6 +2112,14 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+        if (message->what == kDesktopTrashStateCheck) {
+            const bool full = _TrashContainsEntries();
+            if (full != fTrashWasFull) {
+                fTrashWasFull = full;
+                Invalidate(fTrashHitRect);
+            }
+            return;
+        }
 		if (message->what == kFinderDragEntries && message->WasDropped()) {
 			BPoint point = message->DropPoint();
 			ConvertFromScreen(&point);
@@ -2129,10 +2191,10 @@ private:
 	void _LayoutItems()
 	{
 		BRect bounds = Bounds();
-		fDiskRect.Set(bounds.right - 76, 34, bounds.right - 36, 64);
+		fDiskRect.Set(bounds.right - 82, 30, bounds.right - 30, 78);
 		fDiskHitRect.Set(bounds.right - 108, 24, bounds.right - 12, 100);
-		fTrashRect.Set(bounds.right - 70, bounds.bottom - 86,
-			bounds.right - 42, bounds.bottom - 52);
+		fTrashRect.Set(bounds.right - 81, bounds.bottom - 95,
+            bounds.right - 31, bounds.bottom - 47);
 		fTrashHitRect.Set(bounds.right - 108, bounds.bottom - 98,
 			bounds.right - 12, bounds.bottom - 20);
 	}
@@ -2152,60 +2214,39 @@ private:
 		DrawString(label, BPoint(x, y));
 	}
 
-	// The startup volume is drawn as a compact beige external hard drive.
-	void _DrawDisk(BRect rect, bool selected)
-	{
-		SetHighColor(48, 42, 31);
-		FillRoundRect(rect, 3, 3);
-		BRect caseFace = rect.InsetByCopy(1, 1);
-		SetHighColor(227, 224, 211);
-		FillRoundRect(caseFace, 2, 2);
-		SetHighColor(250, 248, 238);
-		FillRect(BRect(caseFace.left + 2, caseFace.top + 2,
-			caseFace.right - 2, caseFace.top + 7));
-		SetHighColor(183, 180, 167);
-		FillRect(BRect(caseFace.left + 2, caseFace.top + 9,
-			caseFace.right - 2, caseFace.bottom - 2));
-		SetHighColor(91, 89, 79);
-		StrokeLine(BPoint(caseFace.left + 2, caseFace.top + 8),
-			BPoint(caseFace.right - 2, caseFace.top + 8));
-		StrokeLine(BPoint(caseFace.left + 3, caseFace.bottom - 5),
-			BPoint(caseFace.right - 3, caseFace.bottom - 5));
-		SetHighColor(45, 53, 47);
-		FillRect(BRect(caseFace.right - 7, caseFace.bottom - 4,
-			caseFace.right - 4, caseFace.bottom - 2));
-		SetHighColor(112, 137, 91);
-		FillRect(BRect(caseFace.right - 6, caseFace.bottom - 4,
-			caseFace.right - 5, caseFace.bottom - 3));
-		_DrawLabel("OSTen", fDiskHitRect, selected);
-	}
 
-	// A wire basket and overhanging lid give Trash its familiar Finder shape.
-	void _DrawTrash(BRect rect, bool selected)
-	{
-		SetHighColor(48, 42, 31);
-		FillRect(BRect(rect.left + 2, rect.top + 7, rect.right - 2,
-			rect.bottom - 1));
-		SetHighColor(225, 222, 207);
-		FillRect(BRect(rect.left + 4, rect.top + 9, rect.right - 4,
-			rect.bottom - 3));
-		SetHighColor(48, 42, 31);
-		FillRect(BRect(rect.left, rect.top + 5, rect.right, rect.top + 7));
-		FillRect(BRect(rect.left + 7, rect.top + 2, rect.right - 7,
-			rect.top + 4));
-		FillRect(BRect(rect.left + 10, rect.top, rect.right - 10,
-			rect.top + 1));
+    // Live Trash state is read from the actual Trash directory.
+    bool _TrashContainsEntries() const
+    {
+        BDirectory directory("/boot/trash");
+        if (directory.InitCheck() != B_OK)
+            return false;
+        BEntry entry;
+        return directory.GetNextEntry(&entry) == B_OK;
+    }
 
-		SetHighColor(126, 123, 110);
-		for (float x = rect.left + 7; x <= rect.right - 7; x += 5)
-			StrokeLine(BPoint(x, rect.top + 11), BPoint(x, rect.bottom - 4));
-		for (float y = rect.top + 13; y <= rect.bottom - 5; y += 5)
-			StrokeLine(BPoint(rect.left + 5, y), BPoint(rect.right - 5, y));
-		SetHighColor(250, 248, 238);
-		StrokeLine(BPoint(rect.left + 4, rect.top + 9),
-			BPoint(rect.left + 4, rect.bottom - 4));
-		_DrawLabel("Trash", fTrashHitRect, selected);
-	}
+    void _DrawDesktopArtwork(BRect rect, int kind)
+    {
+        const BBitmap* bitmap = DesktopArtworkBitmap(kind);
+        if (bitmap == NULL)
+            return;
+        SetDrawingMode(B_OP_ALPHA);
+        SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
+        DrawBitmap(bitmap, bitmap->Bounds(), rect);
+        SetDrawingMode(B_OP_COPY);
+    }
+
+    void _DrawDisk(BRect rect, bool selected)
+    {
+        _DrawDesktopArtwork(rect, 0);
+        _DrawLabel("OSTen", fDiskHitRect, selected);
+    }
+
+    void _DrawTrash(BRect rect, bool selected)
+    {
+        _DrawDesktopArtwork(rect, _TrashContainsEntries() ? 2 : 1);
+        _DrawLabel("Trash", fTrashHitRect, selected);
+    }
 
 	void _OpenItem(desktop_item item)
 	{
@@ -2220,6 +2261,8 @@ private:
 private:
 	bool	fDiskSelected;
 	bool	fTrashSelected;
+    bool    fTrashWasFull;
+    BMessageRunner* fTrashCheckRunner;
 	BRect	fDiskRect;
 	BRect	fDiskHitRect;
 	BRect	fTrashRect;
