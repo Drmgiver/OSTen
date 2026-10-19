@@ -176,6 +176,8 @@ public:
 			new BMessage(kOSTenViewAsIcons));
 		iconsItem->SetMarked(true);
 		viewMenu->AddItem(iconsItem);
+		viewMenu->AddItem(new BMenuItem("as List",
+			new BMessage(kOSTenViewAsList)));
 		viewMenu->AddSeparatorItem();
 		viewMenu->AddItem(new BMenuItem("Arrange by Name",
 			new BMessage(kOSTenArrangeName)));
@@ -460,6 +462,7 @@ public:
 			|| message->what == kOSTenClose
 			|| message->what == kOSTenSelectAll
 			|| message->what == kOSTenViewAsIcons
+			|| message->what == kOSTenViewAsList
 			|| message->what == kOSTenRename
 			|| message->what == kOSTenGetInfo
 			|| message->what == kOSTenEmptyTrash
