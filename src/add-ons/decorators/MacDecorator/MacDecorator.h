@@ -37,6 +37,9 @@ public:
 
 	virtual	Region				RegionAt(BPoint where, int32& tab) const;
 
+	virtual	void				GetSizeLimits(int32* minWidth, int32* minHeight,
+									int32* maxWidth, int32* maxHeight) const;
+
 	virtual	bool				SetRegionHighlight(Region region,
 									uint8 highlight, BRegion* dirty,
 									int32 tab = -1);
