@@ -606,6 +606,8 @@ public:
 		Invalidate();
 	}
 
+	bool IsListMode() const { return fListMode; }
+
 	void SetListMode(bool listMode)
 	{
 		if (fIsDesktop || fListMode == listMode)
@@ -1403,6 +1405,15 @@ NotifyFinderWindowActivated(BWindow* window)
 	be_app->PostMessage(&activated);
 }
 
+static void
+NotifyFinderViewModeChanged(bool listMode)
+{
+	BMessage changed(kOSTenFinderViewModeChanged);
+	changed.AddBool("list_mode", listMode);
+	BMessenger system("application/x-vnd.OSTen-System");
+	system.SendMessage(&changed);
+}
+
 
 // Pop-up folders have an independent, clickable bottom tab. Keeping the
 // actual folder at its normal dimensions avoids WindowShade's long frame.
@@ -1518,8 +1529,10 @@ public:
 		fDirectory(directory),
 		fDepth(depth),
 		fView(NULL),
+		fScrollView(NULL),
 		fShaded(false),
 		fUnshadedHeight(0),
+		fUnshadedWidth(0),
 		fPopupDocked(false),
 		fPopupMoving(false),
 		fPopupTab(NULL),
@@ -1539,8 +1552,10 @@ public:
 		// to the scroll view. B_FOLLOW_ALL retains the space while resizing.
 		frame.bottom -= 16;
 		fView = new FolderView(frame, directory);
-		AddChild(new BScrollView("Folder scrolling", fView, B_FOLLOW_ALL,
-			0, false, true, B_NO_BORDER));
+		fScrollView = new BScrollView("Folder scrolling", fView,
+			B_FOLLOW_ALL, 0, false, true, B_NO_BORDER);
+		AddChild(fScrollView);
+		_UpdateFolderScrollFrame();
 
 		BRect footer(7, frame.bottom + 1, Bounds().right - 7,
 			Bounds().bottom - 7);
@@ -1592,11 +1607,13 @@ public:
 			return;
 		if (fShaded) {
 			fShaded = false;
-			ResizeTo(Frame().Width(), fUnshadedHeight);
+			ResizeTo(fUnshadedWidth, fUnshadedHeight);
 		} else {
+			fUnshadedWidth = Frame().Width();
 			fUnshadedHeight = Frame().Height();
 			fShaded = true;
-			ResizeTo(Frame().Width(), 26);
+			// A compact Platinum window, not a full-width horizontal strip.
+			ResizeTo(166, 26);
 		}
 	}
 
@@ -1634,8 +1651,10 @@ public:
 	void WindowActivated(bool active) override
 	{
 		BWindow::WindowActivated(active);
-		if (active)
+		if (active) {
 			NotifyFinderWindowActivated(this);
+			NotifyFinderViewModeChanged(fView->IsListMode());
+		}
 	}
 
 	bool QuitRequested() override
@@ -1709,15 +1728,34 @@ public:
 				return;
 			case kOSTenViewAsIcons:
 				fView->SetListMode(false);
+				_UpdateFolderScrollFrame();
+				NotifyFinderViewModeChanged(false);
 				return;
 			case kOSTenViewAsList:
 				fView->SetListMode(true);
+				_UpdateFolderScrollFrame();
+				NotifyFinderViewModeChanged(true);
 				return;
 		}
 		BWindow::MessageReceived(message);
 	}
 
 private:
+	void _UpdateFolderScrollFrame()
+	{
+		// Icon view retains the classic inset. In List View the header must
+		// meet the upper inside edge without a blank strip above it.
+		if (fScrollView == NULL)
+			return;
+		BRect frame = fScrollView->Frame();
+		float top = fView->IsListMode() ? 0.0f : 7.0f;
+		float difference = frame.top - top;
+		if (fabsf(difference) < 0.5f)
+			return;
+		fScrollView->MoveTo(frame.left, top);
+		fScrollView->ResizeTo(frame.Width(), frame.Height() + difference);
+	}
+
 	void _OpenEntry(int32 index)
 	{
 		entry_ref ref;
@@ -1848,8 +1886,10 @@ private:
 		BNode node(&fDirectory);
 		BRect frame = fPopupDocked && fPopupNormalFrame.IsValid()
 			? fPopupNormalFrame : Frame();
-		if (!fPopupDocked && fShaded)
+		if (!fPopupDocked && fShaded) {
+			frame.right = frame.left + fUnshadedWidth;
 			frame.bottom = frame.top + fUnshadedHeight;
+		}
 		node.WriteAttr(kWindowFrameAttribute, B_RECT_TYPE, 0, &frame,
 			sizeof(BRect));
 	}
@@ -1858,8 +1898,10 @@ private:
 	entry_ref	fDirectory;
 	int32		fDepth;
 	FolderView*	fView;
+	BScrollView* fScrollView;
 	bool		fShaded;
 	float		fUnshadedHeight;
+	float		fUnshadedWidth;
 	bool		fPopupDocked;
 	bool		fPopupMoving;
 	FinderPopupTab* fPopupTab;
@@ -2204,8 +2246,10 @@ public:
 	void WindowActivated(bool active) override
 	{
 		BWindow::WindowActivated(active);
-		if (active)
+		if (active) {
 			NotifyFinderWindowActivated(this);
+			NotifyFinderViewModeChanged(false);
+		}
 	}
 
 	bool QuitRequested() override
