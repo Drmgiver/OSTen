@@ -191,7 +191,7 @@ MacDecorator::_IsTabOnly() const
 	// Keep the real Platinum tab and its buttons, but omit the frame and
 	// resizing handle altogether. Other normal windows are unaffected.
 	return fTopTab != NULL && fTopTab->look == B_TITLED_WINDOW_LOOK
-		&& fFrame.Height() <= 0.0f;
+		&& fFrame.Height() <= 1.0f;
 }
 
 
