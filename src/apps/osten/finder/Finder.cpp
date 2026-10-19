@@ -362,12 +362,6 @@ public:
 		BView::KeyDown(bytes, numBytes);
 	}
 
-	void SetFolderTitle(const char* title)
-	{
-		fTitle = title;
-		Invalidate();
-	}
-
 	void MouseDown(BPoint where) override
 	{
         // A double-click must outrun a pending single-click rename.
@@ -1197,13 +1191,6 @@ public:
 		MoveTo(screen.left + 6 + column * 146,
 			screen.bottom - 24 - row * 25);
 		fCollapsedPosition = Frame().LeftTop();
-	}
-
-	void SetFolderTitle(const char* title)
-	{
-		FinderPopupTabView* view = dynamic_cast<FinderPopupTabView*>(ChildAt(0));
-		if (view != NULL)
-			view->SetFolderTitle(title);
 	}
 
 	BPoint CollapsedPosition() const { return fCollapsedPosition; }
