@@ -124,6 +124,8 @@ MacDecorator::RegionAt(BPoint where, int32& tab) const
 	}
 	if (region != REGION_NONE)
 		return region;
+	if (_IsTabOnly())
+		return REGION_NONE;
 
 	// The visible classic Mac size box must also be the clickable resize area.
 	// It is available for normal titled Finder windows as well as document
@@ -182,6 +184,17 @@ MacDecorator::SetRegionHighlight(Region region, uint8 highlight,
 }
 
 
+bool
+MacDecorator::_IsTabOnly() const
+{
+	// Finder collapses the client area to zero height for WindowShade.
+	// Keep the real Platinum tab and its buttons, but omit the frame and
+	// resizing handle altogether. Other normal windows are unaffected.
+	return fTopTab != NULL && fTopTab->look == B_TITLED_WINDOW_LOOK
+		&& fFrame.Height() <= 0.0f;
+}
+
+
 void
 MacDecorator::_DoLayout()
 {
@@ -229,7 +242,7 @@ MacDecorator::_DoLayout()
 	// The 16-pixel box overlaps the inner corner; OSTen Finder reserves this
 	// space below its vertical scroller. Fixed-size windows have no box.
 	fResizeRect.Set(0, 0, -1, -1);
-	if (fTopTab != NULL && hasTab
+	if (!_IsTabOnly() && fTopTab != NULL && hasTab
 		&& (fTopTab->flags & (B_NOT_RESIZABLE | B_NOT_H_RESIZABLE
 			| B_NOT_V_RESIZABLE)) == 0) {
 		fResizeRect.Set(fBorderRect.right - 15, fBorderRect.bottom - 15,
@@ -318,7 +331,7 @@ MacDecorator::_DoLayout()
 void
 MacDecorator::_DrawFrame(BRect invalid)
 {
-	if (fTopTab->look == B_NO_BORDER_WINDOW_LOOK)
+	if (_IsTabOnly() || fTopTab->look == B_NO_BORDER_WINDOW_LOOK)
 		return;
 
 	if (fBorderWidth <= 0)
@@ -940,6 +953,17 @@ MacDecorator::_GetFootprint(BRegion* region)
 
 	if (fTopTab->look == B_NO_BORDER_WINDOW_LOOK)
 		return;
+
+	if (_IsTabOnly()) {
+		// Do not leave any side/bottom frame or size-box footprint around
+		// the WindowShade tab. The tab remains visible and clickable.
+		for (int32 i = 0; i < fTabList.CountItems(); ++i) {
+			Decorator::Tab* tab = fTabList.ItemAt(i);
+			if (tab != NULL && tab->tabRect.IsValid())
+				region->Include(tab->tabRect);
+		}
+		return;
+	}
 
 	region->Set(fBorderRect);
 	region->Exclude(fFrame);
