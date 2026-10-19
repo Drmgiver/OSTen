@@ -1598,22 +1598,26 @@ public:
 			_SaveFrame();
 	}
 
-	// Classic Mac WindowShade keeps a thin client strip beneath the title,
-	// including the Platinum resize corner. A one-pixel-high client reduces
-	// the window to a naked tab and loses the characteristic shaded outline.
+	// WindowShade retains the Platinum title and just enough of the client
+	// frame for its resize corner. Temporarily relax normal minimum size limits
+	// so the window can shrink to its tab instead of remaining a wide strip.
 	void Minimize(bool minimize) override
 	{
 		if (!minimize && !fShaded)
 			return;
 		if (fShaded) {
 			fShaded = false;
+			SetSizeLimits(fUnshadedMinWidth, fUnshadedMaxWidth,
+				fUnshadedMinHeight, fUnshadedMaxHeight);
 			ResizeTo(fUnshadedWidth, fUnshadedHeight);
 		} else {
 			fUnshadedWidth = Frame().Width();
 			fUnshadedHeight = Frame().Height();
+			GetSizeLimits(&fUnshadedMinWidth, &fUnshadedMaxWidth,
+				&fUnshadedMinHeight, &fUnshadedMaxHeight);
 			fShaded = true;
-			// A compact Platinum window, not a full-width horizontal strip.
-			ResizeTo(166, 26);
+			SetSizeLimits(0, 32768, 0, 32768);
+			ResizeTo(166, 14);
 		}
 	}
 
@@ -1748,12 +1752,15 @@ private:
 		if (fScrollView == NULL)
 			return;
 		BRect frame = fScrollView->Frame();
-		float top = fView->IsListMode() ? 0.0f : 7.0f;
-		float difference = frame.top - top;
-		if (fabsf(difference) < 0.5f)
+		// The list header and first column align with the inside edges of the
+		// Finder frame; icon view keeps its classic seven-pixel insets.
+		float inset = fView->IsListMode() ? 0.0f : 7.0f;
+		float dx = frame.left - inset;
+		float dy = frame.top - inset;
+		if (fabsf(dx) < 0.5f && fabsf(dy) < 0.5f)
 			return;
-		fScrollView->MoveTo(frame.left, top);
-		fScrollView->ResizeTo(frame.Width(), frame.Height() + difference);
+		fScrollView->MoveTo(inset, inset);
+		fScrollView->ResizeTo(frame.Width() + dx, frame.Height() + dy);
 	}
 
 	void _OpenEntry(int32 index)
@@ -1902,6 +1909,10 @@ private:
 	bool		fShaded;
 	float		fUnshadedHeight;
 	float		fUnshadedWidth;
+	float		fUnshadedMinWidth = 0;
+	float		fUnshadedMaxWidth = 32768;
+	float		fUnshadedMinHeight = 0;
+	float		fUnshadedMaxHeight = 32768;
 	bool		fPopupDocked;
 	bool		fPopupMoving;
 	FinderPopupTab* fPopupTab;
