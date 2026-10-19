@@ -42,6 +42,7 @@ public:
 									int32 tab = -1);
 
 protected:
+			bool				_IsTabOnly() const;
 			void				_DoLayout();
 
 	virtual	void				_DrawFrame(BRect invalid);
