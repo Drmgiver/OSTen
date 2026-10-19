@@ -51,7 +51,8 @@ const uint32 kFinderRefreshFolder = 'osrw';
 const uint32 kFinderPopupTabClicked = 'ospt';
 const uint32 kFinderPopupTabPlacement = 'ospp';
 const uint32 kFinderRestorePopup = 'ospr';
-static int32 sNextPopupSlot = 0;
+static std::mutex sPopupSlotLock;
+static std::vector<int32> sPopupSlotsInUse;
 const uint32 kInlineRenameCommit = 'osic';
 const uint32 kInlineRenameCancel = 'osix';
 const uint32 kInlineRenameAfterClick = 'osid';
@@ -1184,13 +1185,30 @@ public:
 	{
 		AddChild(new FinderPopupTabView(Bounds(), title, fFolder));
 		BRect screen = BScreen(this).Frame();
-		int32 slot = sNextPopupSlot++;
+		int32 slot = 0;
+		{
+			std::lock_guard<std::mutex> guard(sPopupSlotLock);
+			while (std::find(sPopupSlotsInUse.begin(),
+				sPopupSlotsInUse.end(), slot) != sPopupSlotsInUse.end())
+				slot++;
+			sPopupSlotsInUse.push_back(slot);
+		}
+		fSlot = slot;
 		int32 columns = std::max(1, (int32)(screen.Width() / 146));
 		int32 column = slot % columns;
 		int32 row = slot / columns;
 		MoveTo(screen.left + 6 + column * 146,
 			screen.bottom - 24 - row * 25);
 		fCollapsedPosition = Frame().LeftTop();
+	}
+
+	~FinderPopupTab() override
+	{
+		std::lock_guard<std::mutex> guard(sPopupSlotLock);
+		std::vector<int32>::iterator it = std::find(sPopupSlotsInUse.begin(),
+			sPopupSlotsInUse.end(), fSlot);
+		if (it != sPopupSlotsInUse.end())
+			sPopupSlotsInUse.erase(it);
 	}
 
 	BPoint CollapsedPosition() const { return fCollapsedPosition; }
@@ -1213,6 +1231,7 @@ public:
 private:
 	BMessenger fFolder;
 	BPoint fCollapsedPosition;
+	int32 fSlot;
 };
 
 
