@@ -1444,19 +1444,7 @@ private:
 		if (entry.IsDirectory()) {
 			entry_ref resolvedRef;
 			if (entry.GetRef(&resolvedRef) == B_OK)
-				if (fPopupDocked) {
-					fDirectory = resolvedRef;
-					fView->SetDirectory(resolvedRef);
-					char name[B_FILE_NAME_LENGTH];
-					if (entry.GetName(name) == B_OK) {
-						SetTitle(name);
-						if (fPopupTab != NULL && fPopupTab->Lock()) {
-							fPopupTab->SetFolderTitle(name);
-							fPopupTab->Unlock();
-						}
-					}
-				} else
-					(new FinderWindow(resolvedRef, fDepth + 1))->Show();
+				(new FinderWindow(resolvedRef, fDepth + 1))->Show();
 		} else
 			be_roster->Launch(&ref);
 	}
