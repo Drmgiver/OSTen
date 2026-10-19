@@ -172,12 +172,13 @@ public:
 		bar->AddItem(editMenu);
 
 		BMenu* viewMenu = new BMenu("View");
-		BMenuItem* iconsItem = new BMenuItem("as Icons",
+		fIconsMenuItem = new BMenuItem("as Icons",
 			new BMessage(kOSTenViewAsIcons));
-		iconsItem->SetMarked(true);
-		viewMenu->AddItem(iconsItem);
-		viewMenu->AddItem(new BMenuItem("as List",
-			new BMessage(kOSTenViewAsList)));
+		fListMenuItem = new BMenuItem("as List",
+			new BMessage(kOSTenViewAsList));
+		fIconsMenuItem->SetMarked(true);
+		viewMenu->AddItem(fIconsMenuItem);
+		viewMenu->AddItem(fListMenuItem);
 		viewMenu->AddSeparatorItem();
 		viewMenu->AddItem(new BMenuItem("Arrange by Name",
 			new BMessage(kOSTenArrangeName)));
@@ -251,6 +252,14 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+		if (message->what == kOSTenFinderViewModeChanged) {
+			bool listMode = false;
+			if (message->FindBool("list_mode", &listMode) == B_OK) {
+				fIconsMenuItem->SetMarked(!listMode);
+				fListMenuItem->SetMarked(listMode);
+			}
+			return;
+		}
 		if (message->what == kClockTick) {
 			RefreshOSTenClock(fClock);
 			RefreshOSTenApplicationSwitcher(fSwitcher);
@@ -480,6 +489,8 @@ public:
 
 private:
 	BMessenger fAboutMessenger;
+	BMenuItem* fIconsMenuItem = NULL;
+	BMenuItem* fListMenuItem = NULL;
 	BView* fClock;
 	BView* fTray;
 	BView* fSwitcher;
@@ -507,6 +518,7 @@ public:
 	void MessageReceived(BMessage* message) override
 	{
 		if (message->what == kOSTenNewNotice
+			|| message->what == kOSTenFinderViewModeChanged
 			|| message->what == kOSTenNextApplication
 			|| message->what == kOSTenActivateApplication) {
 			if (fBar != NULL)
