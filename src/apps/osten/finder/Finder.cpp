@@ -1159,7 +1159,7 @@ public:
 	FinderPopupTab(const char* title, const BMessenger& folder)
 		:
 		BWindow(BRect(0, 0, 139, 21), title, B_NO_BORDER_WINDOW_LOOK,
-			B_FLOATING_APP_WINDOW_FEEL,
+			B_NORMAL_WINDOW_FEEL,
 			B_NOT_ZOOMABLE | B_NOT_RESIZABLE | B_NOT_MINIMIZABLE
 				| B_ASYNCHRONOUS_CONTROLS),
 		fFolder(folder)
