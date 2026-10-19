@@ -184,6 +184,22 @@ MacDecorator::SetRegionHighlight(Region region, uint8 highlight,
 }
 
 
+void
+MacDecorator::GetSizeLimits(int32* minWidth, int32* minHeight,
+	int32* maxWidth, int32* maxHeight) const
+{
+	// The standard decorator enforces enough client height for the
+	// Platinum resize corner, even when Finder explicitly requests a
+	// zero-height client for WindowShade. That silently clamps ResizeTo(0)
+	// to a visible strip and prevents _IsTabOnly() from activating.
+	const bool tabOnlyRequested = fTopTab != NULL
+		&& fTopTab->look == B_TITLED_WINDOW_LOOK && *minHeight == 0;
+	SATDecorator::GetSizeLimits(minWidth, minHeight, maxWidth, maxHeight);
+	if (tabOnlyRequested)
+		*minHeight = 0;
+}
+
+
 bool
 MacDecorator::_IsTabOnly() const
 {
