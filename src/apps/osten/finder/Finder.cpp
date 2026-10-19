@@ -1617,7 +1617,14 @@ public:
 				&fUnshadedMinHeight, &fUnshadedMaxHeight);
 			fShaded = true;
 			SetSizeLimits(0, 32768, 0, 32768);
-			ResizeTo(166, 14);
+			// Match MacDecorator's tab formula: title + room for close,
+			// zoom and WindowShade controls (minimum 105, maximum 240).
+			// A fixed 166-pixel client left a large strip to the right
+			// of short names. Subtract the 6-pixel borders on both sides.
+			float titleWidth = be_bold_font->StringWidth(Title());
+			float tabWidth = std::min(240.0f,
+				std::max(105.0f, titleWidth + 80.0f));
+			ResizeTo(std::max(93.0f, tabWidth - 12.0f), 14);
 		}
 	}
 
