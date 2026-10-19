@@ -1708,6 +1708,10 @@ public:
 				fView->Refresh();
 				return;
 			case kOSTenViewAsIcons:
+				fView->SetListMode(false);
+				return;
+			case kOSTenViewAsList:
+				fView->SetListMode(true);
 				return;
 		}
 		BWindow::MessageReceived(message);
@@ -2362,6 +2366,7 @@ public:
 			|| message->what == kOSTenClose
 			|| message->what == kOSTenSelectAll
 			|| message->what == kOSTenViewAsIcons
+			|| message->what == kOSTenViewAsList
 			|| message->what == kOSTenRename
 			|| message->what == kOSTenGetInfo
 			|| message->what == kOSTenArrangeName
