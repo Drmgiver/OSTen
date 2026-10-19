@@ -32,6 +32,8 @@
 #include <atomic>
 #include <math.h>
 #include <string.h>
+#include <time.h>
+#include <sys/stat.h>
 #include <vector>
 
 #include "OSTenMessages.h"
@@ -59,6 +61,9 @@ const uint32 kInlineRenameAfterClick = 'osid';
 const char* kWindowFrameAttribute = "OSTen:window_frame";
 const char* kPopupFolderAttribute = "OSTen:popup_folder";
 const char* kArrangeAttribute = "OSTen:arrange_kind";
+const char* kViewModeAttribute = "OSTen:view_mode";
+const float kListHeaderHeight = 24;
+const float kListRowHeight = 23;
 // Store desktop icon locations on their filesystem nodes, not by filename.
 // Renaming an icon therefore does not reset its position.
 const char* kDesktopPositionAttribute = "OSTen:desktop_position";
@@ -177,6 +182,10 @@ struct FinderItem {
 	BString		name;
 	bool		isDirectory;
 	bool		selected;
+	int32		depth;
+	bool		expanded;
+	off_t		size;
+	time_t		modified;
 	BRect		cell;
 };
 
@@ -285,6 +294,9 @@ public:
 		fIsSystemFolder(false),
 		fIsDesktop(desktop),
 		fArrangeKind(false),
+		fListMode(false),
+		fListSortColumn(0),
+		fListSortAscending(true),
 		fTrackingDrag(false),
 		fPressedIndex(-1),
 		fRenameEditor(NULL),
@@ -306,6 +318,11 @@ public:
 		if (folderNode.ReadAttr(kArrangeAttribute, B_INT32_TYPE, 0,
 				&arrangeKind, sizeof(arrangeKind)) == (ssize_t)sizeof(arrangeKind))
 			fArrangeKind = arrangeKind != 0;
+		int32 viewMode = 0;
+		if (!fIsDesktop && folderNode.ReadAttr(kViewModeAttribute,
+			B_INT32_TYPE, 0, &viewMode, sizeof(viewMode))
+			== (ssize_t)sizeof(viewMode))
+			fListMode = viewMode == 1;
 		BEntry folder(&fDirectory);
 		BPath path;
 		if (folder.GetPath(&path) == B_OK) {
@@ -325,6 +342,8 @@ public:
 
 	void Draw(BRect updateRect) override
 	{
+		if (fListMode)
+			_DrawListHeader(updateRect);
 		for (size_t index = 0; index < fItems.size(); index++) {
 			if (fItems[index].cell.Intersects(updateRect))
 				_DrawItem(fItems[index]);
@@ -371,7 +390,26 @@ public:
         if (fRenameEditor != NULL)
             _FinishInlineRename(true);
 		MakeFocus(true);
+		if (fListMode && where.y >= 0 && where.y < kListHeaderHeight) {
+			int32 column = _ListColumnAt(where.x);
+			if (column == fListSortColumn)
+				fListSortAscending = !fListSortAscending;
+			else {
+				fListSortColumn = column;
+				fListSortAscending = true;
+			}
+			Refresh();
+			return;
+		}
 		int32 hit = _ItemAt(where);
+		if (fListMode && hit >= 0 && fItems[hit].isDirectory) {
+			float arrowX = 8 + fItems[hit].depth * 14;
+			if (where.x >= arrowX && where.x <= arrowX + 17) {
+				_ToggleExpandedFolder(fItems[hit].ref);
+				Refresh();
+				return;
+			}
+		}
 		int32 buttons = B_PRIMARY_MOUSE_BUTTON;
 		if (Window()->CurrentMessage() != NULL)
 			Window()->CurrentMessage()->FindInt32("buttons", &buttons);
@@ -393,7 +431,7 @@ public:
         int32 clicks = 1;
         if (Window()->CurrentMessage() != NULL)
             Window()->CurrentMessage()->FindInt32("clicks", &clicks);
-        if (hit >= 0 && fItems[hit].selected && !extend && clicks == 1
+        if (!fListMode && hit >= 0 && fItems[hit].selected && !extend && clicks == 1
             && where.y >= fItems[hit].cell.top + 50
             && where.y <= fItems[hit].cell.top + 70) {
             // Wait until the double-click window has passed, allowing
@@ -527,6 +565,12 @@ public:
 		fTrackingDrag = false;
 		fPressedIndex = -1;
 		fItems.clear();
+		if (fListMode) {
+			_PopulateListItems(fDirectory, 0, selectName);
+			_LayoutItems();
+			Invalidate();
+			return;
+		}
 		BDirectory contents(&fDirectory);
 		BEntry entry;
 		while (contents.GetNextEntry(&entry) == B_OK) {
@@ -545,6 +589,10 @@ public:
 			BEntry resolved(&ref, true);
 			item.isDirectory = resolved.IsDirectory();
 			item.selected = selectName != NULL && item.name == selectName;
+			item.depth = 0;
+			item.expanded = false;
+			item.size = 0;
+			item.modified = 0;
 			fItems.push_back(item);
 		}
 
@@ -556,6 +604,18 @@ public:
 			});
 		_LayoutItems();
 		Invalidate();
+	}
+
+	void SetListMode(bool listMode)
+	{
+		if (fIsDesktop || fListMode == listMode)
+			return;
+		fListMode = listMode;
+		int32 value = listMode ? 1 : 0;
+		BNode folder(&fDirectory);
+		folder.WriteAttr(kViewModeAttribute, B_INT32_TYPE, 0,
+			&value, sizeof(value));
+		Refresh();
 	}
 
 	bool BeginRenameSelected()
@@ -710,8 +770,15 @@ private:
         const FinderItem& item = fItems[index];
         fRenameRef = item.ref;
         fRenameIndex = index;
-        BRect editor(item.cell.left - 10, item.cell.top + 49,
-            item.cell.right + 10, item.cell.top + 73);
+        		BRect editor;
+		if (fListMode) {
+			float left = 43 + item.depth * 14;
+			editor.Set(left, item.cell.top + 1,
+				std::min(Bounds().right - 8, left + 195), item.cell.bottom);
+		} else {
+			editor.Set(item.cell.left - 10, item.cell.top + 49,
+				item.cell.right + 10, item.cell.top + 73);
+		}
         fRenameEditor = new InlineRenameEditor(editor, item.name.String());
         AddChild(fRenameEditor);
         if (!Window()->IsActive())
@@ -835,8 +902,206 @@ private:
 		}
 	}
 
+
+	void _ToggleExpandedFolder(const entry_ref& ref)
+	{
+		std::vector<entry_ref>::iterator it = std::find(fExpandedFolders.begin(),
+			fExpandedFolders.end(), ref);
+		if (it != fExpandedFolders.end())
+			fExpandedFolders.erase(it);
+		else
+			fExpandedFolders.push_back(ref);
+	}
+
+	void _PopulateListItems(const entry_ref& directory, int32 depth,
+		const char* selectName)
+	{
+		// Keep symbolic-link cycles from expanding without bound.
+		if (depth > 12)
+			return;
+		BDirectory contents(&directory);
+		std::vector<FinderItem> children;
+		BEntry entry;
+		while (contents.GetNextEntry(&entry) == B_OK) {
+			entry_ref ref;
+			char name[B_FILE_NAME_LENGTH];
+			if (entry.GetRef(&ref) != B_OK || entry.GetName(name) != B_OK)
+				continue;
+			if (name[0] == '.' || (depth == 0 && _ShouldHide(name)))
+				continue;
+			FinderItem item;
+			item.ref = ref;
+			item.name = name;
+			BEntry resolved(&ref, true);
+			item.isDirectory = resolved.IsDirectory();
+			item.selected = selectName != NULL && item.name == selectName;
+			item.depth = depth;
+			item.expanded = item.isDirectory
+				&& std::find(fExpandedFolders.begin(), fExpandedFolders.end(),
+					ref) != fExpandedFolders.end();
+			struct stat details = {};
+			if (entry.GetStat(&details) == B_OK) {
+				item.size = details.st_size;
+				item.modified = details.st_mtime;
+			} else {
+				item.size = 0;
+				item.modified = 0;
+			}
+			children.push_back(item);
+		}
+		std::sort(children.begin(), children.end(),
+			[this](const FinderItem& a, const FinderItem& b) {
+				int32 compare = 0;
+				switch (fListSortColumn) {
+					case 1:
+						compare = a.modified < b.modified ? -1
+							: (a.modified > b.modified ? 1 : 0);
+						break;
+					case 2:
+						compare = a.size < b.size ? -1
+							: (a.size > b.size ? 1 : 0);
+						break;
+					case 3:
+						compare = (a.isDirectory == b.isDirectory)
+							? 0 : (a.isDirectory ? -1 : 1);
+						break;
+				}
+				if (compare == 0)
+					compare = a.name.ICompare(b.name);
+				return fListSortAscending ? compare < 0 : compare > 0;
+			});
+		for (size_t i = 0; i < children.size(); i++) {
+			fItems.push_back(children[i]);
+			if (children[i].expanded)
+				_PopulateListItems(children[i].ref, depth + 1, selectName);
+		}
+	}
+
+	float _ListBoundary(int32 column) const
+	{
+		const float fractions[] = {0, 0.44f, 0.70f, 0.83f, 1.0f};
+		return Bounds().Width() * fractions[column];
+	}
+
+	int32 _ListColumnAt(float x) const
+	{
+		for (int32 column = 0; column < 3; column++) {
+			if (x < _ListBoundary(column + 1))
+				return column;
+		}
+		return 3;
+	}
+
+	void _DrawListHeader(BRect update)
+	{
+		BRect header(0, 0, Bounds().right, kListHeaderHeight - 1);
+		if (!header.Intersects(update))
+			return;
+		SetHighColor(215, 215, 215);
+		FillRect(header);
+		SetHighColor(72, 72, 72);
+		StrokeLine(header.LeftBottom(), header.RightBottom());
+		const char* names[] = {"Name", "Date Modified", "Size", "Kind"};
+		for (int32 column = 0; column < 4; column++) {
+			float left = _ListBoundary(column);
+			float right = _ListBoundary(column + 1);
+			if (column > 0) {
+				SetHighColor(124, 124, 124);
+				StrokeLine(BPoint(left, 2), BPoint(left, header.bottom - 2));
+			}
+			BString label(names[column]);
+			TruncateString(&label, B_TRUNCATE_END, right - left - 12);
+			SetHighColor(28, 28, 28);
+			DrawString(label.String(), BPoint(left + 6, 16));
+			if (fListSortColumn == column) {
+				SetHighColor(70, 70, 70);
+				float x = right - 7;
+				float y = fListSortAscending ? 7 : 12;
+				FillTriangle(BPoint(x - 3, y + 4),
+					BPoint(x + 3, y + 4), BPoint(x, y));
+			}
+		}
+	}
+
+	void _DrawListItem(const FinderItem& item)
+	{
+		SetHighColor(item.selected ? rgb_color{0, 0, 128, 255}
+			: rgb_color{255, 255, 255, 255});
+		FillRect(item.cell);
+		float left = 8 + item.depth * 14;
+		if (item.isDirectory) {
+			SetHighColor(item.selected ? rgb_color{255, 255, 255, 255}
+				: rgb_color{50, 50, 50, 255});
+			if (item.expanded)
+				FillTriangle(BPoint(left, item.cell.top + 8),
+					BPoint(left + 9, item.cell.top + 8),
+					BPoint(left + 4, item.cell.top + 15));
+			else
+				FillTriangle(BPoint(left + 2, item.cell.top + 5),
+					BPoint(left + 9, item.cell.top + 10),
+					BPoint(left + 2, item.cell.top + 15));
+		}
+		BRect icon(left + 16, item.cell.top + 3,
+			left + 33, item.cell.top + 20);
+		if (item.isDirectory) {
+			if (!_DrawArtworkIcon(icon, kFolderIcon))
+				_DrawFolderIcon(icon);
+		} else
+			_DrawFileIcon(icon);
+		SetHighColor(item.selected ? rgb_color{255, 255, 255, 255}
+			: rgb_color{0, 0, 0, 255});
+		const float baseline = item.cell.top + 16;
+		const float nameLeft = left + 37;
+		BString name(item.name);
+		TruncateString(&name, B_TRUNCATE_END,
+			std::max(0.0f, _ListBoundary(1) - nameLeft - 5));
+		if (fRenameEditor == NULL || fRenameIndex < 0
+			|| &item != &fItems[fRenameIndex])
+			DrawString(name.String(), BPoint(nameLeft, baseline));
+		BString date;
+		if (item.modified > 0) {
+			struct tm info;
+			if (localtime_r(&item.modified, &info) != NULL)
+				date.SetToFormat("%02d/%02d/%04d",
+					info.tm_mon + 1, info.tm_mday, info.tm_year + 1900);
+		}
+		BString size;
+		if (!item.isDirectory)
+			size.SetToFormat("%lld KB", (long long)std::max((off_t)1,
+				(item.size + 1023) / 1024));
+		const BString kind(item.isDirectory ? "Folder" : "Document");
+		const BString values[] = {date, size, kind};
+		for (int32 i = 1; i < 4; i++) {
+			float x = _ListBoundary(i) + 6;
+			BString display(values[i - 1]);
+			TruncateString(&display, B_TRUNCATE_END,
+				std::max(0.0f, _ListBoundary(i + 1) - x - 4));
+			DrawString(display.String(), BPoint(x, baseline));
+		}
+	}
+
 	void _LayoutItems()
 	{
+		if (fListMode) {
+			for (size_t index = 0; index < fItems.size(); index++) {
+				float top = kListHeaderHeight + index * kListRowHeight;
+				fItems[index].cell.Set(0, top, Bounds().right,
+					top + kListRowHeight - 1);
+			}
+			BScrollBar* scrollbar = ScrollBar(B_VERTICAL);
+			if (scrollbar != NULL) {
+				float contentHeight = kListHeaderHeight
+					+ fItems.size() * kListRowHeight + 4;
+				float viewportHeight = Bounds().Height();
+				float overflow = std::max(0.0f,
+					contentHeight - viewportHeight);
+				scrollbar->SetRange(0, overflow);
+				scrollbar->SetProportion(contentHeight > 0
+					? std::min(1.0f, viewportHeight / contentHeight) : 1.0f);
+				scrollbar->SetSteps(kListRowHeight, kListRowHeight * 5);
+			}
+			return;
+		}
 		int32 columns = (int32)((Bounds().Width() - 12) / kCellWidth);
 		if (columns < 1)
 			columns = 1;
@@ -942,6 +1207,10 @@ private:
 
 	void _DrawItem(const FinderItem& item)
 	{
+		if (fListMode) {
+			_DrawListItem(item);
+			return;
+		}
 		BRect icon(item.cell.left + 23, item.cell.top + kIconTop,
 			item.cell.left + 63, item.cell.top + kIconTop + 37);
 		if (item.isDirectory) {
@@ -1063,6 +1332,10 @@ private:
 	bool					fIsSystemFolder;
 	bool					fIsDesktop;
 	bool					fArrangeKind;
+	bool					fListMode;
+	int32					fListSortColumn;
+	bool					fListSortAscending;
+	std::vector<entry_ref> fExpandedFolders;
 	bool					fTrackingDrag;
 	int32					fPressedIndex;
 	BPoint					fDragStart;
