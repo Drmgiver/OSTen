@@ -12,6 +12,7 @@ enum {
 	kOSTenSelectAll = 'ossa',
 	kOSTenViewAsIcons = 'osvi',
 	kOSTenViewAsList = 'osvl',
+	kOSTenFinderViewModeChanged = 'osvm',
 	kOSTenSystemFolderAccess = 'osfa',
 	kOSTenRename = 'osrn',
 	kOSTenGetInfo = 'osgi',
