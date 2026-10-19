@@ -1462,7 +1462,7 @@ private:
 		if (docked) {
 			if (fShaded)
 				Minimize(false);
-				fPopupNormalFrame = Frame();
+			fPopupNormalFrame = Frame();
 			fPopupDocked = true;
 			SetLook(B_BORDERED_WINDOW_LOOK);
 			fPopupMoving = true;
