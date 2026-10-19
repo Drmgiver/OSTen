@@ -1557,7 +1557,9 @@ public:
 		AddChild(fScrollView);
 		_UpdateFolderScrollFrame();
 
-		BRect footer(7, frame.bottom + 1, Bounds().right - 7,
+		// The scrolling region now reaches the size box; its backing
+		// footer only covers the remaining narrow bottom-edge inset.
+		BRect footer(7, Bounds().bottom - 9, Bounds().right - 7,
 			Bounds().bottom - 7);
 		BView* footerView = new BView(footer, "Finder lower inset",
 			B_FOLLOW_LEFT_RIGHT | B_FOLLOW_BOTTOM, B_WILL_DRAW);
@@ -1754,20 +1756,21 @@ public:
 private:
 	void _UpdateFolderScrollFrame()
 	{
-		// Icon view retains the classic inset. In List View the header must
-		// meet the upper inside edge without a blank strip above it.
 		if (fScrollView == NULL)
 			return;
-		BRect frame = fScrollView->Frame();
-		// The list header and first column align with the inside edges of the
-		// Finder frame; icon view keeps its classic seven-pixel insets.
-		float inset = fView->IsListMode() ? 0.0f : 7.0f;
-		float dx = frame.left - inset;
-		float dy = frame.top - inset;
-		if (fabsf(dx) < 0.5f && fabsf(dy) < 0.5f)
+		// In list view, the header meets the inside top/left edges; icons
+		// keep their classic inset. Both modes share the same right/bottom
+		// geometry so the vertical scrollbar ends immediately above the
+		// Platinum resize corner instead of floating in a white gutter.
+		const float inset = fView->IsListMode() ? 0.0f : 7.0f;
+		const BRect bounds = Bounds();
+		const BRect desired(inset, inset, bounds.right,
+			bounds.bottom - 10.0f);
+		const BRect current = fScrollView->Frame();
+		if (current == desired)
 			return;
-		fScrollView->MoveTo(inset, inset);
-		fScrollView->ResizeTo(frame.Width() + dx, frame.Height() + dy);
+		fScrollView->MoveTo(desired.LeftTop());
+		fScrollView->ResizeTo(desired.Width(), desired.Height());
 	}
 
 	void _OpenEntry(int32 index)
