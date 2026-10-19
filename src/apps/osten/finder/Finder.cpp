@@ -1310,9 +1310,9 @@ public:
 			_SaveFrame();
 	}
 
-	// The MacDecorator minimize button represents Classic Mac WindowShade.
-	// Unlike standard Haiku minimizing, this keeps the title bar visible and
-	// clickable, and restores the previous folder height on the next click.
+	// Classic Mac WindowShade keeps a thin client strip beneath the title,
+	// including the Platinum resize corner. A one-pixel-high client reduces
+	// the window to a naked tab and loses the characteristic shaded outline.
 	void Minimize(bool minimize) override
 	{
 		if (!minimize && !fShaded)
@@ -1323,7 +1323,7 @@ public:
 		} else {
 			fUnshadedHeight = Frame().Height();
 			fShaded = true;
-			ResizeTo(Frame().Width(), 1);
+			ResizeTo(Frame().Width(), 26);
 		}
 	}
 
