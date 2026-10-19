@@ -1159,7 +1159,7 @@ public:
 		SetHighColor(255, 255, 255);
 		StrokeLine(BPoint(2, r.bottom - 1), BPoint(2, 7));
 		SetHighColor(45, 45, 45);
-		DrawString(fTitle.String(), BPoint(8, 15));
+		DrawString(fTitle.String(), BPoint(7, 13));
 	}
 
 	void MouseDown(BPoint where) override
@@ -1177,7 +1177,7 @@ class FinderPopupTab : public BWindow {
 public:
 	FinderPopupTab(const char* title, const BMessenger& folder)
 		:
-		BWindow(BRect(0, 0, 139, 21), title, B_NO_BORDER_WINDOW_LOOK,
+		BWindow(BRect(0, 0, 105, 17), title, B_NO_BORDER_WINDOW_LOOK,
 			B_NORMAL_WINDOW_FEEL,
 			B_NOT_ZOOMABLE | B_NOT_RESIZABLE | B_NOT_MINIMIZABLE
 				| B_ASYNCHRONOUS_CONTROLS),
@@ -1194,11 +1194,11 @@ public:
 			sPopupSlotsInUse.push_back(slot);
 		}
 		fSlot = slot;
-		int32 columns = std::max(1, (int32)(screen.Width() / 146));
+		int32 columns = std::max(1, (int32)(screen.Width() / 112));
 		int32 column = slot % columns;
 		int32 row = slot / columns;
-		MoveTo(screen.left + 6 + column * 146,
-			screen.bottom - 24 - row * 25);
+		MoveTo(screen.left + 6 + column * 112,
+			screen.bottom - 20 - row * 21);
 		fCollapsedPosition = Frame().LeftTop();
 	}
 
@@ -1497,7 +1497,7 @@ private:
 		BRect screen = BScreen(this).Frame();
 		BPoint position;
 		if (expanded)
-			position = BPoint(Frame().left - 1, Frame().top - 22);
+			position = BPoint(Frame().left - 1, Frame().top - 18);
 		else {
 			if (!fPopupTab->Lock())
 				return;
