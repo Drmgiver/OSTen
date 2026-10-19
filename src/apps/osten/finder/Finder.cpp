@@ -1559,7 +1559,7 @@ public:
 
 		// The scrolling region now reaches the size box; its backing
 		// footer only covers the remaining narrow bottom-edge inset.
-		BRect footer(7, Bounds().bottom - 9, Bounds().right - 7,
+		BRect footer(7, Bounds().bottom - 8, Bounds().right - 7,
 			Bounds().bottom - 7);
 		BView* footerView = new BView(footer, "Finder lower inset",
 			B_FOLLOW_LEFT_RIGHT | B_FOLLOW_BOTTOM, B_WILL_DRAW);
@@ -1600,9 +1600,9 @@ public:
 			_SaveFrame();
 	}
 
-	// WindowShade retains the Platinum title and just enough of the client
-	// frame for its resize corner. Temporarily relax normal minimum size limits
-	// so the window can shrink to its tab instead of remaining a wide strip.
+	// WindowShade collapses the client to zero height. MacDecorator treats
+	// that geometry as tab-only: no frame, scrollbars, or resize corner.
+	// The normal size limits are restored when the folder is unshaded.
 	void Minimize(bool minimize) override
 	{
 		if (!minimize && !fShaded)
@@ -1626,7 +1626,7 @@ public:
 			float titleWidth = be_bold_font->StringWidth(Title());
 			float tabWidth = std::min(240.0f,
 				std::max(105.0f, titleWidth + 80.0f));
-			ResizeTo(std::max(93.0f, tabWidth - 12.0f), 14);
+			ResizeTo(std::max(93.0f, tabWidth - 12.0f), 0);
 		}
 	}
 
@@ -1758,14 +1758,14 @@ private:
 	{
 		if (fScrollView == NULL)
 			return;
-		// In list view, the header meets the inside top/left edges; icons
-		// keep their classic inset. Both modes share the same right/bottom
-		// geometry so the vertical scrollbar ends immediately above the
-		// Platinum resize corner instead of floating in a white gutter.
-		const float inset = fView->IsListMode() ? 0.0f : 7.0f;
+		// Both modes place the scrollbar against the top inner edge.
+		// List View also meets the left edge with its header; Icon View
+		// retains a seven-pixel left inset for its contents. The lower end
+		// meets the Platinum size box without a white gap.
+		const float leftInset = fView->IsListMode() ? 0.0f : 7.0f;
 		const BRect bounds = Bounds();
-		const BRect desired(inset, inset, bounds.right,
-			bounds.bottom - 10.0f);
+		const BRect desired(leftInset, 0.0f, bounds.right,
+			bounds.bottom - 9.0f);
 		const BRect current = fScrollView->Frame();
 		if (current == desired)
 			return;
