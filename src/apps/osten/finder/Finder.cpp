@@ -71,7 +71,7 @@ const float kFinderClientMinTop = 54;
 // Compact three-icon-wide classic Mac pop-up drawer, independent of its
 // regular Finder window geometry.
 const float kPopupDrawerWidth = 314;
-const float kPopupDrawerHeight = 124;
+const float kPopupDrawerHeight = 252;
 
 // Finder-local Owner permission. Reset to locked whenever Finder restarts.
 static std::atomic<bool> sSystemFolderUnlocked(false);
@@ -1499,7 +1499,7 @@ private:
 		float left = std::max(screen.left + 7,
 			std::min(tab.left, screen.right - Frame().Width() - 7));
 		float top = std::max(kFinderClientMinTop,
-			tab.top - Frame().Height() - 1);
+			screen.bottom - 7 - Frame().Height());
 		fPopupMoving = true;
 		MoveTo(left, top);
 		fPopupMoving = false;
