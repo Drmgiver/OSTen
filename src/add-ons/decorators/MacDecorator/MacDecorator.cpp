@@ -236,16 +236,16 @@ MacDecorator::_DoLayout()
 
 	fBorderRect = fFrame.InsetByCopy(-fBorderWidth, -fBorderWidth);
 
-	// Integrate the classic Macintosh size box into the existing Platinum
-	// frame. Its right and bottom edges share the frame's outside edges:
-	// unlike the old position, it cannot hang off the window into desktop.
-	// The 16-pixel box overlaps the inner corner; OSTen Finder reserves this
-	// space below its vertical scroller. Fixed-size windows have no box.
+	// Keep the classic Macintosh size box flush with the outer right
+	// and bottom edges, but extend only its LEFT edge to align with the
+	// vertical scrollbar. The old 16-pixel box started seven pixels too
+	// far right, leaving a step at the scrollbar/resize-box junction.
+	// Do not change the box's top or bottom: their alignment is correct.
 	fResizeRect.Set(0, 0, -1, -1);
 	if (!_IsTabOnly() && fTopTab != NULL && hasTab
 		&& (fTopTab->flags & (B_NOT_RESIZABLE | B_NOT_H_RESIZABLE
 			| B_NOT_V_RESIZABLE)) == 0) {
-		fResizeRect.Set(fBorderRect.right - 15, fBorderRect.bottom - 15,
+		fResizeRect.Set(fBorderRect.right - 22, fBorderRect.bottom - 15,
 			fBorderRect.right, fBorderRect.bottom);
 	}
 
