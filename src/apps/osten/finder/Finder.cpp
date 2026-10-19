@@ -71,7 +71,7 @@ const float kFinderClientMinTop = 54;
 // Compact three-icon-wide classic Mac pop-up drawer, independent of its
 // regular Finder window geometry.
 const float kPopupDrawerWidth = 314;
-const float kPopupDrawerHeight = 252;
+const float kPopupDrawerHeight = 124;
 
 // Finder-local Owner permission. Reset to locked whenever Finder restarts.
 static std::atomic<bool> sSystemFolderUnlocked(false);
@@ -1156,7 +1156,7 @@ public:
 		StrokeArc(BRect(r.right - 12, r.top, r.right, r.top + 12), 0, 90);
 		StrokeLine(BPoint(r.right, r.top + 6), r.RightBottom());
 		SetHighColor(255, 255, 255);
-		StrokeLine(BPoint(1, r.bottom - 1), BPoint(1, 2));
+		StrokeLine(BPoint(2, r.bottom - 1), BPoint(2, 7));
 		SetHighColor(45, 45, 45);
 		DrawString(fTitle.String(), BPoint(8, 15));
 	}
@@ -1478,7 +1478,7 @@ private:
 		BRect screen = BScreen(this).Frame();
 		BPoint position;
 		if (expanded)
-			position = BPoint(Frame().left, Frame().top - 22);
+			position = BPoint(Frame().left - 1, Frame().top - 22);
 		else {
 			if (!fPopupTab->Lock())
 				return;
