@@ -25,6 +25,7 @@
 #include <Window.h>
 
 #include "AboutComputer.h"
+#include "ControlStrip.h"
 #include "OSTenMessages.h"
 #include "SystemExtras.h"
 #include "OSTenWordmark.h"
@@ -513,6 +514,8 @@ public:
 	{
 		fBar = new SystemBar();
 		fBar->Show();
+        fControlStrip = CreateOSTenControlStrip();
+        fControlStrip->Show();
 	}
 
 	void MessageReceived(BMessage* message) override
@@ -529,6 +532,7 @@ public:
 	}
 private:
 	SystemBar* fBar = NULL;
+    BWindow* fControlStrip = NULL;
 };
 
 } // namespace
