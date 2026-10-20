@@ -168,10 +168,12 @@ private:
     {
         BRect screen = BScreen().Frame();
         const float width = _Width(collapsed);
-        // Classic Macintosh: fixed left edge, extending right on expansion.
-        // Mid-screen placement avoids Finder's bottom-row pop-up folder tabs.
+        // Finder's first collapsed tab begins at screen.bottom - 20.
+        // Position the Control Strip directly above that row with a 6px gap,
+        // retaining the classic fixed-left edge and rightward expansion.
         const float left = screen.left + 5;
-        const float top = screen.top + (screen.Height() - kStripHeight) / 2;
+        const float tabTop = screen.bottom - 20;
+        const float top = tabTop - 6 - kStripHeight;
         return BRect(left, top, left + width - 1,
             top + kStripHeight - 1);
     }
