@@ -45,7 +45,7 @@ class StripView : public BView {
 public:
     explicit StripView(BRect frame)
         : BView(frame, "OSTen Control Strip", B_FOLLOW_ALL,
-            B_WILL_DRAW | B_FRAME_EVENTS), fCollapsed(false)
+            B_WILL_DRAW | B_FRAME_EVENTS), fCollapsed(true)
     {
         SetViewColor(B_TRANSPARENT_COLOR);
     }
@@ -129,12 +129,12 @@ private:
 class ControlStripWindow : public BWindow {
 public:
     ControlStripWindow()
-        : BWindow(_Frame(false), "Control Strip",
+        : BWindow(_Frame(true), "Control Strip",
             B_NO_BORDER_WINDOW_LOOK, B_FLOATING_ALL_WINDOW_FEEL,
             B_NOT_CLOSABLE | B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE
                 | B_NOT_RESIZABLE | B_NOT_MOVABLE
                 | B_WILL_ACCEPT_FIRST_CLICK),
-          fView(NULL), fCollapsed(false)
+          fView(NULL), fCollapsed(true)
     {
         fView = new StripView(Bounds());
         AddChild(fView);
