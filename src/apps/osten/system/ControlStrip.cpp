@@ -169,11 +169,11 @@ private:
         BRect screen = BScreen().Frame();
         const float width = _Width(collapsed);
         // Finder's first collapsed tab begins at screen.bottom - 20.
-        // Position the Control Strip directly above that row with a 6px gap,
+        // Position the Control Strip just above that row with a 2px gap,
         // retaining the classic fixed-left edge and rightward expansion.
         const float left = screen.left + 5;
         const float tabTop = screen.bottom - 20;
-        const float top = tabTop - 6 - kStripHeight;
+        const float top = tabTop - 2 - kStripHeight;
         return BRect(left, top, left + width - 1,
             top + kStripHeight - 1);
     }
