@@ -168,14 +168,12 @@ private:
     {
         BRect screen = BScreen().Frame();
         const float width = _Width(collapsed);
-        // Anchor at the right edge, halfway down the screen. Finder's
-        // collapsed pop-up tabs reserve the bottom edge starting at x=6;
-        // the Control Strip must never occupy their row. Expanding and
-        // collapsing preserve the same right edge, classic Mac-style.
-        const float right = screen.right - 8;
+        // Classic Macintosh: fixed left edge, extending right on expansion.
+        // Mid-screen placement avoids Finder's bottom-row pop-up folder tabs.
+        const float left = screen.left + 5;
         const float top = screen.top + (screen.Height() - kStripHeight) / 2;
-        return BRect(right - width + 1, top,
-            right, top + kStripHeight - 1);
+        return BRect(left, top, left + width - 1,
+            top + kStripHeight - 1);
     }
 
     StripView* fView;
