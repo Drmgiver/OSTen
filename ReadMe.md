@@ -1,61 +1,59 @@
-Haiku
-=======================
-**[Homepage](https://www.haiku-os.org/)
-| [Mailing Lists](https://www.haiku-os.org/community/ml)
-| [IRC Channels](https://www.haiku-os.org/community/irc)
-| [Issue Tracker](https://dev.haiku-os.org/)
-| [API docs](https://api.haiku-os.org)**
+# OSTen
 
-Haiku is an open-source operating system that specifically targets personal
-computing. Inspired by the BeOS, Haiku is fast, simple to use, easy to learn
-and yet very powerful.
+**The classic Macintosh road not taken.**
 
-Goals
-------------
- * Sensible defaults with minimal configuration required.
- * Clean, clear, concise code.
- * Unified desktop environment.
+> **What if Apple had acquired BeOS instead of NeXT?**
 
-Trying Haiku
----------------
-Haiku provides pre-built [nightly images](http://download.haiku-os.org/) and
-[release images](https://www.haiku-os.org/get-haiku). Haiku is compatible
-with a large variety of hardware, but in case you don't want to "take the
-plunge" and install Haiku on bare metal, you can install it on a virtual
-machine (VM) instead. If you've never used a VM before, you can follow one of
-the ["Emulating Haiku"](https://www.haiku-os.org/guides/virtualizing/) guides.
+OSTen explores an alternate progression of the classic Macintosh operating system: the familiar, direct, spatial experience of **Mac OS 8**, evolving on a technical foundation inspired by **BeOS** rather than the NeXT-derived path that led to Mac OS X.
 
-Compiling Haiku
----------------
-See `ReadMe.Compiling`.
+It's a design thought experiment, not a claim about what Apple would actually have built. The goal is to carry the classic Mac approach forward without preserving the limitations of the original system.
 
-Contributing
--------------------
-Haiku is a meritocratic open source project with a large variety of tasks. Even
-if you can't write code, *you can still help*! Haiku needs designers,
-(technical) writers, translators, testers... [Get involved](https://www.haiku-os.org/community/getting-involved/)
-and help out!
+OSTen is an independent, open-source operating-system project **built on Haiku**, the modern open-source successor to the BeOS tradition. Haiku supplies the underlying system foundation; OSTen develops its own Mac-inspired desktop, Finder, system interface, and behavior. It is not an Apple product or a skin for macOS.
 
-### Contributing code
-If you're submitting a patch to us, please make sure you're following the
-[patch submitting guidelines](https://dev.haiku-os.org/wiki/CodingGuidelines/SubmittingPatches).
+## Status: early alpha
 
-If you're having trouble finding something in the source tree, you can use
-one of our web-based source code browsers:
+**OSTen boots as a development preview in x86-64 QEMU.** The desktop is real and under active development, but this is **not a stable release** or a recommendation for daily use.
 
- * https://grok.nikisoft.one/opengrok/ (OpenGrok, provided by Niklas Poslovski)
- * https://git.haiku-os.org/ (git, provided by Haiku, Inc.)
+### Present in the development preview
 
-### Contributing documentation
-The main piece of documentation that still needs work are the API docs (found
-in the tree at `docs/user`). Just find an undocumented class, write
-documentation for it, and [submit a patch](https://dev.haiku-os.org/wiki/CodingGuidelines/SubmittingPatches).
+- **OSTen System:** a global menu bar with classic Mac-style commands, application switching, clock, and system controls.
+- **OSTen Finder:** spatial folder windows, desktop icons, and file operations.
+- **Classic window behavior:** custom window decoration, WindowShade, and dockable Finder pop-up folder tabs.
+- **Desktop artwork:** custom hard disk and empty/full Trash icons.
+- **System Folder:** a visible system directory, with an explicit **Special → System Folder Access…** lock/unlock mechanism in Finder.
+- **Control Strip:** a collapsible accessory above the Finder pop-up tabs, with its own `Control Strip Modules` folder. **The current module controls are placeholders**, not finished system integrations.
 
-### Contributing translations
-See [wiki:i18n](https://dev.haiku-os.org/wiki/i18n).
+### Still being developed
 
-### Contributing software ports
-See [HaikuPorts](https://github.com/haikuports/haikuports/).
+- Working Control Strip modules for sound, display, networking, power, Bluetooth, storage, and settings.
+- External module discovery and loading.
+- Complete, consistent desktop keyboard shortcuts and further Finder polish.
+- Native applications, deeper system integration, testing, and release readiness.
 
-### Contributing to our infrastructure
-See [Infrastructure](https://github.com/haiku/infrastructure/).
+This list describes the current direction, not a promise that unfinished features already work.
+
+## Source and development
+
+**The active OSTen development branch is [`osten/main`](https://github.com/Drmgiver/OSTen/tree/osten/main).** The repository's `master` branch is the Haiku baseline; it is **not** where OSTen desktop development takes place.
+
+To check out the active code:
+
+```bash
+git clone --branch osten/main https://github.com/Drmgiver/OSTen.git
+```
+
+- [Build OSTen and run it in QEMU](https://github.com/Drmgiver/OSTen/blob/osten/main/docs/osten/Building.md) — includes historical baseline steps and the current OSTen preview profile.
+- [OSTen preview builds and boot checks](https://github.com/Drmgiver/OSTen/actions/workflows/osten-preview.yml) — GitHub Actions produces development images and test evidence; artifacts are temporary.
+- [Project charter and design direction](https://github.com/Drmgiver/OSTen/blob/osten/main/docs/osten/Project.md).
+
+Please treat development previews as experimental, and report reproducible bugs with the build/commit used.
+
+## Philosophy
+
+The familiar parts of the classic Mac weren't just decorations. Spatial windows, direct manipulation, visible files, a coherent system menu, and a user-understandable System Folder were an approach to personal computing. OSTen aims to revisit that approach with a more modern technical foundation, not reproduce the old operating system byte-for-byte.
+
+## Acknowledgements and licensing
+
+OSTen stands on the work of the [Haiku project](https://www.haiku-os.org/) and the BeOS tradition. Apple's classic Macintosh system software is an important design inspiration. **OSTen is independent of and not endorsed by Apple, Haiku, or the former Be Inc.**
+
+Inherited source code retains its applicable upstream licenses and notices. Check individual file headers and the [project charter](https://github.com/Drmgiver/OSTen/blob/osten/main/docs/osten/Project.md) for licensing intentions and attribution; the OSTen name and logo remain project identifiers.
