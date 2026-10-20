@@ -214,11 +214,31 @@ CreateDesktopArtworkBitmap(int kind)
         }
         const uint8* c = palette + 4 * index;
         float a = c[3] / 255.0f;
-        // The older palette contains white background specks at translucent
-        // silhouette edges; suppress them, never the solid interior highlights.
-        if (kind != 0 && a < 0.98f && c[0] > 190
-            && c[1] > 190 && c[2] > 190)
-            a = 0;
+        // Trim the old light matte only at the Trash silhouette. A bright
+        // interior highlight must survive; bright pixels adjacent to the
+        // transparent exterior must not become white corner artifacts.
+        if (kind != 0) {
+            bool touchesExterior = false;
+            for (int dy = -1; dy <= 1 && !touchesExterior; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    int nx = x + dx, ny = y + dy;
+                    if (nx < 0 || ny < 0 || nx >= kDesktopArtworkSize
+                        || ny >= kDesktopArtworkSize) {
+                        touchesExterior = true;
+                        break;
+                    }
+                    uint8 neighbor = indices[ny * kDesktopArtworkSize + nx];
+                    if (neighbor >= kDesktopArtworkColors
+                        || palette[neighbor * 4 + 3] < 32) {
+                        touchesExterior = true;
+                        break;
+                    }
+                }
+            }
+            if (touchesExterior && c[0] > 180 && c[1] > 180
+                && c[2] > 180)
+                a = 0;
+        }
         out[0] = c[0] * a;
         out[1] = c[1] * a;
         out[2] = c[2] * a;
@@ -247,6 +267,34 @@ CreateDesktopArtworkBitmap(int kind)
             for (int i = 0; i < 3; i++) {
                 int c = alpha > 0.001f ? (int)(value[i] / alpha + 0.5f) : 0;
                 out[2 - i] = (uint8)std::max(0, std::min(c, 255));
+            }
+        }
+    }
+    // Restore definition lost in the original 24px hard disk source.
+    // Only sharpen RGB on opaque disk pixels, retaining soft silhouette
+    // antialiasing and leaving the Trash can surfaces untouched.
+    if (kind == 0) {
+        const int32 stride = bitmap->BytesPerRow();
+        std::vector<uint8> snapshot(dest,
+            dest + outputSize * stride);
+        for (int y = 1; y < outputSize - 1; y++) {
+            for (int x = 1; x < outputSize - 1; x++) {
+                const uint8* center = &snapshot[y * stride + x * 4];
+                if (center[3] < 245)
+                    continue;
+                uint8* target = dest + y * stride + x * 4;
+                for (int channel = 0; channel < 3; channel++) {
+                    int neighbors = snapshot[y * stride + (x-1)*4 + channel]
+                        + snapshot[y * stride + (x+1)*4 + channel]
+                        + snapshot[(y-1)*stride + x*4 + channel]
+                        + snapshot[(y+1)*stride + x*4 + channel];
+                    // Conservative unsharp mask: emphasize the drive's
+                    // platter ring, slot, activity light, and enclosure.
+                    int value = (int)(center[channel] * 1.45f
+                        - neighbors * 0.1125f + 0.5f);
+                    target[channel] = (uint8)std::max(0,
+                        std::min(value, 255));
+                }
             }
         }
     }
