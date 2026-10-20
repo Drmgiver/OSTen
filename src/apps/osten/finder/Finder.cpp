@@ -42,6 +42,7 @@
 #include "IconArtwork.h"
 #include "DesktopArtwork.h"
 #include "DiskArtwork48.h"
+#include "HighResDesktopArtwork.h"
 
 
 namespace {
@@ -350,6 +351,38 @@ CreateHighResolutionDiskBitmap()
     return bitmap;
 }
 
+// True 48x48 RGBA artwork, decoded without palette quantization, warping,
+// interpolation, or alpha heuristics. The approved assets already contain
+// antialiased transparent silhouettes.
+static BBitmap*
+CreateNativeDesktopBitmap(int kind)
+{
+    const char* encoded = kind == 0 ? kOSTenDiskRGBA
+        : (kind == 1 ? kOSTenTrashEmptyRGBA : kOSTenTrashFullRGBA);
+    uint8 pixels[kOSTenDesktopAssetSize * kOSTenDesktopAssetSize * 4];
+    if (!DecodeBase64(encoded, pixels, sizeof(pixels)))
+        return NULL;
+    BBitmap* bitmap = new BBitmap(BRect(0, 0,
+        kOSTenDesktopAssetSize - 1, kOSTenDesktopAssetSize - 1), B_RGBA32);
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        return NULL;
+    }
+    uint8* target = (uint8*)bitmap->Bits();
+    const int stride = bitmap->BytesPerRow();
+    for (int y = 0; y < kOSTenDesktopAssetSize; y++) {
+        for (int x = 0; x < kOSTenDesktopAssetSize; x++) {
+            const uint8* rgba = pixels + (y * kOSTenDesktopAssetSize + x) * 4;
+            uint8* bgra = target + y * stride + x * 4;
+            bgra[0] = rgba[2];
+            bgra[1] = rgba[1];
+            bgra[2] = rgba[0];
+            bgra[3] = rgba[3];
+        }
+    }
+    return bitmap;
+}
+
 static const BBitmap*
 DesktopArtworkBitmap(int kind)
 {
@@ -357,8 +390,7 @@ DesktopArtworkBitmap(int kind)
     static BBitmap* bitmaps[3] = { NULL, NULL, NULL };
     std::call_once(once, []() {
         for (int i = 0; i < 3; i++)
-            bitmaps[i] = i == 0 ? CreateHighResolutionDiskBitmap()
-                : CreateDesktopArtworkBitmap(i);
+            bitmaps[i] = CreateNativeDesktopBitmap(i);
     });
     return bitmaps[kind];
 }
