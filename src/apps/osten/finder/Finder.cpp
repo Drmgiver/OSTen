@@ -41,6 +41,7 @@
 #include "FinderActions.h"
 #include "IconArtwork.h"
 #include "DesktopArtwork.h"
+#include "DiskArtwork48.h"
 
 
 namespace {
@@ -301,6 +302,41 @@ CreateDesktopArtworkBitmap(int kind)
     return bitmap;
 }
 
+// Preserve the original Option D disk detail at native 48px resolution.
+// Do not resample the old 24px artwork and do not apply an unsharp mask.
+static BBitmap*
+CreateHighResolutionDiskBitmap()
+{
+    uint8 palette[kOSTenDiskColors * 4];
+    uint8 indices[kOSTenDiskSize * kOSTenDiskSize];
+    if (!DecodeBase64(kOSTenDiskArt.palette, palette, sizeof(palette))
+        || !DecodeBase64(kOSTenDiskArt.pixels, indices, sizeof(indices)))
+        return NULL;
+    BBitmap* bitmap = new BBitmap(BRect(0, 0,
+        kOSTenDiskSize - 1, kOSTenDiskSize - 1), B_RGBA32);
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        return NULL;
+    }
+    uint8* dest = (uint8*)bitmap->Bits();
+    for (int32 y = 0; y < kOSTenDiskSize; ++y) {
+        for (int32 x = 0; x < kOSTenDiskSize; ++x) {
+            uint8 index = indices[y * kOSTenDiskSize + x];
+            if (index >= kOSTenDiskColors) {
+                delete bitmap;
+                return NULL;
+            }
+            const uint8* rgba = palette + index * 4;
+            uint8* bgra = dest + y * bitmap->BytesPerRow() + x * 4;
+            bgra[0] = rgba[2];
+            bgra[1] = rgba[1];
+            bgra[2] = rgba[0];
+            bgra[3] = rgba[3];
+        }
+    }
+    return bitmap;
+}
+
 static const BBitmap*
 DesktopArtworkBitmap(int kind)
 {
@@ -308,7 +344,8 @@ DesktopArtworkBitmap(int kind)
     static BBitmap* bitmaps[3] = { NULL, NULL, NULL };
     std::call_once(once, []() {
         for (int i = 0; i < 3; i++)
-            bitmaps[i] = CreateDesktopArtworkBitmap(i);
+            bitmaps[i] = i == 0 ? CreateHighResolutionDiskBitmap()
+                : CreateDesktopArtworkBitmap(i);
     });
     return bitmaps[kind];
 }
