@@ -180,33 +180,74 @@ ArtworkBitmap(OSTenIcon kind)
 }
 
 // Decode the approved 24x24 Option D disk and mesh Trash pixel artwork.
+// Convert legacy indexed artwork into premultiplied-alpha, bilinearly
+// resampled desktop bitmaps. The old 24px decoder enlarged hard pixel blocks.
+// The resampling also eliminates bright background-matte artifacts on Trash.
 static BBitmap*
 CreateDesktopArtworkBitmap(int kind)
 {
     uint8 palette[kDesktopArtworkColors * 4];
-    uint8 pixels[kDesktopArtworkSize * kDesktopArtworkSize];
+    uint8 indices[kDesktopArtworkSize * kDesktopArtworkSize];
     const OSTenArtwork& artwork = kDesktopArtwork[kind];
     if (!DecodeBase64(artwork.palette, palette, sizeof(palette))
-        || !DecodeBase64(artwork.pixels, pixels, sizeof(pixels)))
+        || !DecodeBase64(artwork.pixels, indices, sizeof(indices)))
         return NULL;
-    BBitmap* bitmap = new BBitmap(BRect(0, 0,
-        kDesktopArtworkSize - 1, kDesktopArtworkSize - 1), B_RGBA32);
+
+    // Construct a 72px bitmap before drawing to the desktop, so the
+    // screen-size downsampling is smooth instead of blocky nearest-neighbor.
+    const int32 outputSize = 72;
+    BBitmap* bitmap = new BBitmap(BRect(0, 0, outputSize - 1,
+        outputSize - 1), B_RGBA32);
     if (bitmap->InitCheck() != B_OK) {
         delete bitmap;
         return NULL;
     }
-    uint8* bytes = (uint8*)bitmap->Bits();
-    for (int y = 0; y < kDesktopArtworkSize; y++) {
-        for (int x = 0; x < kDesktopArtworkSize; x++) {
-            uint8 i = pixels[y * kDesktopArtworkSize + x];
-            if (i >= kDesktopArtworkColors) {
-                delete bitmap;
-                return NULL;
+
+    auto pixelAt = [&](int x, int y, float* out) {
+        x = std::max(0, std::min(x, kDesktopArtworkSize - 1));
+        y = std::max(0, std::min(y, kDesktopArtworkSize - 1));
+        uint8 index = indices[y * kDesktopArtworkSize + x];
+        if (index >= kDesktopArtworkColors) {
+            for (int i = 0; i < 4; i++)
+                out[i] = 0;
+            return;
+        }
+        const uint8* c = palette + 4 * index;
+        float a = c[3] / 255.0f;
+        // The older palette contains white background specks at translucent
+        // silhouette edges; suppress them, never the solid interior highlights.
+        if (kind != 0 && a < 0.98f && c[0] > 190
+            && c[1] > 190 && c[2] > 190)
+            a = 0;
+        out[0] = c[0] * a;
+        out[1] = c[1] * a;
+        out[2] = c[2] * a;
+        out[3] = a;
+    };
+
+    uint8* dest = (uint8*)bitmap->Bits();
+    for (int y = 0; y < outputSize; y++) {
+        for (int x = 0; x < outputSize; x++) {
+            float sx = (x + 0.5f) * kDesktopArtworkSize / outputSize - 0.5f;
+            float sy = (y + 0.5f) * kDesktopArtworkSize / outputSize - 0.5f;
+            int x0 = (int)floorf(sx), y0 = (int)floorf(sy);
+            float fx = sx - x0, fy = sy - y0;
+            float c00[4], c10[4], c01[4], c11[4];
+            pixelAt(x0, y0, c00);
+            pixelAt(x0 + 1, y0, c10);
+            pixelAt(x0, y0 + 1, c01);
+            pixelAt(x0 + 1, y0 + 1, c11);
+            float value[4];
+            for (int i = 0; i < 4; i++)
+                value[i] = (1 - fy) * ((1 - fx) * c00[i] + fx * c10[i])
+                    + fy * ((1 - fx) * c01[i] + fx * c11[i]);
+            const float alpha = std::max(0.0f, std::min(1.0f, value[3]));
+            uint8* out = dest + y * bitmap->BytesPerRow() + x * 4;
+            out[3] = (uint8)(alpha * 255 + 0.5f);
+            for (int i = 0; i < 3; i++) {
+                int c = alpha > 0.001f ? (int)(value[i] / alpha + 0.5f) : 0;
+                out[2 - i] = (uint8)std::max(0, std::min(c, 255));
             }
-            const uint8* rgba = palette + i * 4;
-            uint8* bgra = bytes + y * bitmap->BytesPerRow() + x * 4;
-            bgra[0] = rgba[2]; bgra[1] = rgba[1];
-            bgra[2] = rgba[0]; bgra[3] = rgba[3];
         }
     }
     return bitmap;
