@@ -215,6 +215,18 @@ CreateDesktopArtworkBitmap(int kind)
         }
         const uint8* c = palette + 4 * index;
         float a = c[3] / 255.0f;
+        // Never render the original screenshot's white canvas into Trash.
+        // The side fringe survives in fully opaque palette entries, so the
+        // old partial-alpha-only filter cannot remove it.
+        if (kind != 0 && a > 0.0f) {
+            bool outside = false;
+            // The 24px basket silhouette is inset at the first/last columns.
+            if ((x <= 1 || x >= kDesktopArtworkSize - 2)
+                && (c[0] > 160 && c[1] > 160 && c[2] > 160))
+                outside = true;
+            if (outside)
+                a = 0;
+        }
         // Trim the old light matte only at the Trash silhouette. A bright
         // interior highlight must survive; bright pixels adjacent to the
         // transparent exterior must not become white corner artifacts.
@@ -271,30 +283,26 @@ CreateDesktopArtworkBitmap(int kind)
             }
         }
     }
-    // Restore definition lost in the original 24px hard disk source.
-    // Only sharpen RGB on opaque disk pixels, retaining soft silhouette
-    // antialiasing and leaving the Trash can surfaces untouched.
-    if (kind == 0) {
+    // Native disk artwork bypasses this fallback entirely. For the Trash,
+    // retain crisp vertical bars while keeping a soft antialiased outline.
+    if (kind != 0) {
         const int32 stride = bitmap->BytesPerRow();
-        std::vector<uint8> snapshot(dest,
-            dest + outputSize * stride);
+        std::vector<uint8> saved(dest, dest + outputSize * stride);
         for (int y = 1; y < outputSize - 1; y++) {
             for (int x = 1; x < outputSize - 1; x++) {
-                const uint8* center = &snapshot[y * stride + x * 4];
-                if (center[3] < 245)
+                uint8* pixel = dest + y * stride + x * 4;
+                const uint8* original = &saved[y * stride + x * 4];
+                if (original[3] < 250)
                     continue;
-                uint8* target = dest + y * stride + x * 4;
                 for (int channel = 0; channel < 3; channel++) {
-                    int neighbors = snapshot[y * stride + (x-1)*4 + channel]
-                        + snapshot[y * stride + (x+1)*4 + channel]
-                        + snapshot[(y-1)*stride + x*4 + channel]
-                        + snapshot[(y+1)*stride + x*4 + channel];
-                    // Conservative unsharp mask: emphasize the drive's
-                    // platter ring, slot, activity light, and enclosure.
-                    int value = (int)(center[channel] * 1.45f
-                        - neighbors * 0.1125f + 0.5f);
-                    target[channel] = (uint8)std::max(0,
-                        std::min(value, 255));
+                    int neighbors =
+                        saved[y * stride + (x - 1) * 4 + channel]
+                        + saved[y * stride + (x + 1) * 4 + channel]
+                        + saved[(y - 1) * stride + x * 4 + channel]
+                        + saved[(y + 1) * stride + x * 4 + channel];
+                    const int v = (int)(1.25f * original[channel]
+                        - 0.0625f * neighbors + 0.5f);
+                    pixel[channel] = (uint8)std::max(0, std::min(255, v));
                 }
             }
         }
@@ -332,6 +340,11 @@ CreateHighResolutionDiskBitmap()
             bgra[1] = rgba[1];
             bgra[2] = rgba[0];
             bgra[3] = rgba[3];
+            // Remove malformed left-over lower-left scanline data without
+            // moving the upper platter or touching the activity light.
+            if (y >= 30 && x < 8) {
+                bgra[0] = bgra[1] = bgra[2] = bgra[3] = 0;
+            }
         }
     }
     return bitmap;
