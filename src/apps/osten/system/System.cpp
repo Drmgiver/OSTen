@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 
 #include <Alert.h>
+#include <fs_utils.h>
 #include <MimeType.h>
 #include <PopUpMenu.h>
 #include <algorithm>
@@ -512,7 +513,10 @@ public:
 
 	void ReadyToRun() override
 	{
-		fBar = new SystemBar();
+		// Reserve a user-visible home for independent Control Strip modules.
+        // Built-in modules remain compiled into OSTen System for now.
+        create_directory("/boot/System Folder/Control Strip Modules", 0755);
+        fBar = new SystemBar();
 		fBar->Show();
         fControlStrip = CreateOSTenControlStrip();
         fControlStrip->Show();
