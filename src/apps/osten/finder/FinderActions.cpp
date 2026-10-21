@@ -2,6 +2,7 @@
 
 #include "FinderActions.h"
 #include "FileOperations.h"
+#include "OSTenResources.h"
 #include "OSTenMessages.h"
 
 #include <Alert.h>
@@ -32,23 +33,31 @@ public:
         :
         // Use the look/feel constructor: the window_type overload would
         // mistake our modal feel for flags and our flags for workspaces.
-        BWindow(BRect(0, 0, 390, 155), "Rename",
+        BWindow(OSTenFinderResources().Rect("dialog.rename.frame",
+                BRect(0, 0, 390, 155)),
+            OSTenFinderResources().String("dialog.rename.title", "Rename"),
             B_TITLED_WINDOW_LOOK, B_MODAL_APP_WINDOW_FEEL,
             B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE),
         fRef(ref),
         fOwnerUnlocked(ownerUnlocked)
     {
+        const OSTenResourceCatalog& ui = OSTenFinderResources();
         BEntry entry(&ref, false);
         char name[B_FILE_NAME_LENGTH] = "";
         entry.GetName(name);
-        fName = new BTextControl(BRect(20, 27, 365, 57), "name",
-            "Name:", name, NULL);
-        fName->SetDivider(56);
+        fName = new BTextControl(ui.Rect("dialog.rename.input",
+                BRect(20, 27, 365, 57)), "name",
+            ui.String("dialog.rename.label", "Name:"), name, NULL);
+        fName->SetDivider(ui.Number("dialog.rename.divider", 56, 20, 140));
         AddChild(fName);
-        BButton* cancel = new BButton(BRect(185, 100, 268, 129),
-            "cancel", "Cancel", new BMessage(kRenameCancel));
-        BButton* rename = new BButton(BRect(278, 100, 370, 129),
-            "rename", "Rename", new BMessage(kRenameAccept));
+        BButton* cancel = new BButton(ui.Rect("dialog.rename.cancel_frame",
+                BRect(185, 100, 268, 129)), "cancel",
+            ui.String("dialog.rename.cancel", "Cancel"),
+            new BMessage(kRenameCancel));
+        BButton* rename = new BButton(ui.Rect("dialog.rename.ok_frame",
+                BRect(278, 100, 370, 129)), "rename",
+            ui.String("dialog.rename.ok", "Rename"),
+            new BMessage(kRenameAccept));
         AddChild(cancel);
         AddChild(rename);
         SetDefaultButton(rename);
@@ -78,7 +87,7 @@ public:
                 details << "An item with this name already exists.";
             else
                 details << strerror(error);
-            (new BAlert("Rename", details.String(), "OK"))->Go();
+            (new BAlert(OSTenFinderResources().String("dialog.rename.title", "Rename"), details.String(), "OK"))->Go();
             return;
         }
         BWindow::MessageReceived(message);
@@ -126,7 +135,7 @@ ShowFinderInfo(const entry_ref& ref)
     if (S_ISREG(information.st_mode))
         details << "Size: " << (int64)information.st_size << " bytes\n";
     details << "Modified: " << modified;
-    (new BAlert("Get Info", details.String(), "OK"))->Go();
+    (new BAlert(OSTenFinderResources().String("dialog.info.title", "Get Info"), details.String(), "OK"))->Go();
 }
 
 
