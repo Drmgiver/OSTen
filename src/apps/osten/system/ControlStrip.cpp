@@ -116,12 +116,21 @@ public:
             BPoint(bounds.right - 2, bounds.bottom - 2));
 
         SetHighColor(OSTenSystemResources().Color("color.strip.handle_text", rgb_color{25, 25, 28, 255}));
-        SetFont(be_bold_font);
-        DrawString(fCollapsed ? ">" : "<", BPoint(8, 20));
+        BFont handleFont = OSTenSystemResources().Font(
+            "strip.font.handle", be_bold_font);
+        SetFont(&handleFont);
+        DrawString(fCollapsed ? OSTenSystemResources().String(
+                "strip.handle.collapsed", ">")
+                : OSTenSystemResources().String("strip.handle.expanded", "<"),
+            BPoint(OSTenSystemResources().Number(
+                "strip.handle.label_x", 8, 1, 30),
+                OSTenSystemResources().Number("strip.text_baseline", 20, 10, 50)));
         if (fCollapsed)
             return;
 
-        SetFont(be_plain_font);
+        BFont moduleFont = OSTenSystemResources().Font(
+            "strip.font.modules", be_plain_font);
+        SetFont(&moduleFont);
         for (int i = 0; i < kModuleCount; ++i) {
             const float left = _HandleWidth() + i * _ModuleWidth();
             SetHighColor(OSTenSystemResources().Color("color.strip.divider", rgb_color{130, 130, 134, 255}));
@@ -134,7 +143,9 @@ public:
             const char* label = _ModuleText(module, "label",
                 kModules[module].shortLabel);
             const float width = StringWidth(label);
-            DrawString(label, BPoint(left + (_ModuleWidth() - width) / 2, 20));
+            DrawString(label, BPoint(left + (_ModuleWidth() - width) / 2,
+                OSTenSystemResources().Number(
+                    "strip.text_baseline", 20, 10, 50)));
         }
     }
 
@@ -162,9 +173,11 @@ public:
         menu->AddItem(info);
         if (index == kModuleCount - 1) {
             menu->AddSeparatorItem();
-            menu->AddItem(new BMenuItem("Collapse Control Strip",
+            menu->AddItem(new BMenuItem(OSTenSystemResources().String(
+                "strip.menu.collapse", "Collapse Control Strip"),
                 new BMessage(kToggleStrip)));
-            menu->AddItem(new BMenuItem("Hide Control Strip",
+            menu->AddItem(new BMenuItem(OSTenSystemResources().String(
+                "strip.menu.hide", "Hide Control Strip"),
                 new BMessage(kCloseStrip)));
         }
         menu->SetTargetForItems(Window());
