@@ -157,3 +157,11 @@ color.system_notices.1=120,120,120
 color.system_notices.2=24,24,24
 color.system_notifications_window.1=242,242,238
 color.system_notifications_window.2=255,255,255
+
+# Additional Control Strip editor controls
+strip.handle.collapsed=>
+strip.handle.expanded=<
+strip.handle.label_x=8
+strip.text_baseline=20
+strip.menu.collapse=Collapse Control Strip
+strip.menu.hide=Hide Control Strip
