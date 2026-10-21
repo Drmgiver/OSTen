@@ -2,6 +2,7 @@
 // Classic menu-bar controls, using Haiku's native roster and notifications.
 
 #include "SystemExtras.h"
+#include "OSTenResources.h"
 
 #include "FinderSwitcherIcon.h"
 
@@ -331,7 +332,8 @@ public:
         char text[128];
         strftime(text, sizeof(text), "%A, %B %d, %Y\n%I:%M:%S %p %Z",
             &clock);
-        (new BAlert("OSTen Clock", text, "OK"))->Go(NULL);
+        (new BAlert(OSTenSystemResources().String("dialog.clock.title", "OSTen Clock"), text,
+            OSTenSystemResources().String("dialog.ok", "OK")))->Go(NULL);
     }
 };
 
@@ -378,7 +380,8 @@ private:
 class NoticesWindow : public BWindow {
 public:
     NoticesWindow(const BMessenger& owner, BRect frame)
-        : BWindow(frame, "Notification Center", B_TITLED_WINDOW,
+        : BWindow(frame, OSTenSystemResources().String(
+                "notification.title", "Notification Center"), B_TITLED_WINDOW,
             B_NORMAL_WINDOW_FEEL, B_NOT_RESIZABLE | B_NOT_ZOOMABLE),
         fOwner(owner), fList(NULL)
     {
@@ -386,19 +389,27 @@ public:
             B_FOLLOW_ALL, B_WILL_DRAW);
         background->SetViewColor(242, 242, 238);
         AddChild(background);
-        fList = new BListView(BRect(12, 12, Bounds().right - 34,
-            Bounds().bottom - 60), "Recent notifications",
+        fList = new BListView(OSTenSystemResources().Rect(
+                "notification.list_frame",
+                BRect(12, 12, Bounds().right - 34,
+                    Bounds().bottom - 60)), "Recent notifications",
             B_SINGLE_SELECTION_LIST, B_FOLLOW_ALL);
         fList->SetViewColor(255, 255, 255);
         fList->SetInvocationMessage(new BMessage('osnd'));
         background->AddChild(new BScrollView("Notice history", fList,
             B_FOLLOW_ALL, 0, false, true));
-        background->AddChild(new BButton(BRect(14, Bounds().bottom - 42,
-            118, Bounds().bottom - 14), "Clear", "Clear All",
+        background->AddChild(new BButton(OSTenSystemResources().Rect(
+                "notification.clear_frame",
+                BRect(14, Bounds().bottom - 42,
+                    118, Bounds().bottom - 14)), "Clear",
+            OSTenSystemResources().String("notification.clear", "Clear All"),
             new BMessage(kOSTenClearNotices)));
-        background->AddChild(new BButton(BRect(Bounds().right - 166,
-            Bounds().bottom - 42, Bounds().right - 14, Bounds().bottom - 14),
-            "Test", "Test Notification", new BMessage(kOSTenTestNotice)));
+        background->AddChild(new BButton(OSTenSystemResources().Rect(
+                "notification.test_frame",
+                BRect(Bounds().right - 166, Bounds().bottom - 42,
+                    Bounds().right - 14, Bounds().bottom - 14)),
+            "Test", OSTenSystemResources().String("notification.test",
+                "Test Notification"), new BMessage(kOSTenTestNotice)));
     }
 
     bool QuitRequested() override
