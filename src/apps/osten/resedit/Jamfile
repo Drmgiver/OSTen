@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+SubDir HAIKU_TOP src apps osten resedit ;
+
+SubDirHdrs $(HAIKU_TOP) src apps osten ;
+
+Application OSTenResourceEditor :
+    ResourceEditor.cpp
+    : be [ TargetLibstdc++ ]
+    : ResourceEditor.rdef
+;
