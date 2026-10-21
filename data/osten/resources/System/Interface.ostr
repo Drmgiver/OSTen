@@ -137,3 +137,23 @@ notification.test.title=OSTen Notification Test
 notification.test.message=The native notification system is connected.
 notification.default_title=System Notification
 dialog.tray_diagnostics.title=System Tray Diagnostics
+
+# Menu accessories, clock and notification palette
+switcher.icon_frame=4,1,25,22
+switcher.title=Running Applications
+switcher.empty=No running applications
+clock.format=%a %I:%M %p
+clock.text_right_padding=7
+clock.text_baseline=17
+notification.notices=Notices
+notification.notices_count=Notices (%d)
+notification.text_left=9
+notification.text_baseline=17
+color.system_switcher.1=120,120,120
+color.system_switcher.2=85,85,85
+color.system_switcher.3=50,50,50
+color.system_clock.1=24,24,24
+color.system_notices.1=120,120,120
+color.system_notices.2=24,24,24
+color.system_notifications_window.1=242,242,238
+color.system_notifications_window.2=255,255,255
