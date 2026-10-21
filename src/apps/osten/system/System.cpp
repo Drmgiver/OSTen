@@ -30,6 +30,10 @@
 #include "OSTenMessages.h"
 #include "SystemExtras.h"
 #include "OSTenWordmark.h"
+#include "OSTenResources.h"
+#include <string>
+#include <sstream>
+#include <set>
 
 
 namespace {
@@ -90,6 +94,10 @@ protected:
 private:
     static BBitmap* _CreateLogo()
     {
+        BBitmap* override = OSTenSystemResources().Bitmap("wordmark",
+            kOSTenWordmarkWidth, kOSTenWordmarkHeight);
+        if (override != NULL)
+            return override;
         BBitmap* bitmap = new BBitmap(BRect(0, 0,
             kOSTenWordmarkWidth - 1, kOSTenWordmarkHeight - 1), B_RGBA32);
         if (bitmap->InitCheck() != B_OK) {
@@ -124,6 +132,101 @@ private:
 
 
 
+// Stable command IDs allow the visual Resource Editor to rearrange menus
+// without granting it permission to execute arbitrary code.
+struct OSTenActionDefinition {
+    const char* id;
+    const char* label;
+    const char* shortcutKey;
+    char defaultShortcut;
+    uint32 message;
+};
+static const OSTenActionDefinition kSystemActions[] = {
+    { "about", "About OSTen...", NULL, 0, kAboutOSTen },
+    { "restart", "Restart...", NULL, 0, kRestartOSTen },
+    { "shutdown", "Shut Down...", NULL, 0, kShutDownOSTen },
+    { "new_folder", "New Folder", "shortcut.new_folder", 'N', kOSTenNewFolder },
+    { "open", "Open", "shortcut.open", 'O', kOSTenOpen },
+    { "rename", "Rename...", NULL, 0, kOSTenRename },
+    { "get_info", "Get Info", "shortcut.get_info", 'I', kOSTenGetInfo },
+    { "close", "Close Window", "shortcut.close", 'W', kOSTenClose },
+    { "select_all", "Select All", "shortcut.select_all", 'A', kOSTenSelectAll },
+    { "view_icons", "as Icons", NULL, 0, kOSTenViewAsIcons },
+    { "view_list", "as List", NULL, 0, kOSTenViewAsList },
+    { "arrange_name", "Arrange by Name", NULL, 0, kOSTenArrangeName },
+    { "arrange_kind", "Arrange by Kind", NULL, 0, kOSTenArrangeKind },
+    { "clean_up", "Clean Up", NULL, 0, kOSTenCleanUp },
+    { "tray_diagnostics", "System Tray Diagnostics...", NULL, 0, kTrayDiagnostics },
+    { "empty_trash", "Empty Trash...", NULL, 0, kOSTenEmptyTrash },
+    { "toggle_popup", "Dock / Undock Pop-Up Folder", NULL, 0, kOSTenTogglePopupFolder },
+    { "system_folder_access", "System Folder Access...", NULL, 0, kOSTenSystemFolderAccess }
+};
+
+static BMenu*
+_ResourceMenu(const std::string& section, BMenuItem*& icons,
+    BMenuItem*& list)
+{
+    const OSTenResourceCatalog& resources = OSTenSystemResources();
+    const char* defaultItems = NULL;
+    const char* defaultTitle = NULL;
+    if (section == "system") {
+        defaultItems = "about,separator,restart,shutdown";
+        defaultTitle = "OSTen";
+    } else if (section == "file") {
+        defaultItems = "new_folder,separator,open,rename,get_info,close";
+        defaultTitle = "File";
+    } else if (section == "edit") {
+        defaultItems = "select_all";
+        defaultTitle = "Edit";
+    } else if (section == "view") {
+        defaultItems = "view_icons,view_list,separator,arrange_name,arrange_kind,clean_up";
+        defaultTitle = "View";
+    } else if (section == "special") {
+        defaultItems = "tray_diagnostics,empty_trash,toggle_popup,separator,system_folder_access";
+        defaultTitle = "Special";
+    } else
+        return NULL;
+
+    const std::string titleKey = "menu.title." + section;
+    const std::string itemsKey = "menu." + section;
+    BMenu* menu = new BMenu(resources.String(titleKey.c_str(), defaultTitle));
+    std::stringstream source(resources.String(itemsKey.c_str(), defaultItems));
+    std::string entry;
+    std::set<std::string> added;
+    while (std::getline(source, entry, ',')) {
+        if (entry == "separator") {
+            menu->AddSeparatorItem();
+            continue;
+        }
+        if (!added.insert(entry).second)
+            continue;
+        for (size_t i = 0; i < sizeof(kSystemActions) / sizeof(kSystemActions[0]); ++i) {
+            const OSTenActionDefinition& action = kSystemActions[i];
+            if (entry != action.id)
+                continue;
+            std::string labelKey = std::string("menu.item.") + action.id;
+            char shortcut = 0;
+            if (action.shortcutKey != NULL) {
+                const char* value = OSTenFinderResources().String(
+                    action.shortcutKey, "");
+                shortcut = strlen(value) == 1 ? value[0] : action.defaultShortcut;
+            }
+            BMenuItem* item = new BMenuItem(
+                resources.String(labelKey.c_str(), action.label),
+                new BMessage(action.message), shortcut);
+            menu->AddItem(item);
+            if (entry == "view_icons") {
+                icons = item;
+                icons->SetMarked(true);
+            } else if (entry == "view_list")
+                list = item;
+            break;
+        }
+    }
+    return menu;
+}
+
+
 class SystemBar : public BWindow {
 public:
 	SystemBar()
@@ -141,66 +244,30 @@ public:
 		// so a full-width BMenuBar would steal every Notices/Clock/Switcher
 		// click, even when those controls render over it.
 		BRect menuArea = Bounds();
-		menuArea.right -= 289;
+		menuArea.right -= OSTenSystemResources().Number(
+            "layout.menu.reserve", 289, 240, 500);
 		BMenuBar* bar = new BMenuBar(menuArea, "System menu bar",
 			B_FOLLOW_LEFT_TOP, B_ITEMS_IN_ROW, false);
-		BMenu* systemMenu = new BMenu("OSTen");
-		systemMenu->AddItem(new BMenuItem("About OSTen...",
-			new BMessage(kAboutOSTen)));
-		systemMenu->AddSeparatorItem();
-		systemMenu->AddItem(new BMenuItem("Restart...",
-			new BMessage(kRestartOSTen)));
-		systemMenu->AddItem(new BMenuItem("Shut Down...",
-			new BMessage(kShutDownOSTen)));
-		bar->AddItem(new OSTenLogoMenuItem(systemMenu));
-
-		BMenu* fileMenu = new BMenu("File");
-		fileMenu->AddItem(new BMenuItem("New Folder",
-			new BMessage(kOSTenNewFolder), 'N'));
-		fileMenu->AddSeparatorItem();
-		fileMenu->AddItem(new BMenuItem("Open",
-			new BMessage(kOSTenOpen), 'O'));
-		fileMenu->AddItem(new BMenuItem("Rename...",
-			new BMessage(kOSTenRename)));
-		fileMenu->AddItem(new BMenuItem("Get Info",
-			new BMessage(kOSTenGetInfo), 'I'));
-		fileMenu->AddItem(new BMenuItem("Close Window",
-			new BMessage(kOSTenClose), 'W'));
-		bar->AddItem(fileMenu);
-
-		BMenu* editMenu = new BMenu("Edit");
-		editMenu->AddItem(new BMenuItem("Select All",
-			new BMessage(kOSTenSelectAll), 'A'));
-		bar->AddItem(editMenu);
-
-		BMenu* viewMenu = new BMenu("View");
-		fIconsMenuItem = new BMenuItem("as Icons",
-			new BMessage(kOSTenViewAsIcons));
-		fListMenuItem = new BMenuItem("as List",
-			new BMessage(kOSTenViewAsList));
-		fIconsMenuItem->SetMarked(true);
-		viewMenu->AddItem(fIconsMenuItem);
-		viewMenu->AddItem(fListMenuItem);
-		viewMenu->AddSeparatorItem();
-		viewMenu->AddItem(new BMenuItem("Arrange by Name",
-			new BMessage(kOSTenArrangeName)));
-		viewMenu->AddItem(new BMenuItem("Arrange by Kind",
-			new BMessage(kOSTenArrangeKind)));
-		viewMenu->AddItem(new BMenuItem("Clean Up",
-			new BMessage(kOSTenCleanUp)));
-		bar->AddItem(viewMenu);
-
-		BMenu* specialMenu = new BMenu("Special");
-		specialMenu->AddItem(new BMenuItem("System Tray Diagnostics...",
-			new BMessage(kTrayDiagnostics)));
-		specialMenu->AddItem(new BMenuItem("Empty Trash...",
-			new BMessage(kOSTenEmptyTrash)));
-		specialMenu->AddItem(new BMenuItem("Dock / Undock Pop-Up Folder",
-			new BMessage(kOSTenTogglePopupFolder)));
-		specialMenu->AddSeparatorItem();
-		specialMenu->AddItem(new BMenuItem("System Folder Access...",
-			new BMessage(kOSTenSystemFolderAccess)));
-		bar->AddItem(specialMenu);
+        // The menu structure, labels, order and shortcuts come from editable
+        // System and Finder resource catalogs. Action IDs remain fixed.
+        const OSTenResourceCatalog& resources = OSTenSystemResources();
+        const char* order = resources.String("menu.order",
+            "system,file,edit,view,special");
+        std::stringstream menuOrder(order);
+        std::string section;
+        std::set<std::string> added;
+        while (std::getline(menuOrder, section, ',')) {
+            if (section.empty() || !added.insert(section).second)
+                continue;
+            BMenu* menu = _ResourceMenu(section, fIconsMenuItem,
+                fListMenuItem);
+            if (menu == NULL)
+                continue;
+            if (section == "system")
+                bar->AddItem(new OSTenLogoMenuItem(menu));
+            else
+                bar->AddItem(menu);
+        }
 		// The app switcher is a right-side status control, not an ordinary
 		// File/Edit/View menu. Reserve separate space for all three controls.
 		AddChild(bar);
@@ -257,8 +324,10 @@ public:
 		if (message->what == kOSTenFinderViewModeChanged) {
 			bool listMode = false;
 			if (message->FindBool("list_mode", &listMode) == B_OK) {
-				fIconsMenuItem->SetMarked(!listMode);
-				fListMenuItem->SetMarked(listMode);
+				if (fIconsMenuItem != NULL)
+                    fIconsMenuItem->SetMarked(!listMode);
+				if (fListMenuItem != NULL)
+                    fListMenuItem->SetMarked(listMode);
 			}
 			return;
 		}
@@ -451,10 +520,17 @@ public:
 		if (message->what == kShutDownOSTen
 			|| message->what == kRestartOSTen) {
 			bool restart = message->what == kRestartOSTen;
-			if ((new BAlert(restart ? "Restart OSTen" : "Shut Down OSTen",
-				restart ? "Restart OSTen now? Save your work first."
-					: "Shut down OSTen now? Save your work first.",
-				"Cancel", restart ? "Restart" : "Shut Down"))->Go() != 1)
+            const OSTenResourceCatalog& ui = OSTenSystemResources();
+            if ((new BAlert(
+                restart ? ui.String("dialog.restart.title", "Restart OSTen")
+                    : ui.String("dialog.shutdown.title", "Shut Down OSTen"),
+                restart ? ui.String("dialog.restart.message",
+                        "Restart OSTen now? Save your work first.")
+                    : ui.String("dialog.shutdown.message",
+                        "Shut down OSTen now? Save your work first."),
+                ui.String("dialog.cancel", "Cancel"),
+                restart ? ui.String("dialog.restart.button", "Restart")
+                    : ui.String("dialog.shutdown.button", "Shut Down")))->Go() != 1)
 				return;
 			// Use Haiku's normal registrar shutdown sequence: running
 			// applications are notified and the filesystem is unmounted.
