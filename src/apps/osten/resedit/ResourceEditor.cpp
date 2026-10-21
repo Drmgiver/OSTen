@@ -335,7 +335,23 @@ public:
                 entry_ref ref;
                 if (message->FindRef("refs", &ref) == B_OK)
                     _OpenTarget(ref);
+                // The file panel can leave the editor behind Finder when
+                // its Open action completes. Bring the already-running
+                // editor forward without requiring a second app launch.
+                Activate(true);
                 return;
+            }
+            case B_CANCEL: {
+                // BFilePanel also sends B_CANCEL after hiding on a
+                // successful Open; refocus after that hide completes.
+                // Ignore cancellation from the artwork import panel.
+                int32 previous = 0;
+                if (message->FindInt32("old_what", &previous) == B_OK
+                    && previous == (int32)kTargetChosen) {
+                    Activate(true);
+                    return;
+                }
+                break;
             }
             case kSelected: _Select(); return;
             case kApply: _Apply(); return;
