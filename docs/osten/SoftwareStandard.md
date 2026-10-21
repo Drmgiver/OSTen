@@ -89,9 +89,12 @@ future standard requirement.
 
 ### Current limitations that must be resolved for full compliance
 
-The Resource Editor GUI does **not** exist yet. The catalog is the first
-application-side resource backend, not a claim that all native UI can already
-be edited.
+A native graphical Resource Editor now exists. It prompts for an
+application or an `.ostr` file on launch and loads the selected manifest.
+The known System, Finder and Resource Editor executables resolve to their
+installed catalogs. Third-party `.ostr` files can be opened directly.
+This does **not** make arbitrary compiled Haiku executables editable, nor
+does it mean every OSTen UI property has been abstracted into resources.
 
 Remaining work includes resource definitions for all visual geometry, fonts,
 colors, menus and dialogs; fully editable desktop contextual menus; full icon

@@ -16,24 +16,30 @@ The interface catalog files live here:
 - `/boot/System Folder/Resources/Finder/Interface.ostr`
 - `/boot/System Folder/Resources/ResourceEditor/Interface.ostr`
 
-The editor offers **System**, **Finder** and **Resource Editor** modes.
-The System catalog also contains the Platinum/MacDecorator entries.
+**Resource Editor now starts with an Open dialog.** Select an OSTen
+application, its resource folder, or an `.ostr` manifest directly. The
+installed **System**, **Finder** and **Resource Editor** applications resolve
+to their existing `Interface.ostr` catalogs automatically. Use **Open...**
+to switch targets. The System catalog also contains Platinum/MacDecorator
+entries.
+
+Other OSTen-native applications can use their own `.ostr` manifests, which
+the editor can open directly. Such applications must implement resource
+loading themselves. Arbitrary Haiku executables with compiled binary
+resources cannot yet be edited and produce an explicit unsupported message.
 
 ## Basic editing
 
-1. In Finder, choose **Special > System Folder Access...** and unlock
-   the System Folder. This is the existing Finder-level Owner guard.
-2. Open **Applications > Resource Editor**.
-3. Select System, Finder or Resource Editor and choose a resource in the list.
-4. Edit the resource's **Key** or **Value**, then select **Apply**.
-5. Choose **Save**. The editor writes a new manifest and backs up the
-   previous version as `Interface.ostr.bak`.
-6. Restart the edited application to reload its resources. Decorator changes
-   may require restarting the graphical server or rebooting OSTen.
-
-The editor checks Finder's current unlock state before writing to the
-protected System Folder. This is an editing workflow, **not a filesystem
-permission boundary**.
+1. To edit installed System Folder resources, unlock **Special >
+   System Folder Access...** in Finder first.
+2. Open **Applications > Resource Editor**. The **Open** file chooser appears.
+3. Select an application or its `.ostr` manifest, then select a resource.
+   Use **Open...** to switch files later.
+4. Edit the resource **Key** or **Value**, then select **Apply**.
+5. Choose **Save**. The editor writes the selected manifest and backs up the
+   previous version as `<selected filename>.bak`.
+6. Restart the affected application to reload it. Decorator changes may
+   require restarting the graphics server or rebooting OSTen.
 
 ## What can be changed today
 
@@ -51,8 +57,9 @@ permission boundary**.
   backgrounds and the Platinum window decorator palette.
 - **Fonts:** Font resources accept the optional `.family`, `.style`, and
   `.size` suffixes. Unsupported families fall back to native fonts.
-- **Artwork:** Choose an artwork asset from **Artwork** and use **Import...**
-  to select a compatible image, such as a PNG. The editor loads it through
+- **Artwork:** When the installed System or Finder catalog is open, choose
+  a known artwork asset from **Artwork** and use **Import...** to select
+  a compatible image, such as a PNG. The editor loads it through
   Haiku's image translators, checks the dimensions and pixel format,
   and writes an exact-size `.rgba` replacement. The approved embedded
   artwork remains the application fallback.

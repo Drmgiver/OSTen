@@ -14,6 +14,7 @@
 #include <InterfaceDefs.h>
 #include <ListView.h>
 #include <Message.h>
+#include <Path.h>
 #include <Messenger.h>
 #include "OSTenMessages.h"
 #include "OSTenResources.h"
@@ -39,8 +40,7 @@
 namespace {
 
 enum {
-    kLoadSystem = 'rSys', kLoadFinder = 'rFnd',
-    kLoadEditor = 'rEdt',
+    kChooseTarget = 'rOpn', kTargetChosen = 'rTrg',
     kSelected = 'rSel', kApply = 'rApl', kSave = 'rSav',
     kDiscard = 'rDis', kMoveUp = 'rUp1', kMoveDown = 'rDn1',
     kRectangleChanged = 'rRct', kImportGraphic = 'rImp',
@@ -229,7 +229,9 @@ public:
                 BRect(70, 65, 1025, 700)),
             EditorResources().String("editor.title", "OSTen Resource Editor"),
             B_TITLED_WINDOW, B_NORMAL_WINDOW_FEEL, B_QUIT_ON_WINDOW_CLOSE),
-        fDirty(false), fSelection(-1), fAssetIndex(0), fPicker(NULL)
+        fDirty(false), fSelection(-1), fAssetIndex(-1), fPicker(NULL),
+        fTargetPicker(NULL), fAssetMenu(NULL), fArtImport(NULL),
+        fArtUndo(NULL), fCurrentTarget(NULL)
     {
         BView* background = new BView(Bounds(), "background",
             B_FOLLOW_ALL, B_WILL_DRAW);
@@ -237,17 +239,15 @@ public:
             rgb_color{237, 237, 233, 255}));
         AddChild(background);
 
-        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.01", BRect(14, 11, 112, 40)),
-            "system", EditorResources().String("editor.system", "System"),
-            new BMessage(kLoadSystem)));
-        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.02", BRect(119, 11, 216, 40)),
-            "finder", EditorResources().String("editor.finder", "Finder"),
-            new BMessage(kLoadFinder)));
-        background->AddChild(new BButton(
-            EditorResources().Rect("editor.geometry.self_button",
-                BRect(223, 11, 336, 40)),
-            "self", EditorResources().String("editor.self", "Resource Editor"),
-            new BMessage(kLoadEditor)));
+        background->AddChild(new BButton(EditorResources().Rect(
+                "editor.geometry.01", BRect(14, 11, 112, 40)),
+            "open", EditorResources().String("editor.open", "Open..."),
+            new BMessage(kChooseTarget)));
+        fCurrentTarget = new BStringView(EditorResources().Rect(
+                "editor.geometry.current", BRect(125, 11, 610, 40)),
+            "current_target", EditorResources().String(
+                "editor.no_file", "No resource file open"));
+        background->AddChild(fCurrentTarget);
         background->AddChild(new BButton(EditorResources().Rect(
                 "editor.geometry.undo_save", BRect(624, 11, 727, 40)),
             "undo_save", EditorResources().String(
@@ -273,25 +273,22 @@ public:
             "value", EditorResources().String("editor.value", "Value:"), "", NULL);
         fValue->SetDivider(75);
         background->AddChild(fValue);
-        BPopUpMenu* assetMenu = new BPopUpMenu("Artwork");
-        for (size_t i = 0; i < sizeof(kAssets) / sizeof(kAssets[0]); ++i) {
-            BMessage* choose = new BMessage(kAssetSelected);
-            choose->AddInt32("index", (int32)i);
-            assetMenu->AddItem(new BMenuItem(kAssets[i].label, choose));
-        }
-        assetMenu->SetTargetForItems(this);
-        assetMenu->ItemAt(0)->SetMarked(true);
-        BMenuField* assets = new BMenuField(EditorResources().Rect("editor.geometry.09", BRect(339, 155, 626, 189)),
-            "artwork", "Artwork:", assetMenu);
+        fAssetMenu = new BPopUpMenu("Artwork");
+        BMenuField* assets = new BMenuField(EditorResources().Rect(
+                "editor.geometry.09", BRect(339, 155, 626, 189)),
+            "artwork", "Artwork:", fAssetMenu);
         assets->SetDivider(75);
         background->AddChild(assets);
-        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.10", BRect(639, 156, 735, 186)),
+        fArtImport = new BButton(EditorResources().Rect(
+                "editor.geometry.10", BRect(639, 156, 735, 186)),
             "import", EditorResources().String("editor.import", "Import..."),
-            new BMessage(kImportGraphic)));
-        background->AddChild(new BButton(EditorResources().Rect(
+            new BMessage(kImportGraphic));
+        background->AddChild(fArtImport);
+        fArtUndo = new BButton(EditorResources().Rect(
                 "editor.geometry.undo_graphic", BRect(743, 156, 834, 186)),
             "undo_graphic", EditorResources().String(
-                "editor.undo_graphic", "Undo Art"), new BMessage(kUndoGraphic)));
+                "editor.undo_graphic", "Undo Art"), new BMessage(kUndoGraphic));
+        background->AddChild(fArtUndo);
         background->AddChild(new BButton(EditorResources().Rect("editor.geometry.11", BRect(842, 156, 942, 186)),
             "apply", EditorResources().String("editor.apply", "Apply"), new BMessage(kApply)));
 
@@ -310,13 +307,15 @@ public:
         fStatus = new BStringView(EditorResources().Rect("editor.geometry.17", BRect(14, 587, 940, 614)),
             "status", "Choose a resource set.");
         background->AddChild(fStatus);
-        _Load("System");
+        _RefreshAssets();
         Show();
+        _ChooseTarget();
     }
 
     ~EditorWindow() override
     {
         delete fPicker;
+        delete fTargetPicker;
     }
 
     bool QuitRequested() override
@@ -331,21 +330,18 @@ public:
     void MessageReceived(BMessage* message) override
     {
         switch (message->what) {
-            case kLoadSystem:
-            case kLoadFinder:
-            case kLoadEditor: {
-                if (fDirty && (new BAlert("Unsaved resources",
-                        "Discard unsaved edits before switching applications?",
-                        "Cancel", "Discard"))->Go() != 1)
-                    return;
-                _Load(message->what == kLoadSystem ? "System"
-                    : message->what == kLoadFinder ? "Finder"
-                    : "ResourceEditor");
+            case kChooseTarget: _ChooseTarget(); return;
+            case kTargetChosen: {
+                entry_ref ref;
+                if (message->FindRef("refs", &ref) == B_OK)
+                    _OpenTarget(ref);
                 return;
             }
             case kSelected: _Select(); return;
             case kApply: _Apply(); return;
-            case kDiscard: _Load(fApplication); return;
+            case kDiscard:
+                if (!fPath.empty()) _LoadPath(fPath, fApplication);
+                return;
             case kSave: _Save(); return;
             case kMoveUp: _Move(-1); return;
             case kMoveDown: _Move(1); return;
@@ -353,7 +349,9 @@ public:
                 int32 index = -1;
                 if (message->FindInt32("index", &index) == B_OK
                     && index >= 0 && (size_t)index
-                        < sizeof(kAssets) / sizeof(kAssets[0]))
+                        < sizeof(kAssets) / sizeof(kAssets[0])
+                    && fPath == std::string("/boot/System Folder/Resources/")
+                        + kAssets[index].application + "/Interface.ostr")
                     fAssetIndex = index;
                 return;
             }
@@ -377,17 +375,103 @@ public:
     }
 
 private:
-    void _Load(const std::string& application)
+    void _ChooseTarget()
     {
-        fApplication = application;
-        fPath = "/boot/System Folder/Resources/" + application
-            + "/Interface.ostr";
-        fLines.clear();
-        FILE* file = fopen(fPath.c_str(), "rb");
-        if (file == NULL) {
-            _Status("Cannot open " + fPath);
+        if (fTargetPicker == NULL) {
+            BMessenger target(this);
+            BMessage chosen(kTargetChosen);
+            fTargetPicker = new BFilePanel(B_OPEN_PANEL, &target, NULL,
+                B_FILE_NODE | B_DIRECTORY_NODE, false, &chosen);
+            BEntry boot("/boot");
+            entry_ref bootRef;
+            if (boot.GetRef(&bootRef) == B_OK)
+                fTargetPicker->SetPanelDirectory(&bootRef);
+        }
+        fTargetPicker->Show();
+    }
+
+    // Open an .ostr directly or resolve an application's associated manifest.
+    // Never patch an executable when we do not understand its resource format.
+    void _OpenTarget(const entry_ref& ref)
+    {
+        BEntry entry(&ref, true);
+        BPath path;
+        if (entry.GetPath(&path) != B_OK) {
+            _Status("Could not resolve the selected file.");
             return;
         }
+        std::string selected(path.Path());
+        std::string name(path.Leaf());
+        std::string application = name;
+        std::vector<std::string> candidates;
+        bool manifest = entry.IsFile() && name.size() >= 5
+            && name.compare(name.size() - 5, 5, ".ostr") == 0;
+
+        if (manifest) {
+            candidates.push_back(selected);
+            size_t slash = selected.rfind('/');
+            if (slash != std::string::npos) {
+                std::string parent = selected.substr(0, slash);
+                slash = parent.rfind('/');
+                application = parent.substr(slash == std::string::npos
+                    ? 0 : slash + 1);
+            }
+        } else {
+            if (entry.IsDirectory()) {
+                candidates.push_back(selected + "/Interface.ostr");
+                candidates.push_back(selected + "/Resources/Interface.ostr");
+            } else if (entry.IsFile()) {
+                candidates.push_back(selected + ".ostr");
+                candidates.push_back(selected + ".resources/Interface.ostr");
+            }
+            if (name == "Resource Editor" || name == "OSTenResourceEditor")
+                application = "ResourceEditor";
+            else if (name == "OSTenSystem")
+                application = "System";
+            else if (name == "OSTenFinder")
+                application = "Finder";
+            candidates.push_back("/boot/System Folder/Resources/"
+                + application + "/Interface.ostr");
+            if (application != name)
+                candidates.push_back("/boot/System Folder/Resources/"
+                    + name + "/Interface.ostr");
+            std::string compact = name;
+            compact.erase(std::remove(compact.begin(), compact.end(), ' '),
+                compact.end());
+            if (compact != name && compact != application)
+                candidates.push_back("/boot/System Folder/Resources/"
+                    + compact + "/Interface.ostr");
+        }
+
+        for (size_t i = 0; i < candidates.size(); ++i) {
+            struct stat details;
+            if (stat(candidates[i].c_str(), &details) != 0
+                || !S_ISREG(details.st_mode))
+                continue;
+            if (fDirty && (new BAlert("Unsaved resources",
+                    "Discard unsaved edits and open another resource file?",
+                    "Cancel", "Discard"))->Go() != 1)
+                return;
+            if (_LoadPath(candidates[i], application))
+                return;
+        }
+
+        (new BAlert("Unsupported resource file",
+            "No editable OSTen resource manifest was found for that selection.\n"
+            "Choose an .ostr file or an OSTen application with an Interface.ostr "
+            "manifest. Editing other applications' compiled binary resources "
+            "is not implemented yet.", "OK"))->Go();
+        _Status("No supported resource manifest found for " + selected);
+    }
+
+    bool _LoadPath(const std::string& path, const std::string& application)
+    {
+        FILE* file = fopen(path.c_str(), "rb");
+        if (file == NULL) {
+            _Status("Cannot open " + path);
+            return false;
+        }
+        std::vector<ResourceLine> lines;
         char buffer[8192];
         while (fgets(buffer, sizeof(buffer), file) != NULL) {
             ResourceLine line;
@@ -402,12 +486,52 @@ private:
                 line.key = line.line.substr(0, equals);
                 line.value = line.line.substr(equals + 1);
             }
-            fLines.push_back(line);
+            lines.push_back(line);
         }
+        bool success = !ferror(file);
         fclose(file);
+        if (!success) {
+            _Status("Error reading " + path);
+            return false;
+        }
+        fLines.swap(lines);
+        fPath = path;
+        fApplication = application;
         fDirty = false;
         _Populate("");
+        _RefreshAssets();
+        fCurrentTarget->SetText(application.c_str());
         _Status("Editing " + fPath + " (restart the target app to reload)");
+        return true;
+    }
+
+    void _RefreshAssets()
+    {
+        while (fAssetMenu->CountItems() > 0)
+            delete fAssetMenu->RemoveItem((int32)0);
+        fAssetIndex = -1;
+        // Only known System and Finder RGBA dimensions are safe to offer.
+        for (size_t i = 0; i < sizeof(kAssets) / sizeof(kAssets[0]); ++i) {
+            if (fPath != std::string("/boot/System Folder/Resources/")
+                    + kAssets[i].application + "/Interface.ostr")
+                continue;
+            BMessage* choose = new BMessage(kAssetSelected);
+            choose->AddInt32("index", (int32)i);
+            BMenuItem* item = new BMenuItem(kAssets[i].label, choose);
+            fAssetMenu->AddItem(item);
+            if (fAssetIndex < 0) {
+                fAssetIndex = (int32)i;
+                item->SetMarked(true);
+            }
+        }
+        if (fAssetIndex < 0) {
+            BMenuItem* item = new BMenuItem("No known artwork", NULL);
+            item->SetEnabled(false);
+            fAssetMenu->AddItem(item);
+        }
+        fAssetMenu->SetTargetForItems(this);
+        fArtImport->SetEnabled(fAssetIndex >= 0);
+        fArtUndo->SetEnabled(fAssetIndex >= 0);
     }
 
     void _Populate(const std::string& selectKey)
@@ -463,6 +587,10 @@ private:
 
     void _Apply()
     {
+        if (fPath.empty()) {
+            _Status("Open an application or .ostr resource file first.");
+            return;
+        }
         std::string key(fKey->Text());
         std::string value(fValue->Text());
         if (key.empty()
@@ -551,7 +679,7 @@ private:
 
     void _UndoSave()
     {
-        if (!_OwnerAllowsChanges())
+        if (fPath.empty() || !_OwnerAllowsChanges())
             return;
         if (_SwapBackup(fPath)) {
             _Load(fApplication);
@@ -561,7 +689,7 @@ private:
 
     void _UndoGraphic()
     {
-        if (!_OwnerAllowsChanges())
+        if (fAssetIndex < 0 || !_OwnerAllowsChanges(true))
             return;
         const AssetDefinition& asset = kAssets[fAssetIndex];
         const std::string path = std::string("/boot/System Folder/Resources/")
@@ -583,7 +711,7 @@ private:
 
     void _ImportGraphic(const entry_ref& ref)
     {
-        if (!_OwnerAllowsChanges())
+        if (fAssetIndex < 0 || !_OwnerAllowsChanges(true))
             return;
         const AssetDefinition& asset = kAssets[fAssetIndex];
         BBitmap* bitmap = BTranslationUtils::GetBitmap(&ref);
@@ -661,8 +789,13 @@ private:
             + ". Restart the target application.");
     }
 
-    bool _OwnerAllowsChanges()
+    bool _OwnerAllowsChanges(bool protectedArtwork = false)
     {
+        // Respect Finder Owner access for installed system files; ordinary
+        // .ostr files elsewhere use normal filesystem permissions.
+        if (!protectedArtwork && fPath.compare(0,
+                strlen("/boot/System Folder/"), "/boot/System Folder/") != 0)
+            return true;
         BMessenger finder("application/x-vnd.OSTen-Finder");
         BMessage query(kOSTenQuerySystemFolderAccess);
         BMessage answer;
@@ -677,6 +810,10 @@ private:
 
     void _Save()
     {
+        if (fPath.empty()) {
+            _Status("Open an application or .ostr resource file first.");
+            return;
+        }
         if (!_OwnerAllowsChanges())
             return;
         // Apply any visible property edit before persisting the manifest.
@@ -755,6 +892,11 @@ private:
     int32 fSelection;
     int32 fAssetIndex;
     BFilePanel* fPicker;
+    BFilePanel* fTargetPicker;
+    BPopUpMenu* fAssetMenu;
+    BButton* fArtImport;
+    BButton* fArtUndo;
+    BStringView* fCurrentTarget;
 };
 
 class ResourceEditorApp : public BApplication {
