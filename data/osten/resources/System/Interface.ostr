@@ -205,3 +205,20 @@ about.text.footer_second=system total. Values refresh every two seconds.
 about.swap_disabled=Swap disabled
 about.unavailable=Unavailable
 about.used_suffix= used
+
+# Platinum decorator secondary drawing colors
+decorator.colors.accent_01=33,33,33
+decorator.colors.accent_02=33,33,33
+decorator.colors.accent_03=136,136,136
+decorator.colors.accent_04=255,255,255
+decorator.colors.accent_05=33,33,33
+decorator.colors.accent_06=140,140,140
+decorator.colors.accent_07=206,206,206
+decorator.colors.accent_08=255,255,255
+decorator.colors.tab_hatch_dark=115,115,115
+decorator.colors.inactive_hatch=82,82,82
+decorator.colors.resize_light=255,255,255
+decorator.colors.resize_01=216,216,216
+decorator.colors.resize_02=224,224,224
+decorator.colors.resize_03=71,71,71
+decorator.colors.resize_04=139,139,139
