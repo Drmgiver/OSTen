@@ -44,7 +44,8 @@ enum {
     kSelected = 'rSel', kApply = 'rApl', kSave = 'rSav',
     kDiscard = 'rDis', kMoveUp = 'rUp1', kMoveDown = 'rDn1',
     kRectangleChanged = 'rRct', kImportGraphic = 'rImp',
-    kAssetSelected = 'rAst', kImageChosen = 'rImg'
+    kAssetSelected = 'rAst', kImageChosen = 'rImg',
+    kUndoSave = 'rUnS', kUndoGraphic = 'rUnG'
 };
 
 static const OSTenResourceCatalog&
@@ -247,6 +248,10 @@ public:
                 BRect(223, 11, 336, 40)),
             "self", EditorResources().String("editor.self", "Resource Editor"),
             new BMessage(kLoadEditor)));
+        background->AddChild(new BButton(EditorResources().Rect(
+                "editor.geometry.undo_save", BRect(624, 11, 727, 40)),
+            "undo_save", EditorResources().String(
+                "editor.undo_save", "Undo Save"), new BMessage(kUndoSave)));
         background->AddChild(new BButton(EditorResources().Rect("editor.geometry.03", BRect(734, 11, 835, 40)),
             "discard", EditorResources().String("editor.revert", "Revert"), new BMessage(kDiscard)));
         background->AddChild(new BButton(EditorResources().Rect("editor.geometry.04", BRect(844, 11, 942, 40)),
@@ -281,7 +286,12 @@ public:
         assets->SetDivider(75);
         background->AddChild(assets);
         background->AddChild(new BButton(EditorResources().Rect("editor.geometry.10", BRect(639, 156, 735, 186)),
-            "import", EditorResources().String("editor.import", "Import..."), new BMessage(kImportGraphic)));
+            "import", EditorResources().String("editor.import", "Import..."),
+            new BMessage(kImportGraphic)));
+        background->AddChild(new BButton(EditorResources().Rect(
+                "editor.geometry.undo_graphic", BRect(743, 156, 834, 186)),
+            "undo_graphic", EditorResources().String(
+                "editor.undo_graphic", "Undo Art"), new BMessage(kUndoGraphic)));
         background->AddChild(new BButton(EditorResources().Rect("editor.geometry.11", BRect(842, 156, 942, 186)),
             "apply", EditorResources().String("editor.apply", "Apply"), new BMessage(kApply)));
 
@@ -348,6 +358,8 @@ public:
                 return;
             }
             case kImportGraphic: _PickGraphic(); return;
+            case kUndoSave: _UndoSave(); return;
+            case kUndoGraphic: _UndoGraphic(); return;
             case kImageChosen: {
                 entry_ref ref;
                 if (message->FindRef("refs", &ref) == B_OK)
@@ -507,6 +519,55 @@ private:
         fValue->SetText(value.c_str());
         _Preview(value);
         fOrder->Select(next);
+    }
+
+    bool _SwapBackup(const std::string& file)
+    {
+        std::string backup = file + ".bak";
+        if (access(backup.c_str(), R_OK) != 0) {
+            _Status("No previous version is available for that resource.");
+            return false;
+        }
+        std::string temp = file + ".restore.XXXXXX";
+        std::vector<char> name(temp.begin(), temp.end());
+        name.push_back(0);
+        int fd = mkstemp(&name[0]);
+        if (fd < 0) {
+            _Status("Could not prepare the restore operation.");
+            return false;
+        }
+        close(fd);
+        unlink(&name[0]);
+        if (rename(file.c_str(), &name[0]) != 0
+            || rename(backup.c_str(), file.c_str()) != 0) {
+            rename(&name[0], file.c_str());
+            _Status("Restore failed. Existing resource kept.");
+            return false;
+        }
+        if (rename(&name[0], backup.c_str()) != 0)
+            _Status("Restored, but the new backup could not be retained.");
+        return true;
+    }
+
+    void _UndoSave()
+    {
+        if (!_OwnerAllowsChanges())
+            return;
+        if (_SwapBackup(fPath)) {
+            _Load(fApplication);
+            _Status("Previous interface restored. Restart edited application.");
+        }
+    }
+
+    void _UndoGraphic()
+    {
+        if (!_OwnerAllowsChanges())
+            return;
+        const AssetDefinition& asset = kAssets[fAssetIndex];
+        const std::string path = std::string("/boot/System Folder/Resources/")
+            + asset.application + "/" + asset.filename + ".rgba";
+        if (_SwapBackup(path))
+            _Status("Previous graphic restored. Restart the target application.");
     }
 
     void _PickGraphic()
