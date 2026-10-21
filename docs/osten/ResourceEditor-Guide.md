@@ -16,30 +16,40 @@ The interface catalog files live here:
 - `/boot/System Folder/Resources/Finder/Interface.ostr`
 - `/boot/System Folder/Resources/ResourceEditor/Interface.ostr`
 
-**Resource Editor now starts with an Open dialog.** Select an OSTen
-application, its resource folder, or an `.ostr` manifest directly. The
-installed **System**, **Finder** and **Resource Editor** applications resolve
-to their existing `Interface.ostr` catalogs automatically. Use **Open...**
-to switch targets. The System catalog also contains Platinum/MacDecorator
-entries.
+**The new browser starts with an Open dialog**, then opens a
+resource-type window for the chosen OSTen application or `.ostr` file.
+Double-click a type (such as `ICON`, `MENU`, `RECT`, or `TEXT`)
+to open a window listing individual resources of that type. Double-click an
+entry to edit it in a separate window.
 
-Other OSTen-native applications can use their own `.ostr` manifests, which
-the editor can open directly. Such applications must implement resource
-loading themselves. Arbitrary Haiku executables with compiled binary
-resources cannot yet be edited and produce an explicit unsupported message.
+`ICON` resources now have a **real pixel editor** with a magnified grid,
+color swatches, a transparent eraser, direct mouse painting, and
+Save/Revert/Undo Save. The six original approved Finder images (disk,
+empty/full Trash, folder, Finder, System) are bundled as native `.rgba`
+resource files and can be edited without first importing replacements.
+Changes to the installed artwork still require Finder's System Folder
+unlock. Restart Finder after saving to load new pixels.
+
+For the first milestone, other resources use the existing property editor
+as a **temporary inspector**. The browser discovers them from the opened
+`.ostr` rather than limiting them to hardcoded applications.
+Types are presently inferred from key/value conventions and image files:
+the `.ostr` format does not yet carry stable numeric resource IDs or rich
+resource schemas. Opening arbitrary compiled Haiku binaries is not supported.
 
 ## Basic editing
 
-1. To edit installed System Folder resources, unlock **Special >
-   System Folder Access...** in Finder first.
-2. Open **Applications > Resource Editor**. The **Open** file chooser appears.
-3. Select an application or its `.ostr` manifest, then select a resource.
-   Use **Open...** to switch files later.
-4. Edit the resource **Key** or **Value**, then select **Apply**.
-5. Choose **Save**. The editor writes the selected manifest and backs up the
-   previous version as `<selected filename>.bak`.
-6. Restart the affected application to reload it. Decorator changes may
-   require restarting the graphics server or rebooting OSTen.
+1. Open Resource Editor from Applications; select Finder, System, Resource
+   Editor, or an OSTen `.ostr` document.
+2. In the resource-type window, double-click `ICON` to browse artwork
+   thumbnails, then double-click `trash-empty` or `trash-full`.
+3. Paint directly in the magnified image, selecting a color or transparent
+   eraser from the palette. Select **Save**; **Revert** discards changes
+   not yet saved, and **Undo Save** restores the previous file from `.bak`.
+4. For `MENU`, `COLR`, `RECT`, `TEXT`, etc., double-click an entry to
+   open the interim resource property inspector. Edit, Apply, and Save.
+5. Use **Refresh** in the type browser after adding or changing resources.
+   Restart the edited application to see changes.
 
 ## What can be changed today
 

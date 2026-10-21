@@ -18,6 +18,7 @@
 #include <Messenger.h>
 #include "OSTenMessages.h"
 #include "OSTenResources.h"
+#include "ResourceBrowser.h"
 #include <ScrollView.h>
 #include <StringItem.h>
 #include <StringView.h>
@@ -224,11 +225,13 @@ private:
 
 class EditorWindow : public BWindow {
 public:
-    EditorWindow()
+    EditorWindow(const std::string& resourceFile = "",
+        const std::string& application = "",
+        const std::string& selectedKey = "")
         : BWindow(EditorResources().Rect("editor.window",
                 BRect(70, 65, 1025, 700)),
             EditorResources().String("editor.title", "OSTen Resource Editor"),
-            B_TITLED_WINDOW, B_NORMAL_WINDOW_FEEL, B_QUIT_ON_WINDOW_CLOSE),
+            B_TITLED_WINDOW, B_NORMAL_WINDOW_FEEL, 0),
         fDirty(false), fSelection(-1), fAssetIndex(-1), fPicker(NULL),
         fTargetPicker(NULL), fAssetMenu(NULL), fArtImport(NULL),
         fArtUndo(NULL), fCurrentTarget(NULL)
@@ -309,7 +312,11 @@ public:
         background->AddChild(fStatus);
         _RefreshAssets();
         Show();
-        _ChooseTarget();
+        if (!resourceFile.empty()) {
+            if (_LoadPath(resourceFile, application))
+                _Populate(selectedKey);
+        } else
+            _ChooseTarget();
     }
 
     ~EditorWindow() override
@@ -920,8 +927,15 @@ public:
     ResourceEditorApp()
         : BApplication("application/x-vnd.OSTen-ResourceEditor") {}
 
-    void ReadyToRun() override { new EditorWindow(); }
+    void ReadyToRun() override { StartOSTenResourceBrowser(); }
 };
+}
+
+void
+OpenOSTenResourceProperty(const std::string& file,
+    const std::string& application, const std::string& key)
+{
+    new EditorWindow(file, application, key);
 }
 
 int

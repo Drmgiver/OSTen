@@ -132,3 +132,20 @@ during migration except where a resource override explicitly requests it.
 Haiku, the BeOS tradition, and classic Macintosh interface design inform
 OSTen. Preserve upstream copyright notices and individual resource licenses.
 New native OSTen source follows the relevant per-file licensing declarations.
+
+## Browser milestone: typed discovery and Finder pixels (October 21, 2026)
+
+The first classic-ResEdit-inspired browser now opens an OSTen document, then
+opens resource-type lists on double-click, then opens individual resources.
+Resource types are inferred from the current text manifest; this is not yet
+a versioned typed binary resource format. Actual raw-RGBA images staged in
+Finder's resource folder are dynamically enumerated with thumbnails and
+opened in a drawing editor. The six Finder images are reconstructed from the
+approved source-embedded art byte-for-byte; the original appearance remains
+unchanged. The icon editor supports painting, transparency, save, revert,
+and restore from a backup. Other properties still use the interim inspector.
+
+Future work: stable resource IDs and resource schemas; dedicated editors for
+menus, dialogs, sound, fonts, and native vector artwork; import/export;
+cross-file change management; proper window lifecycle and interaction tests;
+safe handling of additional arbitrary application binary resources.

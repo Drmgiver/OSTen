@@ -75,6 +75,19 @@ if $(HAIKU_BUILD_PROFILE) = nightly-osten-raw {
         [ FDirName $(HAIKU_TOP) data osten resources Finder ] ;
     AddFilesToHaikuImage "System Folder" Resources Finder
         : $(finderUi) : Interface.ostr ;
+    # The approved Finder artwork is now installed as native, discoverable
+    # raw RGBA resources (original source pixels, not replacements).
+    local finderArt =
+        <osten-resource-finder>disk.rgba
+        <osten-resource-finder>trash-empty.rgba
+        <osten-resource-finder>trash-full.rgba
+        <osten-resource-finder>folder.rgba
+        <osten-resource-finder>finder.rgba
+        <osten-resource-finder>system.rgba ;
+    SEARCH on $(finderArt) =
+        [ FDirName $(HAIKU_TOP) data osten resources Finder ] ;
+    AddFilesToHaikuImage "System Folder" Resources Finder
+        : $(finderArt) ;
     AddDirectoryToHaikuImage "System Folder" Resources ResourceEditor ;
     local editorUi = <osten-resource-editor>Interface.ostr ;
     SEARCH on $(editorUi) =
