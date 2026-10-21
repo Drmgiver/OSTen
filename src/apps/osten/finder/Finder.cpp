@@ -42,6 +42,8 @@
 #include "IconArtwork.h"
 #include "DiskArtwork48.h"
 #include "HighResDesktopArtwork.h"
+#include "OSTenResources.h"
+#include <sstream>
 
 
 namespace {
@@ -81,6 +83,34 @@ const float kFinderClientMinTop = 54;
 // regular Finder window geometry.
 const float kPopupDrawerWidth = 314;
 const float kPopupDrawerHeight = 252;
+
+static char
+FinderShortcut(const char* name, char fallback)
+{
+    const char* key = OSTenFinderResources().String(name, "");
+    if (strlen(key) != 1 || !((key[0] >= 'A' && key[0] <= 'Z')
+            || (key[0] >= 'a' && key[0] <= 'z')))
+        return fallback;
+    return key[0] >= 'a' && key[0] <= 'z' ? key[0] - 32 : key[0];
+}
+
+static uint32
+FinderKeyboardCommand(char key)
+{
+    if (key >= 'a' && key <= 'z')
+        key -= 32;
+    if (key == FinderShortcut("shortcut.open", 'O'))
+        return kOSTenOpen;
+    if (key == FinderShortcut("shortcut.new_folder", 'N'))
+        return kOSTenNewFolder;
+    if (key == FinderShortcut("shortcut.select_all", 'A'))
+        return kOSTenSelectAll;
+    if (key == FinderShortcut("shortcut.get_info", 'I'))
+        return kOSTenGetInfo;
+    if (key == FinderShortcut("shortcut.close", 'W'))
+        return kOSTenClose;
+    return 0;
+}
 
 // Finder-local Owner permission. Reset to locked whenever Finder restarts.
 static std::atomic<bool> sSystemFolderUnlocked(false);
@@ -133,6 +163,11 @@ DecodeBase64(const char* encoded, uint8* output, size_t expectedSize)
 static BBitmap*
 CreateArtworkBitmap(OSTenIcon kind)
 {
+    const char* names[] = { "folder", "finder", "system" };
+    BBitmap* replacement = OSTenFinderResources().Bitmap(
+        names[(int)kind], kOSTenArtworkSize, kOSTenArtworkSize);
+    if (replacement != NULL)
+        return replacement;
     uint8 palette[kOSTenArtworkColors * 4];
     uint8 pixels[kOSTenArtworkSize * kOSTenArtworkSize];
     const OSTenArtwork& artwork = kOSTenArtwork[(int)kind];
@@ -186,6 +221,14 @@ ArtworkBitmap(OSTenIcon kind)
 static BBitmap*
 CreateNativeDesktopBitmap(int kind)
 {
+    const char* resourceNames[] = { "disk", "trash-empty", "trash-full" };
+    if (kind >= 0 && kind < 3) {
+        BBitmap* replacement = OSTenFinderResources().Bitmap(
+            resourceNames[kind], kOSTenDesktopAssetSize,
+            kOSTenDesktopAssetSize);
+        if (replacement != NULL)
+            return replacement;
+    }
     const char* encoded = kind == 0 ? kOSTenDiskRGBA
         : (kind == 1 ? kOSTenTrashEmptyRGBA : kOSTenTrashFullRGBA);
     uint8 pixels[kOSTenDesktopAssetSize * kOSTenDesktopAssetSize * 4];
@@ -414,13 +457,7 @@ public:
 		// Route Finder commands to the window that actually has keyboard focus.
 		// The separate System menu bar must not decide which folder owns them.
 		if (numBytes == 1 && (modifiers() & B_COMMAND_KEY) != 0) {
-			uint32 command = 0;
-			switch (bytes[0]) {
-				case 'o': case 'O': command = kOSTenOpen; break;
-				case 'n': case 'N': command = kOSTenNewFolder; break;
-				case 'w': case 'W': command = kOSTenClose; break;
-				case 'a': case 'A': command = kOSTenSelectAll; break;
-			}
+			uint32 command = FinderKeyboardCommand(bytes[0]);
 			if (command != 0) {
 				Window()->PostMessage(command);
 				return;
@@ -890,24 +927,24 @@ private:
 		if (hit >= 0) {
 			BMessage* open = new BMessage(kOpenEntry);
 			open->AddInt32("index", hit);
-			menu->AddItem(new BMenuItem("Open", open));
-			menu->AddItem(new BMenuItem("Rename...",
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.open", "Open"), open));
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.rename", "Rename..."),
 				new BMessage(kOSTenRename)));
-			menu->AddItem(new BMenuItem("Get Info",
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.get_info", "Get Info"),
 				new BMessage(kOSTenGetInfo)));
 			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem("Move to Trash",
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.move_to_trash", "Move to Trash"),
 				new BMessage(kFinderMoveToTrash)));
 		} else {
-			menu->AddItem(new BMenuItem("New Folder",
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.new_folder", "New Folder"),
 				new BMessage(kOSTenNewFolder)));
 			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem("Select All",
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.select_all", "Select All"),
 				new BMessage(kOSTenSelectAll)));
 			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem("Arrange by Name",
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.arrange_name", "Arrange by Name"),
 				new BMessage(kOSTenArrangeName)));
-			menu->AddItem(new BMenuItem("Arrange by Kind",
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.arrange_kind", "Arrange by Kind"),
 				new BMessage(kOSTenArrangeKind)));
 		}
 		menu->SetTargetForItems(Window());
@@ -1508,7 +1545,10 @@ class FinderPopupTab : public BWindow {
 public:
 	FinderPopupTab(const char* title, const BMessenger& folder)
 		:
-		BWindow(BRect(0, 0, 105, 17), title, B_NO_BORDER_WINDOW_LOOK,
+		BWindow(BRect(0, 0,
+            OSTenFinderResources().Number("layout.popup_tab.width", 105, 60, 250),
+            OSTenFinderResources().Number("layout.popup_tab.height", 17, 14, 40)),
+            title, B_NO_BORDER_WINDOW_LOOK,
 			B_NORMAL_WINDOW_FEEL,
 			B_NOT_ZOOMABLE | B_NOT_RESIZABLE | B_NOT_MINIMIZABLE
 				| B_ASYNCHRONOUS_CONTROLS),
@@ -1529,7 +1569,8 @@ public:
 		int32 column = slot % columns;
 		int32 row = slot / columns;
 		MoveTo(screen.left + 6 + column * 112,
-			screen.bottom - 20 - row * 21);
+			screen.bottom - OSTenFinderResources().Number(
+                "layout.popup_tab.bottom_offset", 20, 14, 60) - row * 21);
 		fCollapsedPosition = Frame().LeftTop();
 	}
 
@@ -1613,11 +1654,16 @@ public:
 		footerView->SetViewColor(255, 255, 255);
 		AddChild(footerView);
 
-		AddShortcut('O', B_COMMAND_KEY, new BMessage(kOSTenOpen));
-		AddShortcut('N', B_COMMAND_KEY, new BMessage(kOSTenNewFolder));
-		AddShortcut('W', B_COMMAND_KEY, new BMessage(kOSTenClose));
-		AddShortcut('A', B_COMMAND_KEY, new BMessage(kOSTenSelectAll));
-		AddShortcut('I', B_COMMAND_KEY, new BMessage(kOSTenGetInfo));
+        AddShortcut(FinderShortcut("shortcut.open", 'O'), B_COMMAND_KEY,
+            new BMessage(kOSTenOpen));
+        AddShortcut(FinderShortcut("shortcut.new_folder", 'N'), B_COMMAND_KEY,
+            new BMessage(kOSTenNewFolder));
+        AddShortcut(FinderShortcut("shortcut.close", 'W'), B_COMMAND_KEY,
+            new BMessage(kOSTenClose));
+        AddShortcut(FinderShortcut("shortcut.select_all", 'A'), B_COMMAND_KEY,
+            new BMessage(kOSTenSelectAll));
+        AddShortcut(FinderShortcut("shortcut.get_info", 'I'), B_COMMAND_KEY,
+            new BMessage(kOSTenGetInfo));
 		// Restore a previously docked folder in its collapsed state.
 		BNode state(&fDirectory);
 		uint8 docked = 0;
@@ -2053,13 +2099,7 @@ public:
 		// Route Finder commands to the window that actually has keyboard focus.
 		// The separate System menu bar must not decide which folder owns them.
 		if (numBytes == 1 && (modifiers() & B_COMMAND_KEY) != 0) {
-			uint32 command = 0;
-			switch (bytes[0]) {
-				case 'o': case 'O': command = kOSTenOpen; break;
-				case 'n': case 'N': command = kOSTenNewFolder; break;
-				case 'w': case 'W': command = kOSTenClose; break;
-				case 'a': case 'A': command = kOSTenSelectAll; break;
-			}
+			uint32 command = FinderKeyboardCommand(bytes[0]);
 			if (command != 0) {
 				Window()->PostMessage(command);
 				return;
@@ -2176,10 +2216,10 @@ private:
 	void _ShowContextMenu(BPoint where, desktop_item item)
 	{
 		BPopUpMenu* menu = new BPopUpMenu("", false, false);
-		menu->AddItem(new BMenuItem("Open", new BMessage(kOSTenOpen)));
+		menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.open", "Open"), new BMessage(kOSTenOpen)));
 		if (item == kTrashItem) {
 			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem("Empty Trash...",
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.empty_trash", "Empty Trash..."),
 				new BMessage(kOSTenEmptyTrash)));
 		}
 		menu->SetTargetForItems(Window());
@@ -2293,6 +2333,15 @@ public:
 		fFolderView(NULL)
 	{
 		AddChild(fView);
+        // The desktop shares Finder shortcuts, except that it cannot close.
+        AddShortcut(FinderShortcut("shortcut.open", 'O'), B_COMMAND_KEY,
+            new BMessage(kOSTenOpen));
+        AddShortcut(FinderShortcut("shortcut.new_folder", 'N'), B_COMMAND_KEY,
+            new BMessage(kOSTenNewFolder));
+        AddShortcut(FinderShortcut("shortcut.select_all", 'A'), B_COMMAND_KEY,
+            new BMessage(kOSTenSelectAll));
+        AddShortcut(FinderShortcut("shortcut.get_info", 'I'), B_COMMAND_KEY,
+            new BMessage(kOSTenGetInfo));
 		// Desktop icons are backed by the normal, visible Desktop directory.
 		BEntry desktopDirectory("/boot/home/Desktop");
 		entry_ref desktopRef;
