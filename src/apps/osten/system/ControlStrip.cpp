@@ -105,17 +105,17 @@ public:
     void Draw(BRect) override
     {
         const BRect bounds = Bounds();
-        SetHighColor(48, 48, 52);
+        SetHighColor(OSTenSystemResources().Color("color.strip.border", rgb_color{48, 48, 52, 255}));
         FillRect(bounds);
-        SetHighColor(222, 222, 225);
+        SetHighColor(OSTenSystemResources().Color("color.strip.background", rgb_color{222, 222, 225, 255}));
         FillRect(bounds.InsetByCopy(1, 1));
-        SetHighColor(255, 255, 255);
+        SetHighColor(OSTenSystemResources().Color("color.strip.highlight", rgb_color{255, 255, 255, 255}));
         StrokeLine(BPoint(2, 2), BPoint(bounds.right - 2, 2));
-        SetHighColor(110, 110, 116);
+        SetHighColor(OSTenSystemResources().Color("color.strip.shadow", rgb_color{110, 110, 116, 255}));
         StrokeLine(BPoint(2, bounds.bottom - 2),
             BPoint(bounds.right - 2, bounds.bottom - 2));
 
-        SetHighColor(25, 25, 28);
+        SetHighColor(OSTenSystemResources().Color("color.strip.handle_text", rgb_color{25, 25, 28, 255}));
         SetFont(be_bold_font);
         DrawString(fCollapsed ? ">" : "<", BPoint(8, 20));
         if (fCollapsed)
@@ -124,12 +124,12 @@ public:
         SetFont(be_plain_font);
         for (int i = 0; i < kModuleCount; ++i) {
             const float left = _HandleWidth() + i * _ModuleWidth();
-            SetHighColor(130, 130, 134);
+            SetHighColor(OSTenSystemResources().Color("color.strip.divider", rgb_color{130, 130, 134, 255}));
             StrokeLine(BPoint(left, 4), BPoint(left, bounds.bottom - 4));
-            SetHighColor(250, 250, 250);
+            SetHighColor(OSTenSystemResources().Color("color.strip.divider_highlight", rgb_color{250, 250, 250, 255}));
             StrokeLine(BPoint(left + 1, 4),
                 BPoint(left + 1, bounds.bottom - 4));
-            SetHighColor(20, 20, 25);
+            SetHighColor(OSTenSystemResources().Color("color.strip.module_text", rgb_color{20, 20, 25, 255}));
             const int module = _ModuleForSlot(i);
             const char* label = _ModuleText(module, "label",
                 kModules[module].shortLabel);
