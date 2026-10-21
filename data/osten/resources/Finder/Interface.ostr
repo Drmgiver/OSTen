@@ -1,0 +1,24 @@
+# OSTen resource catalog 1
+# Shortcuts are shared by System menus and Finder folder windows.
+# A single letter means that letter with the OSTen Command modifier (Haiku Alt).
+shortcut.new_folder=N
+shortcut.open=O
+shortcut.close=W
+shortcut.select_all=A
+shortcut.get_info=I
+label.context.open=Open
+label.context.rename=Rename...
+label.context.get_info=Get Info
+label.context.move_to_trash=Move to Trash
+label.context.new_folder=New Folder
+label.context.select_all=Select All
+label.context.arrange_name=Arrange by Name
+label.context.arrange_kind=Arrange by Kind
+dialog.system_folder_access.title=System Folder Access
+dialog.system_folder_access.unlock_button=Unlock
+dialog.system_folder_access.keep_locked=Keep Locked
+dialog.system_folder_access.lock_button=Lock
+dialog.system_folder_access.keep_unlocked=Keep Unlocked
+layout.popup_tab.width=105
+layout.popup_tab.height=17
+layout.popup_tab.bottom_offset=20
