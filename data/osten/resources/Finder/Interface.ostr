@@ -25,3 +25,17 @@ layout.popup_tab.bottom_offset=20
 menu.context.selection=open,rename,get_info,separator,move_to_trash
 menu.context.background=new_folder,separator,select_all,separator,arrange_name,arrange_kind
 label.context.empty_trash=Empty Trash...
+
+# Finder dialog resources. Frame coordinates use left,top,right,bottom.
+dialog.rename.title=Rename
+dialog.rename.frame=0,0,390,155
+dialog.rename.input=20,27,365,57
+dialog.rename.divider=56
+dialog.rename.label=Name:
+dialog.rename.cancel_frame=185,100,268,129
+dialog.rename.ok_frame=278,100,370,129
+dialog.rename.cancel=Cancel
+dialog.rename.ok=Rename
+dialog.info.title=Get Info
+dialog.system_folder_access.unlock_message=Owner: Unlock the System Folder for changes in Finder? System files affect startup and stability. Finder will lock it again when restarted.
+dialog.system_folder_access.lock_message=System Folder changes are currently unlocked in Finder. Lock them now?
