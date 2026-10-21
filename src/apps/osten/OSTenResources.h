@@ -87,6 +87,21 @@ public:
         return (float)parsed;
     }
 
+    BPoint Point(const char* key, BPoint fallback) const
+    {
+        std::map<std::string, std::string>::const_iterator it
+            = fValues.find(key);
+        if (it == fValues.end())
+            return fallback;
+        float x, y;
+        char tail = 0;
+        if (sscanf(it->second.c_str(), "%f,%f%c", &x, &y, &tail) != 2
+            || !isfinite(x) || !isfinite(y)
+            || x < -8192 || x > 8192 || y < -8192 || y > 8192)
+            return fallback;
+        return BPoint(x, y);
+    }
+
     BRect Rect(const char* key, BRect fallback) const
     {
         std::map<std::string, std::string>::const_iterator it
