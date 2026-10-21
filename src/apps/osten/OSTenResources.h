@@ -8,6 +8,7 @@
 // Values are loaded once per process; restart the application to reload them.
 // The future graphical Resource Editor must use these same stable keys.
 #include <Bitmap.h>
+#include <Font.h>
 #include <GraphicsDefs.h>
 
 #include <errno.h>
@@ -117,6 +118,23 @@ public:
             || red > 255 || green > 255 || blue > 255)
             return fallback;
         return rgb_color{(uint8)red, (uint8)green, (uint8)blue, 255};
+    }
+
+    // Font names and sizes are resource data too. The fallback is a native
+    // Haiku font; invalid or unavailable typefaces retain that fallback.
+    BFont Font(const char* prefix, const BFont* fallback) const
+    {
+        BFont font(fallback);
+        std::string stem(prefix);
+        std::string familyKey = stem + ".family";
+        std::string styleKey = stem + ".style";
+        std::string sizeKey = stem + ".size";
+        const char* family = String(familyKey.c_str(), "");
+        const char* style = String(styleKey.c_str(), "");
+        if (family[0] != 0 && style[0] != 0)
+            font.SetFamilyAndStyle(family, style);
+        font.SetSize(Number(sizeKey.c_str(), font.Size(), 6, 48));
+        return font;
     }
 
     // 32-bit BGRA bitmap decoded from raw RGBA pixels (top row first).
