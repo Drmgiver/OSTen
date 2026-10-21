@@ -26,6 +26,7 @@
 #include "DrawingEngine.h"
 #include "PatternHandler.h"
 #include "RGBColor.h"
+#include "OSTenResources.h"
 
 
 //#define DEBUG_DECORATOR
@@ -55,14 +56,14 @@ MacDecorator::MacDecorator(DesktopSettings& settings, BRect frame,
 	Desktop* desktop)
 	:
 	SATDecorator(settings, frame, desktop),
-	fButtonHighColor((rgb_color) { 232, 232, 232, 255 }),
-	fButtonLowColor((rgb_color) { 128, 128, 128, 255 }),
-	fFrameHighColor((rgb_color) { 255, 255, 255, 255 }),
-	fFrameMidColor((rgb_color) { 216, 216, 216, 255 }),
-	fFrameLowColor((rgb_color) { 156, 156, 156, 255 }),
-	fFrameLowerColor((rgb_color) { 0, 0, 0, 255 }),
-	fFocusTextColor(settings.UIColor(B_WINDOW_TEXT_COLOR)),
-	fNonFocusTextColor(settings.UIColor(B_WINDOW_INACTIVE_TEXT_COLOR))
+	fButtonHighColor(OSTenSystemResources().Color("decorator.button_high", rgb_color{ 232, 232, 232, 255 })),
+	fButtonLowColor(OSTenSystemResources().Color("decorator.button_low", rgb_color{ 128, 128, 128, 255 })),
+	fFrameHighColor(OSTenSystemResources().Color("decorator.frame_high", rgb_color{ 255, 255, 255, 255 })),
+	fFrameMidColor(OSTenSystemResources().Color("decorator.frame_mid", rgb_color{ 216, 216, 216, 255 })),
+	fFrameLowColor(OSTenSystemResources().Color("decorator.frame_low", rgb_color{ 156, 156, 156, 255 })),
+	fFrameLowerColor(OSTenSystemResources().Color("decorator.frame_lower", rgb_color{ 0, 0, 0, 255 })),
+	fFocusTextColor(OSTenSystemResources().Color("decorator.focus_text", settings.UIColor(B_WINDOW_TEXT_COLOR))),
+	fNonFocusTextColor(OSTenSystemResources().Color("decorator.inactive_text", settings.UIColor(B_WINDOW_INACTIVE_TEXT_COLOR)))
 {
 	STRACE(("MacDecorator()\n"));
 	STRACE(("\tFrame (%.1f,%.1f,%.1f,%.1f)\n",
@@ -219,7 +220,8 @@ MacDecorator::_DoLayout()
 	// Here we determine the size of every rectangle that we use
 	// internally when we are given the size of the client rectangle.
 
-	const int32 kDefaultBorderWidth = 6;
+	const int32 kDefaultBorderWidth = (int32)OSTenSystemResources().Number(
+        "decorator.border_width", 6, 1, 12);
 
 	bool hasTab = false;
 
@@ -237,7 +239,8 @@ MacDecorator::_DoLayout()
 
 			case B_FLOATING_WINDOW_LOOK:
 				hasTab = true;
-				fBorderWidth = 3;
+				fBorderWidth = (int32)OSTenSystemResources().Number(
+                    "decorator.floating_border_width", 3, 1, 12);
 				break;
 
 			case B_BORDERED_WINDOW_LOOK:
@@ -261,7 +264,10 @@ MacDecorator::_DoLayout()
 	if (!_IsTabOnly() && fTopTab != NULL && hasTab
 		&& (fTopTab->flags & (B_NOT_RESIZABLE | B_NOT_H_RESIZABLE
 			| B_NOT_V_RESIZABLE)) == 0) {
-		fResizeRect.Set(fBorderRect.right - 22, fBorderRect.bottom - 15,
+		fResizeRect.Set(fBorderRect.right - OSTenSystemResources().Number(
+                    "decorator.resize_width", 22, 16, 44),
+                fBorderRect.bottom - OSTenSystemResources().Number(
+                    "decorator.resize_height", 15, 12, 38),
 			fBorderRect.right, fBorderRect.bottom);
 	}
 
@@ -276,7 +282,9 @@ MacDecorator::_DoLayout()
 		// rather than painting one full-width title bar for every window.
 		// Keep the title-bar region as the maximum available tab strip.
 		fTitleBarRect.Set(fFrame.left - fBorderWidth,
-			fFrame.top - 22, fFrame.right + fBorderWidth,
+			fFrame.top - OSTenSystemResources().Number(
+                "decorator.tab_height", 22, 18, 36),
+            fFrame.right + fBorderWidth,
 			fFrame.top - 3);
 
 		const int32 count = fTabList.CountItems();
@@ -294,8 +302,12 @@ MacDecorator::_DoLayout()
 			}
 			// Reserve room for the three original Platinum controls.
 			// Grouped windows share the available width instead of overlapping.
-			float tabWidth = std::min(240.0f,
-				std::max(105.0f, titleWidth + 80.0f));
+			float tabWidth = std::min(OSTenSystemResources().Number(
+                    "decorator.max_tab_width", 240, 150, 500),
+                std::max(OSTenSystemResources().Number(
+                    "decorator.min_tab_width", 105, 90, 300),
+                    titleWidth + OSTenSystemResources().Number(
+                    "decorator.tab_padding", 80, 60, 150)));
 			if (count > 1)
 				tabWidth = std::min(tabWidth, slotWidth);
 			else
@@ -312,13 +324,17 @@ MacDecorator::_DoLayout()
 			tabLeft = right + 1;
 
 			tab->zoomRect = tab->tabRect;
-			tab->zoomRect.left = tab->zoomRect.right - 12;
-			tab->zoomRect.bottom = tab->zoomRect.top + 12;
+			tab->zoomRect.left = tab->zoomRect.right - OSTenSystemResources().Number(
+                "decorator.button_size", 12, 10, 18);
+			tab->zoomRect.bottom = tab->zoomRect.top + OSTenSystemResources().Number(
+                "decorator.button_size", 12, 10, 18);
 			tab->zoomRect.OffsetBy(-4, 4);
 			tab->closeRect = tab->zoomRect;
 			tab->minimizeRect = tab->zoomRect;
-			tab->closeRect.OffsetTo(tab->tabRect.left + 4,
-				tab->tabRect.top + 4);
+			tab->closeRect.OffsetTo(tab->tabRect.left + OSTenSystemResources().Number(
+                    "decorator.button_inset", 4, 1, 9),
+                tab->tabRect.top + OSTenSystemResources().Number(
+                    "decorator.button_inset", 4, 1, 9));
 			tab->zoomRect.OffsetBy(-(tab->zoomRect.Width() + 4), 0);
 
 			tab->truncatedTitle = title != NULL ? title : "";
