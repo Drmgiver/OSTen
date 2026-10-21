@@ -7,6 +7,8 @@
 #include <InterfaceDefs.h>
 #include <ListView.h>
 #include <Message.h>
+#include <Messenger.h>
+#include "OSTenMessages.h"
 #include <ScrollView.h>
 #include <StringItem.h>
 #include <StringView.h>
@@ -347,7 +349,7 @@ private:
 
     void _Preview(const std::string& value)
     {
-        BRect rectangle;
+        BRect rectangle(0, 0, 100, 60);
         fPreview->SetRectangle(ParseRectangle(value, rectangle), rectangle);
         while (fOrder->CountItems() > 0)
             delete fOrder->RemoveItem((int32)0);
@@ -422,8 +424,24 @@ private:
         fOrder->Select(next);
     }
 
+    bool _OwnerAllowsChanges()
+    {
+        BMessenger finder("application/x-vnd.OSTen-Finder");
+        BMessage query(kOSTenQuerySystemFolderAccess);
+        BMessage answer;
+        bool unlocked = false;
+        if (finder.SendMessage(&query, &answer, 500000, 500000) != B_OK
+            || answer.FindBool("unlocked", &unlocked) != B_OK || !unlocked) {
+            _Status("Unlock the System Folder in Finder's Special menu first.");
+            return false;
+        }
+        return true;
+    }
+
     void _Save()
     {
+        if (!_OwnerAllowsChanges())
+            return;
         // Apply any visible property edit before persisting the manifest.
         if (fSelection >= 0 && (fLines[fSelection].value != fValue->Text()
             || fLines[fSelection].key != fKey->Text()))
