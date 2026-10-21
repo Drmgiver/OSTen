@@ -108,3 +108,19 @@ decorator.max_tab_width=240
 decorator.tab_padding=80
 decorator.button_size=12
 decorator.button_inset=4
+
+# About This Computer native appearance
+about.color.paper=242,242,238
+about.color.ink=34,34,34
+about.color.muted=95,95,95
+about.color.accent=74,113,167
+about.color.selection=226,233,243
+about.color.border=155,155,155
+about.color.white=255,255,255
+about.font.title.size=24
+about.font.caption.size=11
+about.font.body.size=12
+about.font.heading.size=12
+about.memory_label=Physical memory in use
+about.applications_label=Running Applications
+about.fallback_name=OSTen
