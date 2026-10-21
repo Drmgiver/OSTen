@@ -89,3 +89,22 @@ dialog.clock.title=OSTen Clock
 notification.title=Notification Center
 notification.clear=Clear All
 notification.test=Test Notification
+
+# Platinum MacDecorator window controls, dimensions and colors.
+# The decorator runs inside app_server; restart the app_server or OS after edits.
+decorator.button_high=232,232,232
+decorator.button_low=128,128,128
+decorator.frame_high=255,255,255
+decorator.frame_mid=216,216,216
+decorator.frame_low=156,156,156
+decorator.frame_lower=0,0,0
+decorator.border_width=6
+decorator.floating_border_width=3
+decorator.resize_width=22
+decorator.resize_height=15
+decorator.tab_height=22
+decorator.min_tab_width=105
+decorator.max_tab_width=240
+decorator.tab_padding=80
+decorator.button_size=12
+decorator.button_inset=4
