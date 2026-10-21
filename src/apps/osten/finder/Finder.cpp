@@ -923,30 +923,56 @@ private:
 
 	void _ShowContextMenu(BPoint where, int32 hit)
 	{
-		BPopUpMenu* menu = new BPopUpMenu("", false, false);
-		if (hit >= 0) {
-			BMessage* open = new BMessage(kOpenEntry);
-			open->AddInt32("index", hit);
-			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.open", "Open"), open));
-			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.rename", "Rename..."),
-				new BMessage(kOSTenRename)));
-			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.get_info", "Get Info"),
-				new BMessage(kOSTenGetInfo)));
-			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.move_to_trash", "Move to Trash"),
-				new BMessage(kFinderMoveToTrash)));
-		} else {
-			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.new_folder", "New Folder"),
-				new BMessage(kOSTenNewFolder)));
-			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.select_all", "Select All"),
-				new BMessage(kOSTenSelectAll)));
-			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.arrange_name", "Arrange by Name"),
-				new BMessage(kOSTenArrangeName)));
-			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.arrange_kind", "Arrange by Kind"),
-				new BMessage(kOSTenArrangeKind)));
-		}
+        // ResEdit-compatible command IDs, independent of labels and order.
+        // A resource can rearrange either menu without changing Finder logic.
+        const OSTenResourceCatalog& ui = OSTenFinderResources();
+        const char* actions = hit >= 0
+            ? ui.String("menu.context.selection",
+                "open,rename,get_info,separator,move_to_trash")
+            : ui.String("menu.context.background",
+                "new_folder,separator,select_all,separator,arrange_name,arrange_kind");
+        BPopUpMenu* menu = new BPopUpMenu("", false, false);
+        std::stringstream entries(actions);
+        std::string action;
+        while (std::getline(entries, action, ',')) {
+            if (action == "separator") {
+                menu->AddSeparatorItem();
+                continue;
+            }
+            const char* key = NULL;
+            const char* fallback = NULL;
+            uint32 code = 0;
+            BMessage* message = NULL;
+            if (hit >= 0 && action == "open") {
+                key = "label.context.open"; fallback = "Open";
+                message = new BMessage(kOpenEntry);
+                message->AddInt32("index", hit);
+            } else if (hit >= 0 && action == "rename") {
+                key = "label.context.rename"; fallback = "Rename...";
+                code = kOSTenRename;
+            } else if (hit >= 0 && action == "get_info") {
+                key = "label.context.get_info"; fallback = "Get Info";
+                code = kOSTenGetInfo;
+            } else if (hit >= 0 && action == "move_to_trash") {
+                key = "label.context.move_to_trash"; fallback = "Move to Trash";
+                code = kFinderMoveToTrash;
+            } else if (hit < 0 && action == "new_folder") {
+                key = "label.context.new_folder"; fallback = "New Folder";
+                code = kOSTenNewFolder;
+            } else if (hit < 0 && action == "select_all") {
+                key = "label.context.select_all"; fallback = "Select All";
+                code = kOSTenSelectAll;
+            } else if (hit < 0 && action == "arrange_name") {
+                key = "label.context.arrange_name"; fallback = "Arrange by Name";
+                code = kOSTenArrangeName;
+            } else if (hit < 0 && action == "arrange_kind") {
+                key = "label.context.arrange_kind"; fallback = "Arrange by Kind";
+                code = kOSTenArrangeKind;
+            }
+            if (key != NULL)
+                menu->AddItem(new BMenuItem(ui.String(key, fallback),
+                    message != NULL ? message : new BMessage(code)));
+        }
 		menu->SetTargetForItems(Window());
 		menu->SetAsyncAutoDestruct(true);
 		ConvertToScreen(&where);
