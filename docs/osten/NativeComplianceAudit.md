@@ -2,8 +2,9 @@
 **Code inspection: October 21, 2026 | Target: OSTen Software Standard draft 0.2**
 
 This is a **source-level audit**, not a certification. ResEdit, Finder and
-System are **not yet fully compliant**. The last passing preview build
-(#39675063339) predates the fixes staged in this audit. Only an updated
+System are **not yet fully compliant**. The last passing preview build (#39686115116) validates the earlier
+resource-externalization fixes, not the additional typed index and
+specialized editors staged for the next build. Only an updated
 build and hands-on testing can establish their runtime behavior.
 
 ## Scope and evidence
@@ -23,12 +24,12 @@ build and hands-on testing can establish their runtime behavior.
 | Requirement | Resource Editor | Finder | System |
 | --- | --- | --- | --- |
 | 1. User ownership and manageability | **Partial** — self-editing catalog, but incomplete UI exposure | **Partial** — visible resource catalog, code-defined components remain | **Partial** — catalog covers many elements, not the whole OS |
-| 2. Universal, extensible editable resources | **Fail** — property fallback, no typed IDs; some drawn chrome hardcoded | **Fail** — icons and many keys editable, not all dialogs, controls or metadata | **Fail** — missing complete menus/notifications/decorator structures |
+| 2. Universal, extensible editable resources | **Partial** — stable typed IDs now present; widget schemas and many graphical editors absent | **Fail** — icons and many keys editable, not all dialogs, controls or metadata | **Fail** — missing complete menus/notifications/decorator structures |
 | 3. Self-contained visible application structure | **Partial** — executable in Applications; resource catalog in System Folder, not an application folder | **Partial** — system component by design, resources separately staged | **Partial** — OS component identifiable, resources separately staged |
 | 4. Native interface conventions | **Partial** — native BWindow/BFilePanel but no per-app global-menu integration | **Partial** — Finder conventions work, shortcut collision validation incomplete | **Partial** — global menu targets Finder commands, no general active-app negotiation |
 | 5. Owner control and transparent changes | **Partial** — Owner check, source-data edits, optional backups enabled by explicit setting | **Partial** — Owner lock applies, some operations still code-defined | **Partial** — menu/strip edits supported, some controls aren't exposed |
 | 6. Legacy Haiku compatibility boundary | **Pass in scope** — unsupported binaries rejected rather than treated as native | **Pass in scope** — native Finder, compatibility not conflated | **Pass in scope** — system component, Haiku compatibility distinct |
-| 7. Public formats and future extensibility | **Fail** — `.ostr` inference and fixed-width RGBA; no versioned type registry | **Fail** — relies on application-specific keys and fixed asset dimensions | **Fail** — application-specific keys and partially hardcoded controls |
+| 7. Public formats and future extensibility | **Partial** — versioned typed index exists; field schemas and many editors absent | **Fail** — relies on application-specific keys and fixed asset dimensions | **Fail** — application-specific keys and partially hardcoded controls |
 
 ## Corrections included in the accompanying source change
 
@@ -61,17 +62,19 @@ These changes are **necessary but insufficient** for compliance.
 ## Unresolved blocking work
 
 ### Resource Editor
-- Resource IDs and formal editable type schemas are missing. The initial
-  browser infers types from key names and `.rgba` files; an extensible
-  resource store and public application-facing API are required.
+- Typed resource IDs and a public, versioned index have now been added.
+  Field-level schemas, a universal runtime registry and a complete
+  application-facing API are still absent.
 - All painted UI details, browser glyphs, pixel-canvas geometry, strings,
   fonts, icons, menu structures, file-panel settings, dialogs, notification
   and window behaviors are **not** resource-defined yet.
-- Editors for MENU, dialogs, layout controls, sound, font, vector/HVIF,
-  metadata and unknown typed resources do not meet classic ResEdit behavior.
+- Dedicated MENU sequence editing and RGB color editing now exist.
+  Dialogs, layout controls, sounds, fonts, vector/HVIF, metadata and
+  unknown typed resources still require specialized editors.
 - Standard global menu integration is not implemented for ResEdit.
 - The executable remains a single file under Applications, with
-  application resources staged under System Folder.
+  its own resource catalog staged under System Folder. The shared
+  reader now additionally supports self-contained third-party apps.
 
 ### Finder
 - Unexposed user-facing dialog strings and some controls still exist in
@@ -113,3 +116,20 @@ These changes are **necessary but insufficient** for compliance.
 **Integration gate:** neither a green compile nor a working ICON editor
 constitutes OSTen-native compliance. Keep draft PR #1 unmerged until
 the Owner approves the implementation and the required tests pass.
+
+## Additional progress in current draft
+
+- The `ResourceIndex.osti` format and portable reader have been added;
+  type, stable ID, display label and image dimensions are now indexed
+  for all existing manifest keys and Finder artwork.
+- The resource browser consumes these indexes rather than relying on
+  hardcoded asset dimensions for OSTen's indexed resources.
+- Resource Editor now has purpose-built `MENU` and `COLR` windows.
+  Their visible labels and frames are Resource Editor resources, so
+  basic self-customization extends to the new windows.
+- A documented application-local catalog path and indexed-resource
+  preflight test support future third-party native applications.
+- **This does not close the audit.** Full resource schemas, dialog
+  construction and editing, system-wide active-app menus, sound/HVIF
+  editing, packaging and comprehensive OS resource coverage still block
+  compliance.

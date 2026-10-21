@@ -23,11 +23,22 @@
 
 class OSTenResourceCatalog {
 public:
-    explicit OSTenResourceCatalog(const char* application)
+    // Native applications may keep their resources inside their visible
+    // application folder: <applicationFolder>/Resources/Interface.ostr.
+    // OS-owned System and Finder may continue using the shared folder.
+    explicit OSTenResourceCatalog(const char* application,
+        const char* applicationFolder = NULL)
     {
-        fDirectory = "/boot/System Folder/Resources/";
-        fDirectory += application;
-        fDirectory += "/";
+        if (applicationFolder != NULL && applicationFolder[0] == '/') {
+            fDirectory = applicationFolder;
+            if (fDirectory[fDirectory.size() - 1] != '/')
+                fDirectory += '/';
+            fDirectory += "Resources/";
+        } else {
+            fDirectory = "/boot/System Folder/Resources/";
+            fDirectory += application;
+            fDirectory += "/";
+        }
         std::string manifest = fDirectory + "Interface.ostr";
         FILE* file = fopen(manifest.c_str(), "rb");
         if (file == NULL)

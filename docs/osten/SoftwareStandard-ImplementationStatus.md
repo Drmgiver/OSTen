@@ -81,3 +81,34 @@ through their respective manifests. Multi-line UI strings may be
 encoded as `\\n`, tabs as `\\t`, and literal backslashes as `\\\\`
 in a one-line manifest. Resource writes no longer depend on a
 successful automatic backup. Backups are opt-in and Owner-managed.
+
+## Typed native resource index milestone (October 21, 2026)
+
+A versioned, portable `ResourceIndex.osti` now accompanies each of the
+three native catalogs and declares stable resource IDs, types, display names
+and image dimensions. The Resource Editor reads those catalogs for the
+type → instance → editor browser and displays resource IDs. Unindexed
+legacy catalogs retain an explicitly limited fallback.
+
+The first dedicated `MENU` sequence editor supports command ordering,
+separators, adding, replacing, removing, saving and reverting. The
+`COLR` RGB editor offers three sliders and a live preview. `ICON`
+editing continues to use direct pixel painting. `DLOG`, `WLAY`,
+`FONT`, sound, vector and several other types still need dedicated
+graphical implementations. Their presence in the index does not mean
+their editing capabilities are complete.
+
+Native third-party applications may store their own resource catalog
+and index at `<Application Folder>/Resources/`; the shared resource
+reader supports an explicit application-folder constructor argument.
+The core System and Finder packaging has not yet migrated from its
+shared System Folder resource directory.
+
+A fast preflight checker now checks index/manifest coverage, IDs,
+dimensions and selected source bindings, and a platform-independent
+C++ smoke test compiles the index reader before the expensive OS build.
+Neither test proves full runtime conformance.
+
+**Full OSTen Software Standard compliance remains unachieved.**
+The unresolved blockers are documented in
+[NativeComplianceAudit.md](NativeComplianceAudit.md).

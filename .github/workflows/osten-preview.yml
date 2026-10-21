@@ -43,6 +43,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Validate native resource catalogs (before expensive build)
+        run: |
+          python3 build/osten/tools/validate-native-resources.py
+          g++ -std=c++17 -Wall -Wextra -Werror -Isrc/apps/osten \
+            src/apps/osten/tests/ResourceIndexHostTest.cpp \
+            -o /tmp/osten-resource-index-smoke
+          for app in Finder System ResourceEditor; do
+            /tmp/osten-resource-index-smoke \
+              "data/osten/resources/$app/ResourceIndex.osti"
+          done
+
       - name: Install host dependencies
         run: |
           sudo apt-get update

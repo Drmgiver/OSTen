@@ -5,6 +5,7 @@
 #include "ResourceBrowser.h"
 #include "OSTenMessages.h"
 #include "OSTenResources.h"
+#include "OSTenResourceIndex.h"
 
 #include <Alert.h>
 #include <Application.h>
@@ -22,6 +23,8 @@
 #include <ScrollView.h>
 #include <StringItem.h>
 #include <StringView.h>
+#include <TextControl.h>
+#include <Slider.h>
 #include <View.h>
 #include <Window.h>
 
@@ -48,10 +51,15 @@ enum {
     kOpenFile = 'rbOp', kFileChosen = 'rbFc', kOpenType = 'rbTy',
     kOpenEntry = 'rbEn', kRefresh = 'rbRf',
     kSavePixels = 'pxSv', kRevertPixels = 'pxRv',
-    kUndoPixels = 'pxUn', kPixelsChanged = 'pxCh'
+    kUndoPixels = 'pxUn', kPixelsChanged = 'pxCh',
+    kMenuSelected = 'mnSl', kMenuAdd = 'mnAd', kMenuRemove = 'mnRm',
+    kMenuUp = 'mnUp', kMenuDown = 'mnDn', kMenuSave = 'mnSv',
+    kMenuRevert = 'mnRv', kMenuSeparator = 'mnSp', kMenuReplace = 'mnRp',
+    kColorChange = 'clCh', kColorSave = 'clSv', kColorRevert = 'clRv'
 };
 
 struct ResourceEntry {
+    uint32_t id;
     std::string type;
     std::string key;
     std::string label;
@@ -294,7 +302,10 @@ public:
         else
             snprintf(detail, sizeof(detail), "%s resource", fEntry.type.c_str());
         view->SetHighColor(95, 95, 95);
-        view->DrawString(detail, BPoint(rect.left + 75, rect.top + 49));
+        char numbered[144];
+        snprintf(numbered, sizeof(numbered), "%s  [ID %08lx]",
+            detail, (unsigned long)fEntry.id);
+        view->DrawString(numbered, BPoint(rect.left + 75, rect.top + 49));
     }
 
 private:
@@ -629,6 +640,420 @@ private:
     BStringView* fStatus;
 };
 
+// A real hierarchical menu-order editor. This edits the stable command-ID
+// sequence, not executable commands. Labels live in the target's own catalog.
+// Preserve all unrelated lines exactly. The completed temporary file is
+// atomically renamed over the selected manifest; the Owner owns backups.
+static bool
+WriteResourceValue(const ResourceEntry& item, const std::string& value)
+{
+    FILE* input = fopen(item.path.c_str(), "rb");
+    if (!input) return false;
+    std::string output;
+    char row[8192];
+    bool found = false;
+    while (fgets(row, sizeof(row), input) != NULL) {
+        std::string line(row);
+        if (line.compare(0, item.key.size(), item.key) == 0
+            && line.size() > item.key.size()
+            && line[item.key.size()] == '=') {
+            output += item.key + "=" + value + "\n";
+            found = true;
+        } else output += line;
+    }
+    bool readOK = !ferror(input);
+    fclose(input);
+    if (!found || !readOK) return false;
+    std::string tmp = item.path + ".tmp.XXXXXX";
+    std::vector<char> name(tmp.begin(), tmp.end());
+    name.push_back('\0');
+    int fd = mkstemp(name.data());
+    if (fd < 0) return false;
+    size_t written = 0;
+    bool ok = true;
+    while (written < output.size()) {
+        ssize_t count = write(fd, output.data() + written,
+            output.size() - written);
+        if (count <= 0) { ok = false; break; }
+        written += (size_t)count;
+    }
+    if (fsync(fd) != 0) ok = false;
+    if (close(fd) != 0) ok = false;
+    if (ok && rename(name.data(), item.path.c_str()) == 0)
+        return true;
+    unlink(name.data());
+    return false;
+}
+
+class MenuEditorWindow : public BWindow {
+public:
+    explicit MenuEditorWindow(const ResourceEntry& entry)
+        : BWindow(BrowserUI().Rect("browser.menu.window",
+            BRect(180, 110, 780, 620)),
+            (entry.label + BrowserUI().String("browser.menu.title_suffix",
+                " — Menu Editor")).c_str(), B_TITLED_WINDOW, 0),
+          fEntry(entry), fDirty(false)
+    {
+        BView* pane = new BView(Bounds(), "menu-editor",
+            B_FOLLOW_ALL, B_WILL_DRAW);
+        pane->SetViewColor(BrowserUI().Color("browser.menu.background",
+            rgb_color{239, 239, 236, 255}));
+        AddChild(pane);
+        pane->AddChild(new BStringView(BrowserUI().Rect("browser.menu.hint_frame",
+            BRect(14, 8, 580, 35)), "menu-hint",
+            BrowserUI().String("browser.menu.hint",
+                "Menu command order (drag alternative: Up / Down)")));
+        fItems = new BListView(BrowserUI().Rect("browser.menu.list",
+            BRect(12, 40, 359, 429)),
+            "menu-item-list", B_SINGLE_SELECTION_LIST);
+        fItems->SetSelectionMessage(new BMessage(kMenuSelected));
+        pane->AddChild(new BScrollView("menu-items", fItems,
+            B_FOLLOW_ALL, 0, false, true));
+        fAction = new BTextControl(BrowserUI().Rect("browser.menu.action",
+            BRect(375, 46, 579, 83)), "command-id",
+            BrowserUI().String("browser.menu.action_label", "Command ID"),
+            "", NULL);
+        fAction->SetDivider(85);
+        pane->AddChild(fAction);
+        struct Control { const char* key; const char* text; uint32 action;
+            BRect fallback; const char* name; };
+        const Control buttons[] = {
+            {"add", "Add", kMenuAdd, BRect(373, 92, 471, 124), "add"},
+            {"separator", "Separator", kMenuSeparator,
+                BRect(482, 92, 584, 124), "separator"},
+            {"replace", "Replace", kMenuReplace,
+                BRect(373, 137, 471, 169), "replace"},
+            {"remove", "Remove", kMenuRemove,
+                BRect(482, 137, 584, 169), "remove"},
+            {"up", "Up", kMenuUp, BRect(373, 183, 471, 215), "up"},
+            {"down", "Down", kMenuDown,
+                BRect(482, 183, 584, 215), "down"},
+            {"revert", "Revert", kMenuRevert,
+                BRect(373, 441, 471, 480), "revert"},
+            {"save", "Save", kMenuSave, BRect(482, 441, 584, 480), "save"}
+        };
+        for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); ++i) {
+            std::string key = std::string("browser.menu.") + buttons[i].key;
+            std::string geometry = key + "_frame";
+            pane->AddChild(new BButton(
+                BrowserUI().Rect(geometry.c_str(), buttons[i].fallback),
+                buttons[i].name, BrowserUI().String(key.c_str(), buttons[i].text),
+                new BMessage(buttons[i].action)));
+        }
+        fStatus = new BStringView(BrowserUI().Rect("browser.menu.status",
+            BRect(16, 485, 575, 506)), "menu-status",
+            BrowserUI().String("browser.menu.ready", "Command IDs retain their actions"));
+        pane->AddChild(fStatus);
+        _Load();
+        Show();
+    }
+
+    void MessageReceived(BMessage* message) override
+    {
+        const int32 selection = fItems->CurrentSelection();
+        const bool valid = selection >= 0 && (size_t)selection < fCommands.size();
+        switch (message->what) {
+            case kMenuSelected:
+                if (valid)
+                    fAction->SetText(fCommands[selection].c_str());
+                return;
+            case kMenuAdd: {
+                std::string value(fAction->Text());
+                if (!_ValidateID(value)) return;
+                fCommands.insert(fCommands.begin() + (valid ? selection + 1
+                    : (int32)fCommands.size()), value);
+                _Populate(valid ? selection + 1 : (int32)fCommands.size() - 1);
+                return;
+            }
+            case kMenuSeparator:
+                fCommands.insert(fCommands.begin() + (valid ? selection + 1
+                    : (int32)fCommands.size()), "separator");
+                _Populate(valid ? selection + 1 : (int32)fCommands.size() - 1);
+                return;
+            case kMenuReplace:
+                if (valid) {
+                    std::string value(fAction->Text());
+                    if (!_ValidateID(value)) return;
+                    fCommands[selection] = value;
+                    _Populate(selection);
+                }
+                return;
+            case kMenuRemove:
+                if (valid) {
+                    fCommands.erase(fCommands.begin() + selection);
+                    _Populate((int32)std::min((size_t)selection,
+                        fCommands.size() ? fCommands.size() - 1 : (size_t)0));
+                }
+                return;
+            case kMenuUp:
+            case kMenuDown:
+                if (valid) {
+                    int32 next = selection + (message->what == kMenuUp ? -1 : 1);
+                    if (next >= 0 && (size_t)next < fCommands.size()) {
+                        std::swap(fCommands[selection], fCommands[next]);
+                        _Populate(next);
+                    }
+                }
+                return;
+            case kMenuRevert: _Load(); return;
+            case kMenuSave: _Save(); return;
+        }
+        BWindow::MessageReceived(message);
+    }
+
+private:
+    static bool _ValidateID(const std::string& value)
+    {
+        return !value.empty() && value.size() <= 128
+            && value.find_first_not_of(
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+                "0123456789._-") == std::string::npos;
+    }
+
+    static std::string _Join(const std::vector<std::string>& tokens)
+    {
+        std::string output;
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            if (i != 0) output += ',';
+            output += tokens[i];
+        }
+        return output;
+    }
+
+    void _Populate(int32 selected = -1)
+    {
+        while (fItems->CountItems() != 0)
+            delete fItems->RemoveItem((int32)0);
+        for (size_t i = 0; i < fCommands.size(); ++i) {
+            std::string label = fCommands[i] == "separator"
+                ? BrowserUI().String("browser.menu.separator_name",
+                    "-------- separator --------") : fCommands[i];
+            fItems->AddItem(new BStringItem(label.c_str()));
+        }
+        if (selected >= 0 && (size_t)selected < fCommands.size())
+            fItems->Select(selected);
+        fDirty = true;
+    }
+
+    void _Load()
+    {
+        FILE* input = fopen(fEntry.path.c_str(), "rb");
+        if (!input) {
+            fStatus->SetText(BrowserUI().String("browser.menu.read_failure",
+                "Cannot open resource document"));
+            return;
+        }
+        char line[8192];
+        std::string value;
+        bool found = false;
+        while (fgets(line, sizeof(line), input) != NULL) {
+            std::string entry(line);
+            if (entry.compare(0, fEntry.key.size(), fEntry.key) != 0
+                || entry.size() <= fEntry.key.size()
+                || entry[fEntry.key.size()] != '=')
+                continue;
+            value = entry.substr(fEntry.key.size() + 1);
+            while (!value.empty() && (value.back() == '\n'
+                || value.back() == '\r'))
+                value.pop_back();
+            found = true;
+            break;
+        }
+        fclose(input);
+        if (!found) {
+            fStatus->SetText(BrowserUI().String("browser.menu.not_found",
+                "Resource no longer exists"));
+            return;
+        }
+        fCommands.clear();
+        size_t start = 0;
+        for (size_t i = 0; i <= value.size(); ++i) {
+            if (i == value.size() || value[i] == ',') {
+                if (i != start)
+                    fCommands.push_back(value.substr(start, i - start));
+                start = i + 1;
+            }
+        }
+        _Populate();
+        fDirty = false;
+        fStatus->SetText(BrowserUI().String("browser.menu.ready",
+            "Command IDs retain their actions"));
+    }
+
+    void _Save()
+    {
+        if (!fDirty) return;
+        if (!OwnerMayWrite(fEntry.path)) return;
+        if (!WriteResourceValue(fEntry, _Join(fCommands))) {
+            fStatus->SetText(BrowserUI().String("browser.menu.save_failure",
+                "Save failed. Resource was not replaced"));
+            return;
+        }
+        fDirty = false;
+        fStatus->SetText(BrowserUI().String("browser.menu.saved",
+            "Saved. Restart the application to reload"));
+    }
+
+    ResourceEntry fEntry;
+    BListView* fItems;
+    BTextControl* fAction;
+    BStringView* fStatus;
+    std::vector<std::string> fCommands;
+    bool fDirty;
+};
+
+static bool
+IsMenuSequence(const ResourceEntry& entry)
+{
+    if (entry.type != "MENU") return false;
+    return entry.key.compare(0, 10, "menu.title") != 0
+        && entry.key.compare(0, 9, "menu.item") != 0;
+}
+
+// RGB editor with live preview. The app's own geometry, titles and labels
+// are catalog resources just like the color value being edited.
+class ColorSample : public BView {
+public:
+    ColorSample(BRect rect) : BView(rect, "rgb-preview",
+        B_FOLLOW_LEFT | B_FOLLOW_TOP, B_WILL_DRAW)
+    {
+        fColor = rgb_color{255, 255, 255, 255};
+        SetViewColor(B_TRANSPARENT_COLOR);
+    }
+    void SetColor(rgb_color value) { fColor = value; Invalidate(); }
+    void Draw(BRect) override
+    {
+        SetHighColor(fColor);
+        FillRect(Bounds());
+        SetHighColor(40, 40, 40);
+        StrokeRect(Bounds());
+    }
+private:
+    rgb_color fColor;
+};
+
+class ColorEditorWindow : public BWindow {
+public:
+    explicit ColorEditorWindow(const ResourceEntry& item)
+        : BWindow(BrowserUI().Rect("browser.color.window",
+            BRect(190, 145, 700, 510)),
+            (item.label + BrowserUI().String("browser.color.title_suffix",
+                " — Color Editor")).c_str(), B_TITLED_WINDOW, 0),
+          fEntry(item)
+    {
+        BView* panel = new BView(Bounds(), "color-editor",
+            B_FOLLOW_ALL, B_WILL_DRAW);
+        panel->SetViewColor(BrowserUI().Color("browser.color.background",
+            rgb_color{239, 239, 236, 255}));
+        AddChild(panel);
+        panel->AddChild(new BStringView(BrowserUI().Rect(
+                "browser.color.hint_frame", BRect(18, 9, 475, 38)),
+            "color-hint", BrowserUI().String("browser.color.hint",
+                "Move the sliders to change the selected RGB resource")));
+        static const char* names[] = {"red", "green", "blue"};
+        static const char* defaults[] = {"Red", "Green", "Blue"};
+        for (int i = 0; i < 3; ++i) {
+            char key[80];
+            snprintf(key, sizeof(key), "browser.color.%s_frame", names[i]);
+            BRect fallback(18, 48 + i * 64, 349, 96 + i * 64);
+            fSlider[i] = new BSlider(
+                BrowserUI().Rect(key, fallback), names[i],
+                BrowserUI().String((std::string("browser.color.") + names[i]).c_str(),
+                    defaults[i]), new BMessage(kColorChange), 0, 255);
+            fSlider[i]->SetHashMarks(B_HASH_MARKS_BOTTOM);
+            fSlider[i]->SetHashMarkCount(9);
+            panel->AddChild(fSlider[i]);
+            fSlider[i]->SetTarget(this);
+        }
+        fSample = new ColorSample(BrowserUI().Rect(
+            "browser.color.preview_frame", BRect(371, 55, 480, 226)));
+        panel->AddChild(fSample);
+        panel->AddChild(new BButton(BrowserUI().Rect(
+                "browser.color.revert_frame", BRect(260, 263, 358, 298)),
+            "revert", BrowserUI().String("browser.color.revert", "Revert"),
+            new BMessage(kColorRevert)));
+        panel->AddChild(new BButton(BrowserUI().Rect(
+                "browser.color.save_frame", BRect(378, 263, 482, 298)),
+            "save", BrowserUI().String("browser.color.save", "Save"),
+            new BMessage(kColorSave)));
+        fStatus = new BStringView(BrowserUI().Rect(
+            "browser.color.status_frame", BRect(18, 307, 476, 342)),
+            "color-status", "");
+        panel->AddChild(fStatus);
+        _Load();
+        Show();
+    }
+
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+            case kColorChange: _Preview(); return;
+            case kColorRevert: _Load(); return;
+            case kColorSave: _Save(); return;
+        }
+        BWindow::MessageReceived(message);
+    }
+
+private:
+    void _Preview()
+    {
+        fSample->SetColor(rgb_color{(uint8)fSlider[0]->Value(),
+            (uint8)fSlider[1]->Value(), (uint8)fSlider[2]->Value(), 255});
+    }
+
+    void _Load()
+    {
+        FILE* file = fopen(fEntry.path.c_str(), "rb");
+        if (file == NULL) return;
+        char row[8192];
+        int red = 255, green = 255, blue = 255;
+        while (fgets(row, sizeof(row), file) != NULL) {
+            std::string line(row);
+            if (line.compare(0, fEntry.key.size(), fEntry.key) != 0
+                || line.size() <= fEntry.key.size()
+                || line[fEntry.key.size()] != '=')
+                continue;
+            char remaining;
+            if (sscanf(row + fEntry.key.size() + 1, "%d,%d,%d %c",
+                    &red, &green, &blue, &remaining) != 3
+                || red < 0 || green < 0 || blue < 0
+                || red > 255 || green > 255 || blue > 255) {
+                fStatus->SetText(BrowserUI().String("browser.color.invalid",
+                    "This resource is not a valid RGB triple"));
+                fclose(file);
+                return;
+            }
+            for (int i = 0; i < 3; ++i)
+                fSlider[i]->SetValue(i == 0 ? red : i == 1 ? green : blue);
+            _Preview();
+            fStatus->SetText(BrowserUI().String("browser.color.ready",
+                "The preview reflects your selected values"));
+            fclose(file);
+            return;
+        }
+        fclose(file);
+    }
+
+    void _Save()
+    {
+        if (!OwnerMayWrite(fEntry.path)) return;
+        char text[64];
+        snprintf(text, sizeof(text), "%ld,%ld,%ld",
+            (long)fSlider[0]->Value(), (long)fSlider[1]->Value(),
+            (long)fSlider[2]->Value());
+        bool ok = WriteResourceValue(fEntry, text);
+        fStatus->SetText(BrowserUI().String(ok ? "browser.color.saved"
+            : "browser.color.failed", ok
+                ? "Saved. Restart the application to reload"
+                : "Could not save the selected RGB resource"));
+    }
+
+    ResourceEntry fEntry;
+    BSlider* fSlider[3];
+    ColorSample* fSample;
+    BStringView* fStatus;
+};
+
 class ResourceListWindow : public BWindow {
 public:
     ResourceListWindow(const std::string& kind,
@@ -662,6 +1087,10 @@ public:
             const ResourceEntry& item = fResources[index];
             if (item.artwork)
                 new PixelEditorWindow(item);
+            else if (IsMenuSequence(item))
+                new MenuEditorWindow(item);
+            else if (item.type == "COLR")
+                new ColorEditorWindow(item);
             else
                 OpenOSTenResourceProperty(item.path, item.application,
                     item.key);
@@ -774,6 +1203,7 @@ private:
             } else {
                 candidates.push_back(path + ".ostr");
                 candidates.push_back(path + ".resources/Interface.ostr");
+                candidates.push_back(Parent(path) + "/Resources/Interface.ostr");
             }
             if (name == "Finder" || name == "OSTenFinder")
                 application = "Finder";
@@ -813,6 +1243,8 @@ private:
             return;
         }
         std::vector<ResourceEntry> entries;
+        std::map<std::string, OSTenIndexedResource> index;
+        OSTenReadResourceIndex(Parent(fPath) + "/ResourceIndex.osti", index);
         char line[8192];
         while (fgets(line, sizeof(line), file) != NULL) {
             if (line[0] == '#' || line[0] == ';')
@@ -824,9 +1256,16 @@ private:
             char* value = equals + 1;
             value[strcspn(value, "\r\n")] = '\0';
             ResourceEntry resource;
-            resource.type = Classify(line, value);
             resource.key = line;
-            resource.label = line;
+            std::map<std::string, OSTenIndexedResource>::const_iterator
+                found = index.find(resource.key);
+            resource.type = found == index.end()
+                ? Classify(line, value) : found->second.type;
+            resource.label = found == index.end()
+                ? resource.key : found->second.name;
+            resource.id = found == index.end()
+                ? OSTenStableResourceID(fApplication, resource.key)
+                : found->second.id;
             resource.path = fPath;
             resource.application = fApplication;
             resource.width = 0;
@@ -862,8 +1301,14 @@ private:
             if (stat(resourceFile.c_str(), &st) != 0
                 || st.st_size <= 0 || st.st_size % 4 != 0)
                 continue;
+            std::map<std::string, OSTenIndexedResource>::const_iterator
+                artInfo = index.find(basename);
             int width = 0, height = 0;
-            if (!KnownDimensions(basename, width, height)) {
+            if (artInfo != index.end() && artInfo->second.width > 0
+                && artInfo->second.height > 0) {
+                width = artInfo->second.width;
+                height = artInfo->second.height;
+            } else if (!KnownDimensions(basename, width, height)) {
                 double side = sqrt((double)st.st_size / 4.0);
                 width = (int)(side + 0.5);
                 height = width;
@@ -872,9 +1317,15 @@ private:
                 || (size_t)st.st_size != (size_t)width * height * 4)
                 continue;
             ResourceEntry resource;
-            resource.type = width == height ? "ICON" : "IMAG";
+            resource.type = artInfo == index.end()
+                ? (width == height ? "ICON" : "IMAG")
+                : artInfo->second.type;
             resource.key = basename;
-            resource.label = basename;
+            resource.label = artInfo == index.end()
+                ? basename : artInfo->second.name;
+            resource.id = artInfo == index.end()
+                ? OSTenStableResourceID(fApplication, basename)
+                : artInfo->second.id;
             resource.path = resourceFile;
             resource.application = fApplication;
             resource.width = width;

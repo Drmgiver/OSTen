@@ -18,9 +18,11 @@ The interface catalog files live here:
 
 **The new browser starts with an Open dialog**, then opens a
 resource-type window for the chosen OSTen application or `.ostr` file.
-Double-click a type (such as `ICON`, `MENU`, `RECT`, or `TEXT`)
-to open a window listing individual resources of that type. Double-click an
-entry to edit it in a separate window.
+Double-click a type such as `ICON`, `MENU`, `COLR`, `WLAY`, `DLOG`
+or `TEXT` to open a window listing individual resources of that type.
+Resource entries display a **stable numeric ID** alongside their name and
+preview. The type and ID come from the application's
+`ResourceIndex.osti` file, if present. Double-click a resource to edit it.
 
 `ICON` resources now have a **real pixel editor** with a magnified grid,
 color swatches, a transparent eraser, direct mouse painting, and
@@ -30,12 +32,22 @@ resource files and can be edited without first importing replacements.
 Changes to the installed artwork still require Finder's System Folder
 unlock. Restart Finder after saving to load new pixels.
 
-For the first milestone, other resources use the existing property editor
-as a **temporary inspector**. The browser discovers them from the opened
-`.ostr` rather than limiting them to hardcoded applications.
-Types are presently inferred from key/value conventions and image files:
-the `.ostr` format does not yet carry stable numeric resource IDs or rich
-resource schemas. Opening arbitrary compiled Haiku binaries is not supported.
+A dedicated **menu editor** displays each stable command ID in order and
+provides Add, Separator, Replace, Remove, Up, Down, Revert and Save.
+The **color editor** uses RGB sliders and a live color preview. Other
+resources use the existing property editor as a **temporary inspector**
+until dedicated editors for those types are implemented.
+
+Each native app now has a publicly documented
+`ResourceIndex.osti` listing typed resources and stable IDs. Third-party
+OSTen apps can ship `Resources/Interface.ostr` and
+`Resources/ResourceIndex.osti` inside their visible application folder.
+The editor supports those folders without being recompiled.
+
+The index describes resources but does not yet define complete widget
+schemas, dialogs, or resource-backed executable commands. Arbitrary
+compiled Haiku executables are not supported. See
+[ResourceIndexFormat.md](ResourceIndexFormat.md) for the file format.
 
 ## Basic editing
 
@@ -46,8 +58,10 @@ resource schemas. Opening arbitrary compiled Haiku binaries is not supported.
 3. Paint directly in the magnified image, selecting a color or transparent
    eraser from the palette. Select **Save**; **Revert** discards changes
    not yet saved, and **Undo Save** restores the previous file from `.bak`.
-4. For `MENU`, `COLR`, `RECT`, `TEXT`, etc., double-click an entry to
-   open the interim resource property inspector. Edit, Apply, and Save.
+4. For `MENU`, double-click an ordering resource and use the visual
+   command list to rearrange, add, replace or remove entries, then Save.
+   For `COLR`, change RGB sliders and Save. For other types, use the
+   interim resource property inspector, Apply, and Save.
 5. Use **Refresh** in the type browser after adding or changing resources.
    Restart the edited application to see changes.
 
@@ -115,6 +129,9 @@ otherwise permitted edit. Existing Undo Save/Undo Art only work where
 a backup file actually exists. Make a working copy first if you want
 to keep the original unchanged.
 
-The current implementation still requires complete resource-ID, schema,
-menu/dialog and global-menu work before it can claim full compliance.
+The initial typed resource IDs and menu/color editors are implemented.
+A full resource schema, graphical dialog/layout control editor,
+global active-application menu integration, complete native resource
+coverage and booted-OS interaction tests are still necessary before
+claiming full compliance.
 See [NativeComplianceAudit.md](NativeComplianceAudit.md).
