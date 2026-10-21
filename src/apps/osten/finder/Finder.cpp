@@ -2498,10 +2498,16 @@ public:
 	{
 		if (message->what == kOSTenSystemFolderAccess) {
 			if (!sSystemFolderUnlocked.load()) {
-				BAlert* dialog = new BAlert("System Folder Access",
-					"Owner: Unlock the System Folder for changes in Finder? "
-					"System files affect startup and stability. Finder will "
-					"lock it again when restarted.", "Keep Locked", "Unlock");
+                const OSTenResourceCatalog& ui = OSTenFinderResources();
+                BAlert* dialog = new BAlert(
+                    ui.String("dialog.system_folder_access.title",
+                        "System Folder Access"),
+                    ui.String("dialog.system_folder_access.unlock_message",
+                        "Owner: Unlock the System Folder for changes in Finder? "
+                        "System files affect startup and stability. Finder will "
+                        "lock it again when restarted."),
+                    ui.String("dialog.system_folder_access.keep_locked", "Keep Locked"),
+                    ui.String("dialog.system_folder_access.unlock_button", "Unlock"));
 				if (dialog->Go() == 1) {
 					// Opening the folder makes the access change observable
 					// instead of silently changing a hidden Finder flag.
@@ -2518,9 +2524,16 @@ public:
 					(new FinderWindow(ref, 0))->Show();
 				}
 			} else {
-				BAlert* dialog = new BAlert("System Folder Access",
-					"System Folder changes are currently unlocked in Finder. "
-					"Lock them now?", "Keep Unlocked", "Lock");
+                const OSTenResourceCatalog& ui = OSTenFinderResources();
+                BAlert* dialog = new BAlert(
+                    ui.String("dialog.system_folder_access.title",
+                        "System Folder Access"),
+                    ui.String("dialog.system_folder_access.lock_message",
+                        "System Folder changes are currently unlocked in Finder. "
+                        "Lock them now?"),
+                    ui.String("dialog.system_folder_access.keep_unlocked",
+                        "Keep Unlocked"),
+                    ui.String("dialog.system_folder_access.lock_button", "Lock"));
 				if (dialog->Go() == 1) {
 					sSystemFolderUnlocked.store(false);
 					(new BAlert("System Folder Access",
