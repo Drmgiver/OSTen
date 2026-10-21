@@ -16,6 +16,7 @@
 #include <Message.h>
 #include <Messenger.h>
 #include "OSTenMessages.h"
+#include "OSTenResources.h"
 #include <ScrollView.h>
 #include <StringItem.h>
 #include <StringView.h>
@@ -39,11 +40,19 @@ namespace {
 
 enum {
     kLoadSystem = 'rSys', kLoadFinder = 'rFnd',
+    kLoadEditor = 'rEdt',
     kSelected = 'rSel', kApply = 'rApl', kSave = 'rSav',
     kDiscard = 'rDis', kMoveUp = 'rUp1', kMoveDown = 'rDn1',
     kRectangleChanged = 'rRct', kImportGraphic = 'rImp',
     kAssetSelected = 'rAst', kImageChosen = 'rImg'
 };
+
+static const OSTenResourceCatalog&
+EditorResources()
+{
+    static OSTenResourceCatalog resources("ResourceEditor");
+    return resources;
+}
 
 struct AssetDefinition {
     const char* application;
@@ -120,7 +129,8 @@ public:
         : BView(frame, "Resource layout preview", B_FOLLOW_ALL, B_WILL_DRAW),
         fValid(false), fDragging(false), fScale(1)
     {
-        SetViewColor((rgb_color){245, 245, 242, 255});
+        SetViewColor(EditorResources().Color("editor.preview_background",
+            rgb_color{245, 245, 242, 255}));
     }
 
     void SetRectangle(bool valid, BRect value)
@@ -133,7 +143,7 @@ public:
 
     void Draw(BRect) override
     {
-        SetHighColor(210, 210, 210);
+        SetHighColor(EditorResources().Color("editor.preview_border", rgb_color{210, 210, 210, 255}));
         StrokeRect(Bounds().InsetByCopy(1, 1));
         if (!fValid) {
             SetHighColor(70, 70, 70);
@@ -156,9 +166,9 @@ public:
             fOrigin.x + fRect.right * fScale,
             fOrigin.y + fRect.bottom * fScale);
         fHit = visual;
-        SetHighColor(184, 208, 231);
+        SetHighColor(EditorResources().Color("editor.preview_fill", rgb_color{184, 208, 231, 255}));
         FillRect(visual);
-        SetHighColor(27, 87, 150);
+        SetHighColor(EditorResources().Color("editor.preview_outline", rgb_color{27, 87, 150, 255}));
         SetPenSize(2);
         StrokeRect(visual);
         SetPenSize(1);
@@ -214,38 +224,48 @@ private:
 class EditorWindow : public BWindow {
 public:
     EditorWindow()
-        : BWindow(BRect(70, 65, 1025, 700), "OSTen Resource Editor",
+        : BWindow(EditorResources().Rect("editor.window",
+                BRect(70, 65, 1025, 700)),
+            EditorResources().String("editor.title", "OSTen Resource Editor"),
             B_TITLED_WINDOW, B_NORMAL_WINDOW_FEEL, B_QUIT_ON_WINDOW_CLOSE),
         fDirty(false), fSelection(-1), fAssetIndex(0), fPicker(NULL)
     {
         BView* background = new BView(Bounds(), "background",
             B_FOLLOW_ALL, B_WILL_DRAW);
-        background->SetViewColor((rgb_color){237, 237, 233, 255});
+        background->SetViewColor(EditorResources().Color("editor.background",
+            rgb_color{237, 237, 233, 255}));
         AddChild(background);
 
-        background->AddChild(new BButton(BRect(14, 11, 112, 40),
-            "system", "System", new BMessage(kLoadSystem)));
-        background->AddChild(new BButton(BRect(119, 11, 216, 40),
-            "finder", "Finder", new BMessage(kLoadFinder)));
-        background->AddChild(new BButton(BRect(734, 11, 835, 40),
-            "discard", "Revert", new BMessage(kDiscard)));
-        background->AddChild(new BButton(BRect(844, 11, 942, 40),
-            "save", "Save", new BMessage(kSave)));
+        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.01", BRect(14, 11, 112, 40)),
+            "system", EditorResources().String("editor.system", "System"),
+            new BMessage(kLoadSystem)));
+        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.02", BRect(119, 11, 216, 40)),
+            "finder", EditorResources().String("editor.finder", "Finder"),
+            new BMessage(kLoadFinder)));
+        background->AddChild(new BButton(
+            EditorResources().Rect("editor.geometry.self_button",
+                BRect(223, 11, 336, 40)),
+            "self", EditorResources().String("editor.self", "Resource Editor"),
+            new BMessage(kLoadEditor)));
+        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.03", BRect(734, 11, 835, 40)),
+            "discard", EditorResources().String("editor.revert", "Revert"), new BMessage(kDiscard)));
+        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.04", BRect(844, 11, 942, 40)),
+            "save", EditorResources().String("editor.save", "Save"), new BMessage(kSave)));
 
-        fKeys = new BListView(BRect(14, 65, 318, 567),
+        fKeys = new BListView(EditorResources().Rect("editor.geometry.05", BRect(14, 65, 318, 567)),
             "Resource keys", B_SINGLE_SELECTION_LIST);
         fKeys->SetSelectionMessage(new BMessage(kSelected));
         background->AddChild(new BScrollView("Resource list", fKeys,
             B_FOLLOW_LEFT | B_FOLLOW_TOP_BOTTOM, 0, false, true));
 
-        background->AddChild(new BStringView(BRect(339, 52, 935, 74),
+        background->AddChild(new BStringView(EditorResources().Rect("editor.geometry.06", BRect(339, 52, 935, 74)),
             "hint", "Select a resource. Apply edits, then Save."));
-        fKey = new BTextControl(BRect(339, 80, 941, 108),
-            "key", "Key:", "", NULL);
+        fKey = new BTextControl(EditorResources().Rect("editor.geometry.07", BRect(339, 80, 941, 108)),
+            "key", EditorResources().String("editor.key", "Key:"), "", NULL);
         fKey->SetDivider(75);
         background->AddChild(fKey);
-        fValue = new BTextControl(BRect(339, 116, 941, 148),
-            "value", "Value:", "", NULL);
+        fValue = new BTextControl(EditorResources().Rect("editor.geometry.08", BRect(339, 116, 941, 148)),
+            "value", EditorResources().String("editor.value", "Value:"), "", NULL);
         fValue->SetDivider(75);
         background->AddChild(fValue);
         BPopUpMenu* assetMenu = new BPopUpMenu("Artwork");
@@ -256,28 +276,28 @@ public:
         }
         assetMenu->SetTargetForItems(this);
         assetMenu->ItemAt(0)->SetMarked(true);
-        BMenuField* assets = new BMenuField(BRect(339, 155, 626, 189),
+        BMenuField* assets = new BMenuField(EditorResources().Rect("editor.geometry.09", BRect(339, 155, 626, 189)),
             "artwork", "Artwork:", assetMenu);
         assets->SetDivider(75);
         background->AddChild(assets);
-        background->AddChild(new BButton(BRect(639, 156, 735, 186),
-            "import", "Import...", new BMessage(kImportGraphic)));
-        background->AddChild(new BButton(BRect(842, 156, 942, 186),
-            "apply", "Apply", new BMessage(kApply)));
+        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.10", BRect(639, 156, 735, 186)),
+            "import", EditorResources().String("editor.import", "Import..."), new BMessage(kImportGraphic)));
+        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.11", BRect(842, 156, 942, 186)),
+            "apply", EditorResources().String("editor.apply", "Apply"), new BMessage(kApply)));
 
-        fPreview = new RectanglePreview(BRect(339, 202, 941, 445));
+        fPreview = new RectanglePreview(EditorResources().Rect("editor.geometry.12", BRect(339, 202, 941, 445)));
         background->AddChild(fPreview);
-        background->AddChild(new BStringView(BRect(342, 456, 923, 480),
+        background->AddChild(new BStringView(EditorResources().Rect("editor.geometry.13", BRect(342, 456, 923, 480)),
             "ordering", "Menu or module order (select an item to move it):"));
-        fOrder = new BListView(BRect(339, 485, 752, 566),
+        fOrder = new BListView(EditorResources().Rect("editor.geometry.14", BRect(339, 485, 752, 566)),
             "Order", B_SINGLE_SELECTION_LIST);
         background->AddChild(new BScrollView("Order list", fOrder,
             B_FOLLOW_LEFT_TOP, 0, false, true));
-        background->AddChild(new BButton(BRect(771, 493, 853, 522),
-            "up", "Up", new BMessage(kMoveUp)));
-        background->AddChild(new BButton(BRect(771, 530, 853, 559),
-            "down", "Down", new BMessage(kMoveDown)));
-        fStatus = new BStringView(BRect(14, 587, 940, 614),
+        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.15", BRect(771, 493, 853, 522)),
+            "up", EditorResources().String("editor.up", "Up"), new BMessage(kMoveUp)));
+        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.16", BRect(771, 530, 853, 559)),
+            "down", EditorResources().String("editor.down", "Down"), new BMessage(kMoveDown)));
+        fStatus = new BStringView(EditorResources().Rect("editor.geometry.17", BRect(14, 587, 940, 614)),
             "status", "Choose a resource set.");
         background->AddChild(fStatus);
         _Load("System");
@@ -302,12 +322,15 @@ public:
     {
         switch (message->what) {
             case kLoadSystem:
-            case kLoadFinder: {
+            case kLoadFinder:
+            case kLoadEditor: {
                 if (fDirty && (new BAlert("Unsaved resources",
                         "Discard unsaved edits before switching applications?",
                         "Cancel", "Discard"))->Go() != 1)
                     return;
-                _Load(message->what == kLoadSystem ? "System" : "Finder");
+                _Load(message->what == kLoadSystem ? "System"
+                    : message->what == kLoadFinder ? "Finder"
+                    : "ResourceEditor");
                 return;
             }
             case kSelected: _Select(); return;
