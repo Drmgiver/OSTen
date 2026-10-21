@@ -75,6 +75,13 @@ if $(HAIKU_BUILD_PROFILE) = nightly-osten-raw {
         [ FDirName $(HAIKU_TOP) data osten resources Finder ] ;
     AddFilesToHaikuImage "System Folder" Resources Finder
         : $(finderUi) : Interface.ostr ;
+    AddDirectoryToHaikuImage "System Folder" Resources ResourceEditor ;
+    local editorUi = <osten-resource-editor>Interface.ostr ;
+    SEARCH on $(editorUi) =
+        [ FDirName $(HAIKU_TOP) data osten resources ResourceEditor ] ;
+    AddFilesToHaikuImage "System Folder" Resources ResourceEditor
+        : $(editorUi) : Interface.ostr ;
+
 
 	AddDirectoryToHaikuImage "System Folder" "Control Panels" ;
 	AddDirectoryToHaikuImage "System Folder" Extensions ;
