@@ -57,6 +57,63 @@ if $(HAIKU_BUILD_PROFILE) = nightly-osten-raw {
 	AddDirectoryToHaikuImage "System Folder" ;
 	AddFilesToHaikuImage "System Folder" : OSTenSystem : System ;
 	AddFilesToHaikuImage "System Folder" : OSTenFinder : Finder ;
+    # Owner-facing native resource editor, visible inside Applications.
+    AddFilesToHaikuImage Applications : OSTenResourceEditor : "Resource Editor" ;
+    # OSTen native, editable resources live outside the packaged Haiku base.
+    # Keep them visible and under the same Finder Owner lock as other System
+    # Folder contents. System and Finder read the same shortcut definitions.
+    AddDirectoryToHaikuImage "System Folder" Resources ;
+    AddDirectoryToHaikuImage "System Folder" Resources System ;
+    AddDirectoryToHaikuImage "System Folder" Resources Finder ;
+    local systemUi = <osten-resource-system>Interface.ostr ;
+    SEARCH on $(systemUi) =
+        [ FDirName $(HAIKU_TOP) data osten resources System ] ;
+    AddFilesToHaikuImage "System Folder" Resources System
+        : $(systemUi) : Interface.ostr ;
+    # Versioned public native resource index, next to the editable manifest.
+    local systemIndex = <osten-resource-system>ResourceIndex.osti ;
+    SEARCH on $(systemIndex) =
+        [ FDirName $(HAIKU_TOP) data osten resources System ] ;
+    AddFilesToHaikuImage "System Folder" Resources System
+        : $(systemIndex) ;
+    local finderUi = <osten-resource-finder>Interface.ostr ;
+    SEARCH on $(finderUi) =
+        [ FDirName $(HAIKU_TOP) data osten resources Finder ] ;
+    AddFilesToHaikuImage "System Folder" Resources Finder
+        : $(finderUi) : Interface.ostr ;
+    # Versioned public native resource index, next to the editable manifest.
+    local finderIndex = <osten-resource-finder>ResourceIndex.osti ;
+    SEARCH on $(finderIndex) =
+        [ FDirName $(HAIKU_TOP) data osten resources Finder ] ;
+    AddFilesToHaikuImage "System Folder" Resources Finder
+        : $(finderIndex) ;
+    # The approved Finder artwork is now installed as native, discoverable
+    # raw RGBA resources (original source pixels, not replacements).
+    local finderArt =
+        <osten-resource-finder>disk.rgba
+        <osten-resource-finder>trash-empty.rgba
+        <osten-resource-finder>trash-full.rgba
+        <osten-resource-finder>folder.rgba
+        <osten-resource-finder>finder.rgba
+        <osten-resource-finder>system.rgba ;
+    SEARCH on $(finderArt) =
+        [ FDirName $(HAIKU_TOP) data osten resources Finder ] ;
+    AddFilesToHaikuImage "System Folder" Resources Finder
+        : $(finderArt) ;
+    AddDirectoryToHaikuImage "System Folder" Resources ResourceEditor ;
+    local editorUi = <osten-resource-editor>Interface.ostr ;
+    SEARCH on $(editorUi) =
+        [ FDirName $(HAIKU_TOP) data osten resources ResourceEditor ] ;
+    AddFilesToHaikuImage "System Folder" Resources ResourceEditor
+        : $(editorUi) : Interface.ostr ;
+    # Versioned public native resource index, next to the editable manifest.
+    local editorIndex = <osten-resource-resourceeditor>ResourceIndex.osti ;
+    SEARCH on $(editorIndex) =
+        [ FDirName $(HAIKU_TOP) data osten resources ResourceEditor ] ;
+    AddFilesToHaikuImage "System Folder" Resources ResourceEditor
+        : $(editorIndex) ;
+
+
 	AddDirectoryToHaikuImage "System Folder" "Control Panels" ;
 	AddDirectoryToHaikuImage "System Folder" Extensions ;
 	AddDirectoryToHaikuImage "System Folder" Fonts ;

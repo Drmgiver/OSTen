@@ -1,6 +1,9 @@
 name: OSTen preview image
 
 on:
+  # Validate the resource framework before changing the known-good desktop.
+  pull_request:
+    branches: [osten/main]
   push:
     branches: [osten/main]
     paths:
@@ -13,6 +16,8 @@ on:
       - data/launch/user
       - src/apps/Jamfile
       - src/apps/osten/**
+      - data/osten/resources/**
+      - docs/osten/SoftwareStandard.md
       - src/apps/deskbar/**
       - src/add-ons/decorators/**
       - src/servers/app/Jamfile
@@ -21,6 +26,12 @@ on:
       - src/servers/app/stackandtile/**
       - src/kits/tracker/**
       - src/servers/launch/LaunchDaemon.cpp
+
+# Keep just the newest validation run for the same branch or pull request.
+# Rapid resource-only changes should not build multiple cross-compilers.
+concurrency:
+  group: osten-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -31,6 +42,17 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v5
+
+      - name: Validate native resource catalogs (before expensive build)
+        run: |
+          python3 build/osten/tools/validate-native-resources.py
+          g++ -std=c++17 -Wall -Wextra -Werror -Isrc/apps/osten \
+            src/apps/osten/tests/ResourceIndexHostTest.cpp \
+            -o /tmp/osten-resource-index-smoke
+          for app in Finder System ResourceEditor; do
+            /tmp/osten-resource-index-smoke \
+              "data/osten/resources/$app/ResourceIndex.osti"
+          done
 
       - name: Install host dependencies
         run: |

@@ -2,6 +2,7 @@
 // Classic menu-bar controls, using Haiku's native roster and notifications.
 
 #include "SystemExtras.h"
+#include "OSTenResources.h"
 
 #include "FinderSwitcherIcon.h"
 
@@ -42,6 +43,10 @@ struct AppChoice {
 static BBitmap*
 FinderFaceIcon()
 {
+    BBitmap* override = OSTenSystemResources().Bitmap("switcher-finder",
+        kOSTenFinderSwitcherSize, kOSTenFinderSwitcherSize);
+    if (override != NULL)
+        return override;
     BBitmap* bitmap = new BBitmap(
         BRect(0, 0, kOSTenFinderSwitcherSize - 1,
             kOSTenFinderSwitcherSize - 1), B_RGBA32);
@@ -222,34 +227,38 @@ public:
         _UpdateActiveIcon();
         SetHighColor(ui_color(B_MENU_BACKGROUND_COLOR));
         FillRect(Bounds());
-        SetHighColor(120, 120, 120);
+        SetHighColor(OSTenSystemResources().Color("color.system_switcher.1", rgb_color{120, 120, 120, 255}));
         StrokeLine(BPoint(0, 5), BPoint(0, 21));
 
         if (fIcon != NULL) {
             SetDrawingMode(B_OP_ALPHA);
             SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
-            DrawBitmap(fIcon, fIcon->Bounds(), BRect(4, 1, 25, 22));
+            DrawBitmap(fIcon, fIcon->Bounds(), OSTenSystemResources().Rect(
+                "switcher.icon_frame", BRect(4, 1, 25, 22)));
             SetDrawingMode(B_OP_COPY);
         } else {
             // An unregistered third-party app still gets a selectable icon.
-            SetHighColor(85, 85, 85);
+            SetHighColor(OSTenSystemResources().Color("color.system_switcher.2", rgb_color{85, 85, 85, 255}));
             StrokeRect(BRect(6, 4, 23, 20));
             StrokeLine(BPoint(7, 8), BPoint(22, 8));
         }
 
         // Small drop arrow, no text label beside the icon.
-        SetHighColor(50, 50, 50);
+        SetHighColor(OSTenSystemResources().Color("color.system_switcher.3", rgb_color{50, 50, 50, 255}));
         StrokeLine(BPoint(29, 11), BPoint(33, 15));
         StrokeLine(BPoint(33, 15), BPoint(37, 11));
     }
 
     void MouseDown(BPoint where) override
     {
-        BPopUpMenu* popup = new BPopUpMenu("Running Applications",
+        BPopUpMenu* popup = new BPopUpMenu(
+            OSTenSystemResources().String("switcher.title", "Running Applications"),
             false, false);
         std::vector<AppChoice> apps = GetApplications();
         if (apps.empty()) {
-            BMenuItem* empty = new BMenuItem("No running applications",
+            BMenuItem* empty = new BMenuItem(
+                OSTenSystemResources().String("switcher.empty",
+                    "No running applications"),
                 NULL);
             empty->SetEnabled(false);
             popup->AddItem(empty);
@@ -317,10 +326,17 @@ public:
         struct tm clock;
         localtime_r(&now, &clock);
         char text[64];
-        strftime(text, sizeof(text), "%a %I:%M %p", &clock);
-        SetHighColor(24, 24, 24);
-        SetFont(be_plain_font);
-        DrawString(text, BPoint(Bounds().right - StringWidth(text) - 7, 17));
+        strftime(text, sizeof(text),
+            OSTenSystemResources().String("clock.format", "%a %I:%M %p"), &clock);
+        SetHighColor(OSTenSystemResources().Color("color.system_clock.1", rgb_color{24, 24, 24, 255}));
+        BFont font = OSTenSystemResources().Font(
+            "font.system_clock", be_plain_font);
+        SetFont(&font);
+        DrawString(text, BPoint(
+            Bounds().right - StringWidth(text)
+                - OSTenSystemResources().Number("clock.text_right_padding",
+                    7, 0, 50),
+            OSTenSystemResources().Number("clock.text_baseline", 17, 10, 35)));
     }
 
     void MouseDown(BPoint where) override
@@ -329,9 +345,12 @@ public:
         struct tm clock;
         localtime_r(&now, &clock);
         char text[128];
-        strftime(text, sizeof(text), "%A, %B %d, %Y\n%I:%M:%S %p %Z",
+        strftime(text, sizeof(text),
+            OSTenSystemResources().String("clock.long_format",
+                "%A, %B %d, %Y\\n%I:%M:%S %p %Z"),
             &clock);
-        (new BAlert("OSTen Clock", text, "OK"))->Go(NULL);
+        (new BAlert(OSTenSystemResources().String("dialog.clock.title", "OSTen Clock"), text,
+            OSTenSystemResources().String("dialog.ok", "OK")))->Go(NULL);
     }
 };
 
@@ -355,14 +374,24 @@ public:
     {
         SetHighColor(ui_color(B_MENU_BACKGROUND_COLOR));
         FillRect(Bounds());
-        SetHighColor(120, 120, 120);
+        SetHighColor(OSTenSystemResources().Color("color.system_notices.1", rgb_color{120, 120, 120, 255}));
         StrokeLine(BPoint(0, 5), BPoint(0, 21));
-        SetHighColor(24, 24, 24);
-        SetFont(be_plain_font);
-        BString label("Notices");
-        if (fUnread > 0)
-            label.SetToFormat("Notices (%" B_PRId32 ")", fUnread);
-        DrawString(label.String(), BPoint(9, 17));
+        SetHighColor(OSTenSystemResources().Color("color.system_notices.2", rgb_color{24, 24, 24, 255}));
+        BFont font = OSTenSystemResources().Font(
+            "font.system_notices", be_plain_font);
+        SetFont(&font);
+        BString label(OSTenSystemResources().String("notification.notices", "Notices"));
+        if (fUnread > 0) {
+            // Editable strings are data, never printf format strings.
+            BString number;
+            number.SetToFormat("%" B_PRId32, fUnread);
+            label = OSTenSystemResources().String(
+                "notification.notices_count", "Notices ({count})");
+            label.ReplaceAll("{count}", number.String());
+        }
+        DrawString(label.String(), BPoint(
+            OSTenSystemResources().Number("notification.text_left", 9, 0, 60),
+            OSTenSystemResources().Number("notification.text_baseline", 17, 10, 35)));
     }
 
     void MouseDown(BPoint where) override
@@ -378,27 +407,36 @@ private:
 class NoticesWindow : public BWindow {
 public:
     NoticesWindow(const BMessenger& owner, BRect frame)
-        : BWindow(frame, "Notification Center", B_TITLED_WINDOW,
+        : BWindow(frame, OSTenSystemResources().String(
+                "notification.title", "Notification Center"), B_TITLED_WINDOW,
             B_NORMAL_WINDOW_FEEL, B_NOT_RESIZABLE | B_NOT_ZOOMABLE),
         fOwner(owner), fList(NULL)
     {
         BView* background = new BView(Bounds(), "Notices",
             B_FOLLOW_ALL, B_WILL_DRAW);
-        background->SetViewColor(242, 242, 238);
+        background->SetViewColor(OSTenSystemResources().Color("color.system_notifications_window.1", rgb_color{242, 242, 238, 255}));
         AddChild(background);
-        fList = new BListView(BRect(12, 12, Bounds().right - 34,
-            Bounds().bottom - 60), "Recent notifications",
+        fList = new BListView(OSTenSystemResources().Rect(
+                "notification.list_frame",
+                BRect(12, 12, Bounds().right - 34,
+                    Bounds().bottom - 60)), "Recent notifications",
             B_SINGLE_SELECTION_LIST, B_FOLLOW_ALL);
-        fList->SetViewColor(255, 255, 255);
+        fList->SetViewColor(OSTenSystemResources().Color("color.system_notifications_window.2", rgb_color{255, 255, 255, 255}));
         fList->SetInvocationMessage(new BMessage('osnd'));
         background->AddChild(new BScrollView("Notice history", fList,
             B_FOLLOW_ALL, 0, false, true));
-        background->AddChild(new BButton(BRect(14, Bounds().bottom - 42,
-            118, Bounds().bottom - 14), "Clear", "Clear All",
+        background->AddChild(new BButton(OSTenSystemResources().Rect(
+                "notification.clear_frame",
+                BRect(14, Bounds().bottom - 42,
+                    118, Bounds().bottom - 14)), "Clear",
+            OSTenSystemResources().String("notification.clear", "Clear All"),
             new BMessage(kOSTenClearNotices)));
-        background->AddChild(new BButton(BRect(Bounds().right - 166,
-            Bounds().bottom - 42, Bounds().right - 14, Bounds().bottom - 14),
-            "Test", "Test Notification", new BMessage(kOSTenTestNotice)));
+        background->AddChild(new BButton(OSTenSystemResources().Rect(
+                "notification.test_frame",
+                BRect(Bounds().right - 166, Bounds().bottom - 42,
+                    Bounds().right - 14, Bounds().bottom - 14)),
+            "Test", OSTenSystemResources().String("notification.test",
+                "Test Notification"), new BMessage(kOSTenTestNotice)));
     }
 
     bool QuitRequested() override

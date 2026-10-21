@@ -42,6 +42,8 @@
 #include "IconArtwork.h"
 #include "DiskArtwork48.h"
 #include "HighResDesktopArtwork.h"
+#include "OSTenResources.h"
+#include <sstream>
 
 
 namespace {
@@ -65,22 +67,50 @@ const char* kWindowFrameAttribute = "OSTen:window_frame";
 const char* kPopupFolderAttribute = "OSTen:popup_folder";
 const char* kArrangeAttribute = "OSTen:arrange_kind";
 const char* kViewModeAttribute = "OSTen:view_mode";
-const float kListHeaderHeight = 24;
-const float kListRowHeight = 23;
+const float kListHeaderHeight = OSTenFinderResources().Number("layout.list.header_height", 24, 16, 44);
+const float kListRowHeight = OSTenFinderResources().Number("layout.list.row_height", 23, 18, 48);
 // Store desktop icon locations on their filesystem nodes, not by filename.
 // Renaming an icon therefore does not reset its position.
 const char* kDesktopPositionAttribute = "OSTen:desktop_position";
 
-const float kCellWidth = 94;
-const float kCellHeight = 86;
-const float kIconTop = 8;
+const float kCellWidth = OSTenFinderResources().Number("layout.icons.cell_width", 94, 70, 160);
+const float kCellHeight = OSTenFinderResources().Number("layout.icons.cell_height", 86, 60, 170);
+const float kIconTop = OSTenFinderResources().Number("layout.icons.icon_top", 8, 0, 36);
 // Client-frame top must also accommodate the MacDecorator's title above it.
 // The global System bar occupies the first 26 screen pixels.
-const float kFinderClientMinTop = 54;
+const float kFinderClientMinTop = OSTenFinderResources().Number("layout.folder.min_top", 54, 38, 120);
 // Compact three-icon-wide classic Mac pop-up drawer, independent of its
 // regular Finder window geometry.
-const float kPopupDrawerWidth = 314;
-const float kPopupDrawerHeight = 252;
+const float kPopupDrawerWidth = OSTenFinderResources().Number("layout.popup.width", 314, 210, 620);
+const float kPopupDrawerHeight = OSTenFinderResources().Number("layout.popup.height", 252, 160, 500);
+
+static char
+FinderShortcut(const char* name, char fallback)
+{
+    const char* key = OSTenFinderResources().String(name, "");
+    if (strlen(key) != 1 || !((key[0] >= 'A' && key[0] <= 'Z')
+            || (key[0] >= 'a' && key[0] <= 'z')))
+        return fallback;
+    return key[0] >= 'a' && key[0] <= 'z' ? key[0] - 32 : key[0];
+}
+
+static uint32
+FinderKeyboardCommand(char key)
+{
+    if (key >= 'a' && key <= 'z')
+        key -= 32;
+    if (key == FinderShortcut("shortcut.open", 'O'))
+        return kOSTenOpen;
+    if (key == FinderShortcut("shortcut.new_folder", 'N'))
+        return kOSTenNewFolder;
+    if (key == FinderShortcut("shortcut.select_all", 'A'))
+        return kOSTenSelectAll;
+    if (key == FinderShortcut("shortcut.get_info", 'I'))
+        return kOSTenGetInfo;
+    if (key == FinderShortcut("shortcut.close", 'W'))
+        return kOSTenClose;
+    return 0;
+}
 
 // Finder-local Owner permission. Reset to locked whenever Finder restarts.
 static std::atomic<bool> sSystemFolderUnlocked(false);
@@ -133,6 +163,11 @@ DecodeBase64(const char* encoded, uint8* output, size_t expectedSize)
 static BBitmap*
 CreateArtworkBitmap(OSTenIcon kind)
 {
+    const char* names[] = { "folder", "finder", "system" };
+    BBitmap* replacement = OSTenFinderResources().Bitmap(
+        names[(int)kind], kOSTenArtworkSize, kOSTenArtworkSize);
+    if (replacement != NULL)
+        return replacement;
     uint8 palette[kOSTenArtworkColors * 4];
     uint8 pixels[kOSTenArtworkSize * kOSTenArtworkSize];
     const OSTenArtwork& artwork = kOSTenArtwork[(int)kind];
@@ -186,6 +221,14 @@ ArtworkBitmap(OSTenIcon kind)
 static BBitmap*
 CreateNativeDesktopBitmap(int kind)
 {
+    const char* resourceNames[] = { "disk", "trash-empty", "trash-full" };
+    if (kind >= 0 && kind < 3) {
+        BBitmap* replacement = OSTenFinderResources().Bitmap(
+            resourceNames[kind], kOSTenDesktopAssetSize,
+            kOSTenDesktopAssetSize);
+        if (replacement != NULL)
+            return replacement;
+    }
     const char* encoded = kind == 0 ? kOSTenDiskRGBA
         : (kind == 1 ? kOSTenTrashEmptyRGBA : kOSTenTrashFullRGBA);
     uint8 pixels[kOSTenDesktopAssetSize * kOSTenDesktopAssetSize * 4];
@@ -267,17 +310,16 @@ TransferEntries(const BMessage* message, const entry_ref& targetRef,
 	if (firstError != B_OK) {
 		BString explanation;
 		if (firstError == B_PERMISSION_DENIED) {
-			explanation = "The System Folder is locked.\n\n"
-				"Use Special > System Folder Access... to unlock it.";
+			explanation = OSTenFinderResources().String("dialog.transfer.locked", "The System Folder is locked.\n\nUse Special > System Folder Access... to unlock it.");
 		} else {
-			explanation = "The item could not be moved or copied.\n\n";
+			explanation = OSTenFinderResources().String("dialog.transfer.error", "The item could not be moved or copied.\n\n");
 			explanation << strerror(firstError);
 		}
 		if (!recoveryPath.IsEmpty()) {
-			explanation << "\n\nFiles were kept for recovery in:\n"
+			explanation << OSTenFinderResources().String("dialog.transfer.recovery", "\n\nFiles were kept for recovery in:\n")
 				<< recoveryPath;
 		}
-		(new BAlert("Finder", explanation.String(), "OK"))->Go();
+		(new BAlert(OSTenFinderResources().String("dialog.finder.title", "Finder"), explanation.String(), "OK"))->Go();
 	}
 	be_app->PostMessage(kFinderRefreshAll);
 }
@@ -317,11 +359,11 @@ public:
         BTextControl(frame, "Inline filename", NULL, filename, NULL)
     {
         SetDivider(0);
-        SetViewColor(255, 255, 255);
+        SetViewColor(OSTenFinderResources().Color("color.inline_rename.viewcolor.01", rgb_color{255, 255, 255, 255}));
         BTextView* input = TextView();
-        input->SetViewColor(255, 255, 255);
-        input->SetLowColor(255, 255, 255);
-        input->SetHighColor(0, 0, 0);
+        input->SetViewColor(OSTenFinderResources().Color("color.inline_rename.viewcolor.02", rgb_color{255, 255, 255, 255}));
+        input->SetLowColor(OSTenFinderResources().Color("color.inline_rename.lowcolor.01", rgb_color{255, 255, 255, 255}));
+        input->SetHighColor(OSTenFinderResources().Color("color.inline_rename.highcolor.01", rgb_color{0, 0, 0, 255}));
         input->SetWordWrap(false);
         input->SetMaxBytes(B_FILE_NAME_LENGTH - 1);
         input->AddFilter(new BMessageFilter(B_KEY_DOWN,
@@ -354,12 +396,14 @@ public:
         fRenameClickGeneration(0)
 	{
 		if (fIsDesktop) {
-			SetViewColor(54, 104, 150);
-			SetLowColor(54, 104, 150);
+			SetViewColor(OSTenFinderResources().Color("color.folder.viewcolor.01", rgb_color{54, 104, 150, 255}));
+			SetLowColor(OSTenFinderResources().Color("color.folder.lowcolor.01", rgb_color{54, 104, 150, 255}));
 		} else {
-			SetViewColor(255, 255, 255);
-			SetLowColor(255, 255, 255);
+			SetViewColor(OSTenFinderResources().Color("color.folder.viewcolor.02", rgb_color{255, 255, 255, 255}));
+			SetLowColor(OSTenFinderResources().Color("color.folder.lowcolor.02", rgb_color{255, 255, 255, 255}));
 		}
+        BFont font = OSTenFinderResources().Font("font.folder", be_plain_font);
+        SetFont(&font);
 		BNode folderNode(&fDirectory);
 		int32 arrangeKind = 0;
 		if (folderNode.ReadAttr(kArrangeAttribute, B_INT32_TYPE, 0,
@@ -414,13 +458,7 @@ public:
 		// Route Finder commands to the window that actually has keyboard focus.
 		// The separate System menu bar must not decide which folder owns them.
 		if (numBytes == 1 && (modifiers() & B_COMMAND_KEY) != 0) {
-			uint32 command = 0;
-			switch (bytes[0]) {
-				case 'o': case 'O': command = kOSTenOpen; break;
-				case 'n': case 'N': command = kOSTenNewFolder; break;
-				case 'w': case 'W': command = kOSTenClose; break;
-				case 'a': case 'A': command = kOSTenSelectAll; break;
-			}
+			uint32 command = FinderKeyboardCommand(bytes[0]);
 			if (command != 0) {
 				Window()->PostMessage(command);
 				return;
@@ -868,7 +906,7 @@ private:
                 details << "An item with this name already exists.";
             else
                 details << strerror(error);
-            (new BAlert("Rename", details.String(), "OK"))->Go();
+            (new BAlert(OSTenFinderResources().String("dialog.rename.title", "Rename"), details.String(), "OK"))->Go();
             Refresh(previous.String());
             return;
         }
@@ -886,30 +924,56 @@ private:
 
 	void _ShowContextMenu(BPoint where, int32 hit)
 	{
-		BPopUpMenu* menu = new BPopUpMenu("", false, false);
-		if (hit >= 0) {
-			BMessage* open = new BMessage(kOpenEntry);
-			open->AddInt32("index", hit);
-			menu->AddItem(new BMenuItem("Open", open));
-			menu->AddItem(new BMenuItem("Rename...",
-				new BMessage(kOSTenRename)));
-			menu->AddItem(new BMenuItem("Get Info",
-				new BMessage(kOSTenGetInfo)));
-			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem("Move to Trash",
-				new BMessage(kFinderMoveToTrash)));
-		} else {
-			menu->AddItem(new BMenuItem("New Folder",
-				new BMessage(kOSTenNewFolder)));
-			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem("Select All",
-				new BMessage(kOSTenSelectAll)));
-			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem("Arrange by Name",
-				new BMessage(kOSTenArrangeName)));
-			menu->AddItem(new BMenuItem("Arrange by Kind",
-				new BMessage(kOSTenArrangeKind)));
-		}
+        // ResEdit-compatible command IDs, independent of labels and order.
+        // A resource can rearrange either menu without changing Finder logic.
+        const OSTenResourceCatalog& ui = OSTenFinderResources();
+        const char* actions = hit >= 0
+            ? ui.String("menu.context.selection",
+                "open,rename,get_info,separator,move_to_trash")
+            : ui.String("menu.context.background",
+                "new_folder,separator,select_all,separator,arrange_name,arrange_kind");
+        BPopUpMenu* menu = new BPopUpMenu("", false, false);
+        std::stringstream entries(actions);
+        std::string action;
+        while (std::getline(entries, action, ',')) {
+            if (action == "separator") {
+                menu->AddSeparatorItem();
+                continue;
+            }
+            const char* key = NULL;
+            const char* fallback = NULL;
+            uint32 code = 0;
+            BMessage* message = NULL;
+            if (hit >= 0 && action == "open") {
+                key = "label.context.open"; fallback = "Open";
+                message = new BMessage(kOpenEntry);
+                message->AddInt32("index", hit);
+            } else if (hit >= 0 && action == "rename") {
+                key = "label.context.rename"; fallback = "Rename...";
+                code = kOSTenRename;
+            } else if (hit >= 0 && action == "get_info") {
+                key = "label.context.get_info"; fallback = "Get Info";
+                code = kOSTenGetInfo;
+            } else if (hit >= 0 && action == "move_to_trash") {
+                key = "label.context.move_to_trash"; fallback = "Move to Trash";
+                code = kFinderMoveToTrash;
+            } else if (hit < 0 && action == "new_folder") {
+                key = "label.context.new_folder"; fallback = "New Folder";
+                code = kOSTenNewFolder;
+            } else if (hit < 0 && action == "select_all") {
+                key = "label.context.select_all"; fallback = "Select All";
+                code = kOSTenSelectAll;
+            } else if (hit < 0 && action == "arrange_name") {
+                key = "label.context.arrange_name"; fallback = "Arrange by Name";
+                code = kOSTenArrangeName;
+            } else if (hit < 0 && action == "arrange_kind") {
+                key = "label.context.arrange_kind"; fallback = "Arrange by Kind";
+                code = kOSTenArrangeKind;
+            }
+            if (key != NULL)
+                menu->AddItem(new BMenuItem(ui.String(key, fallback),
+                    message != NULL ? message : new BMessage(code)));
+        }
 		menu->SetTargetForItems(Window());
 		menu->SetAsyncAutoDestruct(true);
 		ConvertToScreen(&where);
@@ -1028,7 +1092,10 @@ private:
 
 	float _ListBoundary(int32 column) const
 	{
-		const float fractions[] = {0, 0.44f, 0.70f, 0.83f, 1.0f};
+		const float fractions[] = { 0,
+            OSTenFinderResources().Number("layout.list.column_name", .44f, .20f, .55f),
+            OSTenFinderResources().Number("layout.list.column_date", .70f, .60f, .79f),
+            OSTenFinderResources().Number("layout.list.column_size", .83f, .80f, .96f), 1.0f };
 		return Bounds().Width() * fractions[column];
 	}
 
@@ -1046,24 +1113,29 @@ private:
 		BRect header(0, 0, Bounds().right, kListHeaderHeight - 1);
 		if (!header.Intersects(update))
 			return;
-		SetHighColor(215, 215, 215);
+		SetHighColor(OSTenFinderResources().Color("color.list_header.highcolor.01", rgb_color{215, 215, 215, 255}));
 		FillRect(header);
-		SetHighColor(72, 72, 72);
+		SetHighColor(OSTenFinderResources().Color("color.list_header.highcolor.02", rgb_color{72, 72, 72, 255}));
 		StrokeLine(header.LeftBottom(), header.RightBottom());
-		const char* names[] = {"Name", "Date Modified", "Size", "Kind"};
+		const char* names[] = {
+            OSTenFinderResources().String("label.list.name", "Name"),
+            OSTenFinderResources().String("label.list.date", "Date Modified"),
+            OSTenFinderResources().String("label.list.size", "Size"),
+            OSTenFinderResources().String("label.list.kind", "Kind")
+        };
 		for (int32 column = 0; column < 4; column++) {
 			float left = _ListBoundary(column);
 			float right = _ListBoundary(column + 1);
 			if (column > 0) {
-				SetHighColor(124, 124, 124);
+				SetHighColor(OSTenFinderResources().Color("color.list_header.highcolor.03", rgb_color{124, 124, 124, 255}));
 				StrokeLine(BPoint(left, 2), BPoint(left, header.bottom - 2));
 			}
 			BString label(names[column]);
 			TruncateString(&label, B_TRUNCATE_END, right - left - 12);
-			SetHighColor(28, 28, 28);
+			SetHighColor(OSTenFinderResources().Color("color.list_header.highcolor.04", rgb_color{28, 28, 28, 255}));
 			DrawString(label.String(), BPoint(left + 6, 16));
 			if (fListSortColumn == column) {
-				SetHighColor(70, 70, 70);
+				SetHighColor(OSTenFinderResources().Color("color.list_header.highcolor.05", rgb_color{70, 70, 70, 255}));
 				float x = right - 7;
 				float y = fListSortAscending ? 7 : 12;
 				FillTriangle(BPoint(x - 3, y + 4),
@@ -1074,13 +1146,13 @@ private:
 
 	void _DrawListItem(const FinderItem& item)
 	{
-		SetHighColor(item.selected ? rgb_color{0, 0, 128, 255}
-			: rgb_color{255, 255, 255, 255});
+		SetHighColor(item.selected ? OSTenFinderResources().Color("color.list_item.selected_background", rgb_color{0, 0, 128, 255})
+            : OSTenFinderResources().Color("color.list_item.background", rgb_color{255, 255, 255, 255}));
 		FillRect(item.cell);
 		float left = 8 + item.depth * 14;
 		if (item.isDirectory) {
-			SetHighColor(item.selected ? rgb_color{255, 255, 255, 255}
-				: rgb_color{50, 50, 50, 255});
+			SetHighColor(item.selected ? OSTenFinderResources().Color("color.list_item.selected_arrow", rgb_color{255, 255, 255, 255})
+                : OSTenFinderResources().Color("color.list_item.arrow", rgb_color{50, 50, 50, 255}));
 			if (item.expanded)
 				FillTriangle(BPoint(left, item.cell.top + 8),
 					BPoint(left + 9, item.cell.top + 8),
@@ -1097,8 +1169,8 @@ private:
 				_DrawFolderIcon(icon);
 		} else
 			_DrawFileIcon(icon);
-		SetHighColor(item.selected ? rgb_color{255, 255, 255, 255}
-			: rgb_color{0, 0, 0, 255});
+		SetHighColor(item.selected ? OSTenFinderResources().Color("color.list_item.selected_text", rgb_color{255, 255, 255, 255})
+            : OSTenFinderResources().Color("color.list_item.text", rgb_color{0, 0, 0, 255}));
 		const float baseline = item.cell.top + 16;
 		const float nameLeft = left + 37;
 		BString name(item.name);
@@ -1285,13 +1357,13 @@ private:
 		BRect label(textX - 3, baseline - 13, textX + textWidth + 3,
 			baseline + 3);
 		if (item.selected) {
-			SetHighColor(0, 0, 128);
+			SetHighColor(OSTenFinderResources().Color("color.icon_labels.highcolor.01", rgb_color{0, 0, 128, 255}));
 			FillRect(label);
-			SetHighColor(255, 255, 255);
+			SetHighColor(OSTenFinderResources().Color("color.icon_labels.highcolor.02", rgb_color{255, 255, 255, 255}));
 		} else if (fIsDesktop)
-			SetHighColor(255, 255, 255);
+			SetHighColor(OSTenFinderResources().Color("color.icon_labels.highcolor.03", rgb_color{255, 255, 255, 255}));
 		else
-			SetHighColor(0, 0, 0);
+			SetHighColor(OSTenFinderResources().Color("color.icon_labels.highcolor.04", rgb_color{0, 0, 0, 255}));
 		DrawString(display.String(), BPoint(textX, baseline));
 	}
 
@@ -1317,29 +1389,29 @@ private:
 		BRect tab(rect.left + 3, rect.top + 3, rect.left + 20,
 			rect.top + 11);
 
-		SetHighColor(41, 88, 148);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.01", rgb_color{41, 88, 148, 255}));
 		FillRect(body);
 		FillRect(tab);
 
-		SetHighColor(90, 159, 225);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.02", rgb_color{90, 159, 225, 255}));
 		FillRect(BRect(rect.left + 4, rect.top + 10, rect.right - 3,
 			rect.bottom - 4));
 		FillRect(BRect(rect.left + 5, rect.top + 5, rect.left + 18,
 			rect.top + 9));
 
-		SetHighColor(205, 235, 255);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.03", rgb_color{205, 235, 255, 255}));
 		FillRect(BRect(rect.left + 5, rect.top + 11, rect.right - 5,
 			rect.top + 13));
-		SetHighColor(141, 195, 247);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.04", rgb_color{141, 195, 247, 255}));
 		FillRect(BRect(rect.left + 5, rect.top + 14, rect.right - 5,
 			rect.bottom - 7));
-		SetHighColor(66, 134, 210);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.05", rgb_color{66, 134, 210, 255}));
 		FillRect(BRect(rect.right - 5, rect.top + 13, rect.right - 3,
 			rect.bottom - 4));
 		FillRect(BRect(rect.left + 4, rect.bottom - 5, rect.right - 3,
 			rect.bottom - 4));
 
-		SetHighColor(55, 107, 176);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.06", rgb_color{55, 107, 176, 255}));
 		StrokeLine(BPoint(rect.left + 4, rect.top + 9),
 			BPoint(rect.left + 19, rect.top + 9));
 		StrokeLine(BPoint(rect.left + 20, rect.top + 10),
@@ -1349,22 +1421,22 @@ private:
 	// A folded-corner paper icon is the neutral Macintosh document symbol.
 	void _DrawFileIcon(BRect rect)
 	{
-		SetHighColor(48, 42, 31);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.07", rgb_color{48, 42, 31, 255}));
 		FillRect(BRect(rect.left + 6, rect.top + 1, rect.right - 5,
 			rect.bottom - 1));
-		SetHighColor(249, 247, 237);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.08", rgb_color{249, 247, 237, 255}));
 		FillRect(BRect(rect.left + 8, rect.top + 3, rect.right - 7,
 			rect.bottom - 3));
-		SetHighColor(207, 202, 186);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.09", rgb_color{207, 202, 186, 255}));
 		FillRect(BRect(rect.right - 13, rect.top + 3, rect.right - 8,
 			rect.top + 8));
-		SetHighColor(48, 42, 31);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.10", rgb_color{48, 42, 31, 255}));
 		StrokeLine(BPoint(rect.right - 13, rect.top + 3),
 			BPoint(rect.right - 13, rect.top + 8));
 		StrokeLine(BPoint(rect.right - 13, rect.top + 8),
 			BPoint(rect.right - 8, rect.top + 8));
 
-		SetHighColor(139, 133, 117);
+		SetHighColor(OSTenFinderResources().Color("color.fallback_icons.highcolor.11", rgb_color{139, 133, 117, 255}));
 		StrokeLine(BPoint(rect.left + 11, rect.top + 13),
 			BPoint(rect.right - 11, rect.top + 13));
 		StrokeLine(BPoint(rect.left + 11, rect.top + 18),
@@ -1415,8 +1487,12 @@ ShowSelectedInfo(FolderView* view)
 static BRect
 FolderWindowFrame(const entry_ref& directory, int32 depth)
 {
-	BRect frame(60 + depth * 28, 60 + depth * 28,
-		530 + depth * 28, 405 + depth * 28);
+	BRect frame = OSTenFinderResources().Rect("layout.folder.default_frame",
+        BRect(60, 60, 530, 405));
+    frame.OffsetBy(depth * OSTenFinderResources().Number(
+        "layout.folder.cascade_step", 28, 0, 64),
+        depth * OSTenFinderResources().Number(
+        "layout.folder.cascade_step", 28, 0, 64));
 	BNode node(&directory);
 	BRect stored;
 	if (node.ReadAttr(kWindowFrameAttribute, B_RECT_TYPE, 0, &stored,
@@ -1478,18 +1554,18 @@ public:
 	void Draw(BRect update) override
 	{
 		BRect r = Bounds();
-		SetHighColor(215, 215, 215);
+		SetHighColor(OSTenFinderResources().Color("color.popup_tab.highcolor.01", rgb_color{215, 215, 215, 255}));
 		FillRoundRect(r, 6, 6);
 		FillRect(BRect(r.left, r.top + 6, r.right, r.bottom));
-		SetHighColor(40, 40, 40);
+		SetHighColor(OSTenFinderResources().Color("color.popup_tab.highcolor.02", rgb_color{40, 40, 40, 255}));
 		StrokeLine(BPoint(r.left, r.bottom), BPoint(r.left, r.top + 6));
 		StrokeArc(BRect(r.left, r.top, r.left + 12, r.top + 12), 90, 90);
 		StrokeLine(BPoint(r.left + 6, r.top), BPoint(r.right - 6, r.top));
 		StrokeArc(BRect(r.right - 12, r.top, r.right, r.top + 12), 0, 90);
 		StrokeLine(BPoint(r.right, r.top + 6), r.RightBottom());
-		SetHighColor(255, 255, 255);
+		SetHighColor(OSTenFinderResources().Color("color.popup_tab.highcolor.03", rgb_color{255, 255, 255, 255}));
 		StrokeLine(BPoint(2, r.bottom - 1), BPoint(2, 7));
-		SetHighColor(45, 45, 45);
+		SetHighColor(OSTenFinderResources().Color("color.popup_tab.highcolor.04", rgb_color{45, 45, 45, 255}));
 		DrawString(fTitle.String(), BPoint(7, 13));
 	}
 
@@ -1508,7 +1584,10 @@ class FinderPopupTab : public BWindow {
 public:
 	FinderPopupTab(const char* title, const BMessenger& folder)
 		:
-		BWindow(BRect(0, 0, 105, 17), title, B_NO_BORDER_WINDOW_LOOK,
+		BWindow(BRect(0, 0,
+            OSTenFinderResources().Number("layout.popup_tab.width", 105, 60, 250),
+            OSTenFinderResources().Number("layout.popup_tab.height", 17, 14, 40)),
+            title, B_NO_BORDER_WINDOW_LOOK,
 			B_NORMAL_WINDOW_FEEL,
 			B_NOT_ZOOMABLE | B_NOT_RESIZABLE | B_NOT_MINIMIZABLE
 				| B_ASYNCHRONOUS_CONTROLS),
@@ -1525,11 +1604,17 @@ public:
 			sPopupSlotsInUse.push_back(slot);
 		}
 		fSlot = slot;
-		int32 columns = std::max(1, (int32)(screen.Width() / 112));
+		float stride = OSTenFinderResources().Number("layout.popup_tab.width", 105, 60, 250)
+            + OSTenFinderResources().Number("layout.popup_tab.column_gap", 7, 0, 30);
+        int32 columns = std::max(1, (int32)(screen.Width() / stride));
 		int32 column = slot % columns;
 		int32 row = slot / columns;
-		MoveTo(screen.left + 6 + column * 112,
-			screen.bottom - 20 - row * 21);
+		MoveTo(screen.left + OSTenFinderResources().Number(
+            "layout.popup_tab.left_margin", 6, 0, 40) + column * stride,
+			screen.bottom - OSTenFinderResources().Number(
+                "layout.popup_tab.bottom_offset", 20, 14, 60)
+                - row * OSTenFinderResources().Number(
+                "layout.popup_tab.row_pitch", 21, 14, 60));
 		fCollapsedPosition = Frame().LeftTop();
 	}
 
@@ -1610,14 +1695,19 @@ public:
 			Bounds().bottom - 7);
 		BView* footerView = new BView(footer, "Finder lower inset",
 			B_FOLLOW_LEFT_RIGHT | B_FOLLOW_BOTTOM, B_WILL_DRAW);
-		footerView->SetViewColor(255, 255, 255);
+		footerView->SetViewColor(OSTenFinderResources().Color("color.popup_tab.viewcolor.01", rgb_color{255, 255, 255, 255}));
 		AddChild(footerView);
 
-		AddShortcut('O', B_COMMAND_KEY, new BMessage(kOSTenOpen));
-		AddShortcut('N', B_COMMAND_KEY, new BMessage(kOSTenNewFolder));
-		AddShortcut('W', B_COMMAND_KEY, new BMessage(kOSTenClose));
-		AddShortcut('A', B_COMMAND_KEY, new BMessage(kOSTenSelectAll));
-		AddShortcut('I', B_COMMAND_KEY, new BMessage(kOSTenGetInfo));
+        AddShortcut(FinderShortcut("shortcut.open", 'O'), B_COMMAND_KEY,
+            new BMessage(kOSTenOpen));
+        AddShortcut(FinderShortcut("shortcut.new_folder", 'N'), B_COMMAND_KEY,
+            new BMessage(kOSTenNewFolder));
+        AddShortcut(FinderShortcut("shortcut.close", 'W'), B_COMMAND_KEY,
+            new BMessage(kOSTenClose));
+        AddShortcut(FinderShortcut("shortcut.select_all", 'A'), B_COMMAND_KEY,
+            new BMessage(kOSTenSelectAll));
+        AddShortcut(FinderShortcut("shortcut.get_info", 'I'), B_COMMAND_KEY,
+            new BMessage(kOSTenGetInfo));
 		// Restore a previously docked folder in its collapsed state.
 		BNode state(&fDirectory);
 		uint8 docked = 0;
@@ -1848,22 +1938,21 @@ private:
 		if (!sSystemFolderUnlocked.load()
 			&& current.GetPath(&currentPath) == B_OK
 			&& IsOSTenSystemFolderPath(currentPath)) {
-			(new BAlert("System Folder",
-				"The System Folder is locked. Use Special > "
-				"System Folder Access... to unlock it.", "OK"))->Go();
+			(new BAlert(OSTenFinderResources().String("dialog.folder.locked_title", "System Folder"),
+				OSTenFinderResources().String("dialog.folder.locked", "The System Folder is locked. Use Special > System Folder Access... to unlock it."), "OK"))->Go();
 			return;
 		}
 		BDirectory directory(&fDirectory);
-		BString name("untitled folder");
+		BString name(OSTenFinderResources().String("dialog.folder.default_name", "untitled folder"));
 		int32 suffix = 2;
 		while (directory.Contains(name.String())) {
-			name.SetToFormat("untitled folder %ld", (long)suffix);
+			name.SetToFormat("%s %ld", OSTenFinderResources().String("dialog.folder.default_name", "untitled folder"), (long)suffix);
 			suffix++;
 		}
 		if (directory.CreateDirectory(name.String(), NULL) == B_OK)
 			fView->Refresh(name.String());
 		else {
-			(new BAlert("New Folder", "The folder could not be created.",
+			(new BAlert(OSTenFinderResources().String("dialog.folder.new_title", "New Folder"), OSTenFinderResources().String("dialog.folder.create_failed", "The folder could not be created."),
 				"OK"))->Go();
 		}
 	}
@@ -1992,9 +2081,9 @@ OpenFinderEntry(const entry_ref& ref, int32 depth)
     } else {
         status_t error = be_roster->Launch(&ref);
         if (error != B_OK) {
-            BString reason("The file could not be opened.\n\n");
+            BString reason(OSTenFinderResources().String("dialog.open.failed", "The file could not be opened.\n\n"));
             reason << strerror(error);
-            (new BAlert("Finder", reason.String(), "OK"))->Go();
+            (new BAlert(OSTenFinderResources().String("dialog.finder.title", "Finder"), reason.String(), "OK"))->Go();
         }
     }
 }
@@ -2018,7 +2107,9 @@ public:
         fTrashWasFull(false),
         fTrashCheckRunner(NULL)
 	{
-		SetViewColor(54, 104, 150);
+		SetViewColor(OSTenFinderResources().Color("color.desktop.viewcolor.01", rgb_color{54, 104, 150, 255}));
+        BFont font = OSTenFinderResources().Font("font.desktop", be_plain_font);
+        SetFont(&font);
 		_LayoutItems();
 	}
 
@@ -2053,13 +2144,7 @@ public:
 		// Route Finder commands to the window that actually has keyboard focus.
 		// The separate System menu bar must not decide which folder owns them.
 		if (numBytes == 1 && (modifiers() & B_COMMAND_KEY) != 0) {
-			uint32 command = 0;
-			switch (bytes[0]) {
-				case 'o': case 'O': command = kOSTenOpen; break;
-				case 'n': case 'N': command = kOSTenNewFolder; break;
-				case 'w': case 'W': command = kOSTenClose; break;
-				case 'a': case 'A': command = kOSTenSelectAll; break;
-			}
+			uint32 command = FinderKeyboardCommand(bytes[0]);
 			if (command != 0) {
 				Window()->PostMessage(command);
 				return;
@@ -2176,10 +2261,10 @@ private:
 	void _ShowContextMenu(BPoint where, desktop_item item)
 	{
 		BPopUpMenu* menu = new BPopUpMenu("", false, false);
-		menu->AddItem(new BMenuItem("Open", new BMessage(kOSTenOpen)));
+		menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.open", "Open"), new BMessage(kOSTenOpen)));
 		if (item == kTrashItem) {
 			menu->AddSeparatorItem();
-			menu->AddItem(new BMenuItem("Empty Trash...",
+			menu->AddItem(new BMenuItem(OSTenFinderResources().String("label.context.empty_trash", "Empty Trash..."),
 				new BMessage(kOSTenEmptyTrash)));
 		}
 		menu->SetTargetForItems(Window());
@@ -2191,12 +2276,19 @@ private:
 	void _LayoutItems()
 	{
 		BRect bounds = Bounds();
-		fDiskRect.Set(bounds.right - 82, 30, bounds.right - 30, 78);
-		fDiskHitRect.Set(bounds.right - 108, 24, bounds.right - 12, 100);
-		fTrashRect.Set(bounds.right - 81, bounds.bottom - 95,
-            bounds.right - 31, bounds.bottom - 47);
-		fTrashHitRect.Set(bounds.right - 108, bounds.bottom - 98,
-			bounds.right - 12, bounds.bottom - 20);
+        // Art and hit rectangles share the same user-editable geometry.
+        fDiskRect = OSTenFinderResources().Rect("desktop.disk.icon",
+            BRect(-82, 30, -30, 78));
+        fDiskRect.OffsetBy(bounds.right, 0);
+        fDiskHitRect = OSTenFinderResources().Rect("desktop.disk.hit",
+            BRect(-108, 24, -12, 100));
+        fDiskHitRect.OffsetBy(bounds.right, 0);
+        fTrashRect = OSTenFinderResources().Rect("desktop.trash.icon",
+            BRect(-81, -95, -31, -47));
+        fTrashRect.OffsetBy(bounds.right, bounds.bottom);
+        fTrashHitRect = OSTenFinderResources().Rect("desktop.trash.hit",
+            BRect(-108, -98, -12, -20));
+        fTrashHitRect.OffsetBy(bounds.right, bounds.bottom);
 	}
 
 	void _DrawLabel(const char* label, BRect hitRect, bool selected)
@@ -2206,11 +2298,11 @@ private:
 		float y = hitRect.bottom - 8;
 		BRect labelRect(x - 3, y - 13, x + width + 3, y + 3);
 		if (selected) {
-			SetHighColor(0, 0, 128);
+			SetHighColor(OSTenFinderResources().Color("color.desktop.highcolor.01", rgb_color{0, 0, 128, 255}));
 			FillRect(labelRect);
-			SetHighColor(255, 255, 255);
+			SetHighColor(OSTenFinderResources().Color("color.desktop.highcolor.02", rgb_color{255, 255, 255, 255}));
 		} else
-			SetHighColor(0, 0, 0);
+			SetHighColor(OSTenFinderResources().Color("color.desktop.highcolor.03", rgb_color{0, 0, 0, 255}));
 		DrawString(label, BPoint(x, y));
 	}
 
@@ -2274,7 +2366,8 @@ static BRect
 DesktopFrame()
 {
 	BRect frame = BScreen().Frame();
-	frame.top = 26;
+	frame.top = OSTenSystemResources().Number(
+        "layout.bar.height", 25, 24, 40) + 1;
 	return frame;
 }
 
@@ -2293,6 +2386,15 @@ public:
 		fFolderView(NULL)
 	{
 		AddChild(fView);
+        // The desktop shares Finder shortcuts, except that it cannot close.
+        AddShortcut(FinderShortcut("shortcut.open", 'O'), B_COMMAND_KEY,
+            new BMessage(kOSTenOpen));
+        AddShortcut(FinderShortcut("shortcut.new_folder", 'N'), B_COMMAND_KEY,
+            new BMessage(kOSTenNewFolder));
+        AddShortcut(FinderShortcut("shortcut.select_all", 'A'), B_COMMAND_KEY,
+            new BMessage(kOSTenSelectAll));
+        AddShortcut(FinderShortcut("shortcut.get_info", 'I'), B_COMMAND_KEY,
+            new BMessage(kOSTenGetInfo));
 		// Desktop icons are backed by the normal, visible Desktop directory.
 		BEntry desktopDirectory("/boot/home/Desktop");
 		entry_ref desktopRef;
@@ -2388,13 +2490,13 @@ private:
         BDirectory desktop("/boot/home/Desktop");
         if (desktop.InitCheck() != B_OK)
             return;
-        BString name("untitled folder");
+        BString name(OSTenFinderResources().String("dialog.folder.default_name", "untitled folder"));
         for (int32 suffix = 2; desktop.Contains(name.String()); suffix++)
-            name.SetToFormat("untitled folder %ld", (long)suffix);
+            name.SetToFormat("%s %ld", OSTenFinderResources().String("dialog.folder.default_name", "untitled folder"), (long)suffix);
         if (desktop.CreateDirectory(name.String(), NULL) == B_OK)
             fFolderView->Refresh(name.String());
         else
-            (new BAlert("New Folder", "The folder could not be created.",
+            (new BAlert(OSTenFinderResources().String("dialog.folder.new_title", "New Folder"), OSTenFinderResources().String("dialog.folder.create_failed", "The folder could not be created."),
                 "OK"))->Go();
     }
 
@@ -2421,12 +2523,26 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+        if (message->what == kOSTenQuerySystemFolderAccess) {
+            // This reflects Finder's existing Owner editing state. It does
+            // not claim filesystem-level security or grant any OS privilege.
+            BMessage reply(B_REPLY);
+            reply.AddBool("unlocked", sSystemFolderUnlocked.load());
+            message->SendReply(&reply);
+            return;
+        }
 		if (message->what == kOSTenSystemFolderAccess) {
 			if (!sSystemFolderUnlocked.load()) {
-				BAlert* dialog = new BAlert("System Folder Access",
-					"Owner: Unlock the System Folder for changes in Finder? "
-					"System files affect startup and stability. Finder will "
-					"lock it again when restarted.", "Keep Locked", "Unlock");
+                const OSTenResourceCatalog& ui = OSTenFinderResources();
+                BAlert* dialog = new BAlert(
+                    ui.String("dialog.system_folder_access.title",
+                        "System Folder Access"),
+                    ui.String("dialog.system_folder_access.unlock_message",
+                        "Owner: Unlock the System Folder for changes in Finder? "
+                        "System files affect startup and stability. Finder will "
+                        "lock it again when restarted."),
+                    ui.String("dialog.system_folder_access.keep_locked", "Keep Locked"),
+                    ui.String("dialog.system_folder_access.unlock_button", "Unlock"));
 				if (dialog->Go() == 1) {
 					// Opening the folder makes the access change observable
 					// instead of silently changing a hidden Finder flag.
@@ -2443,9 +2559,16 @@ public:
 					(new FinderWindow(ref, 0))->Show();
 				}
 			} else {
-				BAlert* dialog = new BAlert("System Folder Access",
-					"System Folder changes are currently unlocked in Finder. "
-					"Lock them now?", "Keep Unlocked", "Lock");
+                const OSTenResourceCatalog& ui = OSTenFinderResources();
+                BAlert* dialog = new BAlert(
+                    ui.String("dialog.system_folder_access.title",
+                        "System Folder Access"),
+                    ui.String("dialog.system_folder_access.lock_message",
+                        "System Folder changes are currently unlocked in Finder. "
+                        "Lock them now?"),
+                    ui.String("dialog.system_folder_access.keep_unlocked",
+                        "Keep Unlocked"),
+                    ui.String("dialog.system_folder_access.lock_button", "Lock"));
 				if (dialog->Go() == 1) {
 					sSystemFolderUnlocked.store(false);
 					(new BAlert("System Folder Access",
