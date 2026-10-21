@@ -5,6 +5,6 @@ SubDirHdrs $(HAIKU_TOP) src apps osten ;
 
 Application OSTenResourceEditor :
     ResourceEditor.cpp
-    : be translation [ TargetLibstdc++ ]
+    : be tracker translation [ TargetLibstdc++ ]
     : ResourceEditor.rdef
 ;

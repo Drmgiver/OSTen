@@ -335,15 +335,15 @@ public:
 
         _Label(OSTenSystemResources().String("about.text.label_01", "Built-in Memory:"),
             OSTenSystemResources().Point("about.position.label_01", BPoint(20, 143)), bold);
-        _Value(fHasInfo ? FormatMemory(installed) : OSTenSystemResources().String("about.unavailable", "Unavailable"), OSTenSystemResources().Point(
+        _Value(fHasInfo ? FormatMemory(installed) : BString(OSTenSystemResources().String("about.unavailable", "Unavailable")), OSTenSystemResources().Point(
             "about.position.value_01", BPoint(156, 143)), ordinary);
         _Label(OSTenSystemResources().String("about.text.label_02", "Memory In Use:"),
             OSTenSystemResources().Point("about.position.label_02", BPoint(20, 169)), bold);
-        _Value(fHasInfo ? FormatMemory(inUse) : OSTenSystemResources().String("about.unavailable", "Unavailable"), OSTenSystemResources().Point(
+        _Value(fHasInfo ? FormatMemory(inUse) : BString(OSTenSystemResources().String("about.unavailable", "Unavailable")), OSTenSystemResources().Point(
             "about.position.value_02", BPoint(156, 169)), ordinary);
         _Label(OSTenSystemResources().String("about.text.label_03", "Available Memory:"),
             OSTenSystemResources().Point("about.position.label_03", BPoint(20, 195)), bold);
-        _Value(fHasInfo ? FormatMemory(installed - inUse) : OSTenSystemResources().String("about.unavailable", "Unavailable"), OSTenSystemResources().Point(
+        _Value(fHasInfo ? FormatMemory(installed - inUse) : BString(OSTenSystemResources().String("about.unavailable", "Unavailable")), OSTenSystemResources().Point(
             "about.position.value_03", BPoint(156, 195)), ordinary);
 
         _Label(OSTenSystemResources().String("about.text.label_04", "Processors:"),
@@ -372,7 +372,7 @@ public:
 
         _Label(OSTenSystemResources().String("about.text.label_06", "Swap Capacity:"),
             OSTenSystemResources().Point("about.position.label_06", BPoint(311, 195)), bold);
-        _Value(fHasInfo ? FormatMemory(swapTotal) : OSTenSystemResources().String("about.unavailable", "Unavailable"), OSTenSystemResources().Point(
+        _Value(fHasInfo ? FormatMemory(swapTotal) : BString(OSTenSystemResources().String("about.unavailable", "Unavailable")), OSTenSystemResources().Point(
             "about.position.value_06", BPoint(427, 195)), ordinary);
 
         BRect usageBar = OSTenSystemResources().Rect(
