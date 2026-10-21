@@ -2368,7 +2368,8 @@ static BRect
 DesktopFrame()
 {
 	BRect frame = BScreen().Frame();
-	frame.top = 26;
+	frame.top = OSTenSystemResources().Number(
+        "layout.bar.height", 25, 24, 40) + 1;
 	return frame;
 }
 
