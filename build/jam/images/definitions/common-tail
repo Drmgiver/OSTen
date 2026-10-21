@@ -57,6 +57,23 @@ if $(HAIKU_BUILD_PROFILE) = nightly-osten-raw {
 	AddDirectoryToHaikuImage "System Folder" ;
 	AddFilesToHaikuImage "System Folder" : OSTenSystem : System ;
 	AddFilesToHaikuImage "System Folder" : OSTenFinder : Finder ;
+    # OSTen native, editable resources live outside the packaged Haiku base.
+    # Keep them visible and under the same Finder Owner lock as other System
+    # Folder contents. System and Finder read the same shortcut definitions.
+    AddDirectoryToHaikuImage "System Folder" Resources ;
+    AddDirectoryToHaikuImage "System Folder" Resources System ;
+    AddDirectoryToHaikuImage "System Folder" Resources Finder ;
+    local systemUi = <osten-resource-system>Interface.ostr ;
+    SEARCH on $(systemUi) =
+        [ FDirName $(HAIKU_TOP) data osten resources System ] ;
+    AddFilesToHaikuImage "System Folder" Resources System
+        : $(systemUi) : Interface.ostr ;
+    local finderUi = <osten-resource-finder>Interface.ostr ;
+    SEARCH on $(finderUi) =
+        [ FDirName $(HAIKU_TOP) data osten resources Finder ] ;
+    AddFilesToHaikuImage "System Folder" Resources Finder
+        : $(finderUi) : Interface.ostr ;
+
 	AddDirectoryToHaikuImage "System Folder" "Control Panels" ;
 	AddDirectoryToHaikuImage "System Folder" Extensions ;
 	AddDirectoryToHaikuImage "System Folder" Fonts ;
