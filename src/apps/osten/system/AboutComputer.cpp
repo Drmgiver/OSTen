@@ -33,13 +33,13 @@ namespace {
 const uint32 kRefreshAbout = 'osar';
 const uint32 kFocusAbout = 'osaf';
 
-const rgb_color kPaper = { 242, 242, 238, 255 };
-const rgb_color kInk = { 34, 34, 34, 255 };
-const rgb_color kMuted = { 95, 95, 95, 255 };
-const rgb_color kBlue = { 74, 113, 167, 255 };
-const rgb_color kPaleBlue = { 226, 233, 243, 255 };
-const rgb_color kBorder = { 155, 155, 155, 255 };
-const rgb_color kWhite = { 255, 255, 255, 255 };
+const rgb_color kPaper = OSTenSystemResources().Color("about.color.paper", rgb_color{ 242, 242, 238, 255 });
+const rgb_color kInk = OSTenSystemResources().Color("about.color.ink", rgb_color{ 34, 34, 34, 255 });
+const rgb_color kMuted = OSTenSystemResources().Color("about.color.muted", rgb_color{ 95, 95, 95, 255 });
+const rgb_color kBlue = OSTenSystemResources().Color("about.color.accent", rgb_color{ 74, 113, 167, 255 });
+const rgb_color kPaleBlue = OSTenSystemResources().Color("about.color.selection", rgb_color{ 226, 233, 243, 255 });
+const rgb_color kBorder = OSTenSystemResources().Color("about.color.border", rgb_color{ 155, 155, 155, 255 });
+const rgb_color kWhite = OSTenSystemResources().Color("about.color.white", rgb_color{ 255, 255, 255, 255 });
 
 struct ApplicationUsage {
     team_id team;
@@ -213,7 +213,9 @@ public:
             BPoint(frame.right, frame.bottom));
 
         owner->SetHighColor(kInk);
-        owner->SetFont(be_plain_font);
+        BFont itemFont = OSTenSystemResources().Font(
+            "about.font.app_row", be_plain_font);
+        owner->SetFont(&itemFont);
         BFont font;
         owner->GetFont(&font);
         BString label(fName);
@@ -291,13 +293,14 @@ public:
             SetDrawingMode(B_OP_COPY);
         } else {
             BFont title(be_bold_font);
-            title.SetSize(24);
+             title.SetSize(OSTenSystemResources().Number("about.font.title.size", 24, 6, 48));
             SetFont(&title);
-            DrawString("OSTen", BPoint(20, 46));
+            DrawString(OSTenSystemResources().String("about.fallback_name", "OSTen"),
+                BPoint(20, 46));
         }
 
         BFont caption(be_plain_font);
-        caption.SetSize(11);
+         caption.SetSize(OSTenSystemResources().Number("about.font.caption.size", 11, 6, 48));
         SetFont(&caption);
         SetHighColor(kMuted);
         DrawString(OSTenSystemResources().String(
@@ -312,9 +315,9 @@ public:
         StrokeLine(BPoint(18, 112), BPoint(560, 112));
 
         BFont ordinary(be_plain_font);
-        ordinary.SetSize(12);
+         ordinary.SetSize(OSTenSystemResources().Number("about.font.body.size", 12, 6, 48));
         BFont bold(be_bold_font);
-        bold.SetSize(12);
+         bold.SetSize(OSTenSystemResources().Number("about.font.heading.size", 12, 6, 48));
 
         uint64 installed = 0;
         uint64 inUse = 0;
@@ -378,13 +381,15 @@ public:
 
         SetHighColor(kMuted);
         SetFont(&caption);
-        DrawString("Physical memory in use", BPoint(20, 246));
+        DrawString(OSTenSystemResources().String("about.memory_label",
+            "Physical memory in use"), BPoint(20, 246));
 
         SetHighColor(kBorder);
         StrokeLine(BPoint(18, 256), BPoint(560, 256));
         SetHighColor(kInk);
         SetFont(&bold);
-        DrawString("Running Applications", BPoint(20, 278));
+        DrawString(OSTenSystemResources().String("about.applications_label",
+            "Running Applications"), BPoint(20, 278));
         SetFont(&caption);
         SetHighColor(kMuted);
         DrawString("Relative memory bar / approximate resident memory",
