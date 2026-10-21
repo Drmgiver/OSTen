@@ -124,3 +124,16 @@ about.font.heading.size=12
 about.memory_label=Physical memory in use
 about.applications_label=Running Applications
 about.fallback_name=OSTen
+
+# Global menu bar and notification layout, right-relative where documented
+layout.bar.height=25
+layout.bar.title=System
+layout.bar.tray=-225,1,-193,24
+layout.bar.clock=-191,1,-44,24
+layout.bar.switcher=-43,1,-2,24
+layout.bar.tray_clock_gap=2
+notification.window_frame=-425,32,-14,379
+notification.test.title=OSTen Notification Test
+notification.test.message=The native notification system is connected.
+notification.default_title=System Notification
+dialog.tray_diagnostics.title=System Tray Diagnostics
