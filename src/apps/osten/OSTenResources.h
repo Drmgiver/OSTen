@@ -86,6 +86,39 @@ public:
         return (float)parsed;
     }
 
+    BRect Rect(const char* key, BRect fallback) const
+    {
+        std::map<std::string, std::string>::const_iterator it
+            = fValues.find(key);
+        if (it == fValues.end())
+            return fallback;
+        float left, top, right, bottom;
+        char tail = 0;
+        if (sscanf(it->second.c_str(), "%f,%f,%f,%f%c",
+                &left, &top, &right, &bottom, &tail) != 4
+            || !isfinite(left) || !isfinite(top) || !isfinite(right)
+            || !isfinite(bottom) || left < -8192 || top < -8192
+            || right > 8192 || bottom > 8192
+            || right <= left || bottom <= top)
+            return fallback;
+        return BRect(left, top, right, bottom);
+    }
+
+    rgb_color Color(const char* key, rgb_color fallback) const
+    {
+        std::map<std::string, std::string>::const_iterator it
+            = fValues.find(key);
+        if (it == fValues.end())
+            return fallback;
+        unsigned red, green, blue;
+        char tail = 0;
+        if (sscanf(it->second.c_str(), "%u,%u,%u%c",
+                &red, &green, &blue, &tail) != 3
+            || red > 255 || green > 255 || blue > 255)
+            return fallback;
+        return rgb_color{(uint8)red, (uint8)green, (uint8)blue, 255};
+    }
+
     // 32-bit BGRA bitmap decoded from raw RGBA pixels (top row first).
     // Exact dimensions and file length are required; bad overrides are ignored.
     // The resource editor may replace these files, but they are never executed.
