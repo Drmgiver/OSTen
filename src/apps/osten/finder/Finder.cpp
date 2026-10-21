@@ -2525,6 +2525,14 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+        if (message->what == kOSTenQuerySystemFolderAccess) {
+            // This reflects Finder's existing Owner editing state. It does
+            // not claim filesystem-level security or grant any OS privilege.
+            BMessage reply(B_REPLY);
+            reply.AddBool("unlocked", sSystemFolderUnlocked.load());
+            message->SendReply(&reply);
+            return;
+        }
 		if (message->what == kOSTenSystemFolderAccess) {
 			if (!sSystemFolderUnlocked.load()) {
                 const OSTenResourceCatalog& ui = OSTenFinderResources();
