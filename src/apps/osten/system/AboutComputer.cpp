@@ -292,31 +292,31 @@ public:
                     BRect(20, 18, 267, 86)));
             SetDrawingMode(B_OP_COPY);
         } else {
-            BFont title(be_bold_font);
+            BFont title = OSTenSystemResources().Font("about.font.title", be_bold_font);
              title.SetSize(OSTenSystemResources().Number("about.font.title.size", 24, 6, 48));
             SetFont(&title);
             DrawString(OSTenSystemResources().String("about.fallback_name", "OSTen"),
-                BPoint(20, 46));
+                OSTenSystemResources().Point("about.point.01", BPoint(20, 46)));
         }
 
-        BFont caption(be_plain_font);
+        BFont caption = OSTenSystemResources().Font("about.font.caption", be_plain_font);
          caption.SetSize(OSTenSystemResources().Number("about.font.caption.size", 11, 6, 48));
         SetFont(&caption);
         SetHighColor(kMuted);
         DrawString(OSTenSystemResources().String(
-            "about.preview", "Developer Preview"), BPoint(292, 35));
+            "about.preview", "Developer Preview"), OSTenSystemResources().Point("about.point.02", BPoint(292, 35)));
         DrawString(OSTenSystemResources().String("about.tagline",
             "Classic Macintosh spirit. BeOS foundation."),
-            BPoint(292, 54));
+            OSTenSystemResources().Point("about.point.03", BPoint(292, 54)));
         DrawString(OSTenSystemResources().String(
-            "about.native", "Native OSTen desktop"), BPoint(292, 74));
+            "about.native", "Native OSTen desktop"), OSTenSystemResources().Point("about.point.04", BPoint(292, 74)));
 
         SetHighColor(kBorder);
-        StrokeLine(BPoint(18, 112), BPoint(560, 112));
+        StrokeLine(OSTenSystemResources().Point("about.point.05", BPoint(18, 112)), OSTenSystemResources().Point("about.point.06", BPoint(560, 112)));
 
-        BFont ordinary(be_plain_font);
+        BFont ordinary = OSTenSystemResources().Font("about.font.body", be_plain_font);
          ordinary.SetSize(OSTenSystemResources().Number("about.font.body.size", 12, 6, 48));
-        BFont bold(be_bold_font);
+        BFont bold = OSTenSystemResources().Font("about.font.heading", be_bold_font);
          bold.SetSize(OSTenSystemResources().Number("about.font.heading.size", 12, 6, 48));
 
         uint64 installed = 0;
@@ -333,41 +333,50 @@ public:
                 fInfo.max_swap_pages)) * pageSize;
         }
 
-        _Label("Built-in Memory:", 20, 143, bold);
-        _Value(fHasInfo ? FormatMemory(installed) : "Unavailable", 156,
-            143, ordinary);
-        _Label("Memory In Use:", 20, 169, bold);
-        _Value(fHasInfo ? FormatMemory(inUse) : "Unavailable", 156,
-            169, ordinary);
-        _Label("Available Memory:", 20, 195, bold);
-        _Value(fHasInfo ? FormatMemory(installed - inUse) : "Unavailable",
-            156, 195, ordinary);
+        _Label(OSTenSystemResources().String("about.text.label_01", "Built-in Memory:"),
+            OSTenSystemResources().Point("about.position.label_01", BPoint(20, 143)), bold);
+        _Value(fHasInfo ? FormatMemory(installed) : OSTenSystemResources().String("about.unavailable", "Unavailable"), OSTenSystemResources().Point(
+            "about.position.value_01", BPoint(156, 143)), ordinary);
+        _Label(OSTenSystemResources().String("about.text.label_02", "Memory In Use:"),
+            OSTenSystemResources().Point("about.position.label_02", BPoint(20, 169)), bold);
+        _Value(fHasInfo ? FormatMemory(inUse) : OSTenSystemResources().String("about.unavailable", "Unavailable"), OSTenSystemResources().Point(
+            "about.position.value_02", BPoint(156, 169)), ordinary);
+        _Label(OSTenSystemResources().String("about.text.label_03", "Available Memory:"),
+            OSTenSystemResources().Point("about.position.label_03", BPoint(20, 195)), bold);
+        _Value(fHasInfo ? FormatMemory(installed - inUse) : OSTenSystemResources().String("about.unavailable", "Unavailable"), OSTenSystemResources().Point(
+            "about.position.value_03", BPoint(156, 195)), ordinary);
 
-        _Label("Processors:", 311, 143, bold);
+        _Label(OSTenSystemResources().String("about.text.label_04", "Processors:"),
+            OSTenSystemResources().Point("about.position.label_04", BPoint(311, 143)), bold);
         BString processorCount;
         if (fHasInfo)
             processorCount.SetToFormat("%" B_PRIu32, fInfo.cpu_count);
         else
-            processorCount = "Unavailable";
-        _Value(processorCount, 427, 143, ordinary);
+            processorCount = OSTenSystemResources().String("about.unavailable", "Unavailable");
+        _Value(processorCount, OSTenSystemResources().Point(
+            "about.position.value_04", BPoint(427, 143)), ordinary);
 
-        _Label("Virtual Memory:", 311, 169, bold);
+        _Label(OSTenSystemResources().String("about.text.label_05", "Virtual Memory:"),
+            OSTenSystemResources().Point("about.position.label_05", BPoint(311, 169)), bold);
         BString swapText;
         if (fHasInfo && swapTotal > 0) {
             swapText = FormatMemory(swapUsed);
-            swapText << " used";
+            swapText << OSTenSystemResources().String("about.used_suffix", " used");
         } else if (fHasInfo) {
-            swapText = "Swap disabled";
+            swapText = OSTenSystemResources().String("about.swap_disabled", "Swap disabled");
         } else {
-            swapText = "Unavailable";
+            swapText = OSTenSystemResources().String("about.unavailable", "Unavailable");
         }
-        _Value(swapText, 427, 169, ordinary);
+        _Value(swapText, OSTenSystemResources().Point(
+            "about.position.value_05", BPoint(427, 169)), ordinary);
 
-        _Label("Swap Capacity:", 311, 195, bold);
-        _Value(fHasInfo ? FormatMemory(swapTotal) : "Unavailable", 427,
-            195, ordinary);
+        _Label(OSTenSystemResources().String("about.text.label_06", "Swap Capacity:"),
+            OSTenSystemResources().Point("about.position.label_06", BPoint(311, 195)), bold);
+        _Value(fHasInfo ? FormatMemory(swapTotal) : OSTenSystemResources().String("about.unavailable", "Unavailable"), OSTenSystemResources().Point(
+            "about.position.value_06", BPoint(427, 195)), ordinary);
 
-        BRect usageBar(20, 212, 560, 230);
+        BRect usageBar = OSTenSystemResources().Rect(
+            "about.memory_bar", BRect(20, 212, 560, 230));
         SetHighColor(kWhite);
         FillRect(usageBar);
         SetHighColor(kBorder);
@@ -376,45 +385,45 @@ public:
             float usedFraction = (float)((double)inUse / (double)installed);
             SetHighColor(kBlue);
             FillRect(BRect(usageBar.left + 1, usageBar.top + 1,
-                usageBar.left + 1 + 538 * usedFraction, usageBar.bottom - 1));
+                usageBar.left + 1 + (usageBar.Width() - 2) * usedFraction, usageBar.bottom - 1));
         }
 
         SetHighColor(kMuted);
         SetFont(&caption);
         DrawString(OSTenSystemResources().String("about.memory_label",
-            "Physical memory in use"), BPoint(20, 246));
+            "Physical memory in use"), OSTenSystemResources().Point("about.point.07", BPoint(20, 246)));
 
         SetHighColor(kBorder);
-        StrokeLine(BPoint(18, 256), BPoint(560, 256));
+        StrokeLine(OSTenSystemResources().Point("about.point.08", BPoint(18, 256)), OSTenSystemResources().Point("about.point.09", BPoint(560, 256)));
         SetHighColor(kInk);
         SetFont(&bold);
         DrawString(OSTenSystemResources().String("about.applications_label",
-            "Running Applications"), BPoint(20, 278));
+            "Running Applications"), OSTenSystemResources().Point("about.point.10", BPoint(20, 278)));
         SetFont(&caption);
         SetHighColor(kMuted);
-        DrawString("Relative memory bar / approximate resident memory",
-            BPoint(279, 278));
+        DrawString(OSTenSystemResources().String("about.text.bar_explanation", "Relative memory bar / approximate resident memory"),
+            OSTenSystemResources().Point("about.point.11", BPoint(279, 278)));
 
         SetHighColor(kMuted);
-        DrawString("App memory counts shared areas and may not add up to the",
-            BPoint(20, 524));
-        DrawString("system total. Values refresh every two seconds.",
-            BPoint(20, 539));
+        DrawString(OSTenSystemResources().String("about.text.footer_first", "App memory counts shared areas and may not add up to the"),
+            OSTenSystemResources().Point("about.point.12", BPoint(20, 524)));
+        DrawString(OSTenSystemResources().String("about.text.footer_second", "system total. Values refresh every two seconds."),
+            OSTenSystemResources().Point("about.point.13", BPoint(20, 539)));
     }
 
 private:
-    void _Label(const char* title, float x, float y, const BFont& font)
+    void _Label(const char* title, BPoint position, const BFont& font)
     {
         SetHighColor(kInk);
         SetFont(&font);
-        DrawString(title, BPoint(x, y));
+        DrawString(title, position);
     }
 
-    void _Value(const BString& value, float x, float y, const BFont& font)
+    void _Value(const BString& value, BPoint position, const BFont& font)
     {
         SetHighColor(kInk);
         SetFont(&font);
-        DrawString(value.String(), BPoint(x, y));
+        DrawString(value.String(), position);
     }
 
     BBitmap* fWordmark;
