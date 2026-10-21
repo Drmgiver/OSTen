@@ -63,3 +63,29 @@ strip.module.5.summary=Mounted volumes and removable media are not wired yet.
 strip.module.6.name=Settings
 strip.module.6.label=Set
 strip.module.6.summary=Control Strip preferences will be added here.
+
+# Control Strip order and appearance
+strip.module.order=0,1,2,3,4,5,6
+strip.title=Control Strip
+color.strip.border=48,48,52
+color.strip.background=222,222,225
+color.strip.highlight=255,255,255
+color.strip.shadow=110,110,116
+color.strip.handle_text=25,25,28
+color.strip.divider=130,130,134
+color.strip.divider_highlight=250,250,250
+color.strip.module_text=20,20,25
+# About This Computer resource bindings
+about.title=About OSTen
+about.frame=145,80,725,639
+about.wordmark_frame=20,18,267,86
+about.app_list_frame=19,296,542,497
+about.preview=Developer Preview
+about.tagline=Classic Macintosh spirit. BeOS foundation.
+about.native=Native OSTen desktop
+# System accessory resources
+dialog.ok=OK
+dialog.clock.title=OSTen Clock
+notification.title=Notification Center
+notification.clear=Clear All
+notification.test=Test Notification
