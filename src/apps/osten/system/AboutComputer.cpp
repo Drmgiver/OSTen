@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "AboutComputer.h"
+#include "OSTenResources.h"
 #include "OSTenAboutWordmark.h"
 
 
@@ -70,6 +71,10 @@ CreateWordmark()
 {
     const int width = kOSTenAboutWordmarkWidth;
     const int height = kOSTenAboutWordmarkHeight;
+    BBitmap* replacement = OSTenSystemResources().Bitmap(
+        "about-wordmark", width, height);
+    if (replacement != NULL)
+        return replacement;
     BBitmap* bitmap = new BBitmap(BRect(0, 0, width - 1, height - 1),
         B_RGBA32);
     if (bitmap->InitCheck() != B_OK) {
@@ -280,7 +285,9 @@ public:
         if (fWordmark != NULL) {
             SetDrawingMode(B_OP_ALPHA);
             SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
-            DrawBitmap(fWordmark, fWordmark->Bounds(), BRect(20, 18, 267, 86));
+            DrawBitmap(fWordmark, fWordmark->Bounds(),
+                OSTenSystemResources().Rect("about.wordmark_frame",
+                    BRect(20, 18, 267, 86)));
             SetDrawingMode(B_OP_COPY);
         } else {
             BFont title(be_bold_font);
@@ -293,10 +300,13 @@ public:
         caption.SetSize(11);
         SetFont(&caption);
         SetHighColor(kMuted);
-        DrawString("Developer Preview", BPoint(292, 35));
-        DrawString("Classic Macintosh spirit. BeOS foundation.",
+        DrawString(OSTenSystemResources().String(
+            "about.preview", "Developer Preview"), BPoint(292, 35));
+        DrawString(OSTenSystemResources().String("about.tagline",
+            "Classic Macintosh spirit. BeOS foundation."),
             BPoint(292, 54));
-        DrawString("Native OSTen desktop", BPoint(292, 74));
+        DrawString(OSTenSystemResources().String(
+            "about.native", "Native OSTen desktop"), BPoint(292, 74));
 
         SetHighColor(kBorder);
         StrokeLine(BPoint(18, 112), BPoint(560, 112));
@@ -412,7 +422,9 @@ class AboutComputerWindow : public BWindow {
 public:
     AboutComputerWindow()
         :
-        BWindow(BRect(145, 80, 725, 639), "About OSTen",
+        BWindow(OSTenSystemResources().Rect("about.frame",
+                BRect(145, 80, 725, 639)),
+            OSTenSystemResources().String("about.title", "About OSTen"),
             B_TITLED_WINDOW, B_NORMAL_WINDOW_FEEL,
             B_NOT_ZOOMABLE | B_NOT_RESIZABLE),
         fOverview(NULL),
@@ -423,7 +435,8 @@ public:
         fOverview = new AboutOverviewView(frame);
         AddChild(fOverview);
 
-        fList = new BListView(BRect(19, 296, 542, 497),
+        fList = new BListView(OSTenSystemResources().Rect(
+                "about.app_list_frame", BRect(19, 296, 542, 497)),
             "Running applications", B_SINGLE_SELECTION_LIST,
             B_FOLLOW_LEFT_TOP);
         fList->SetViewColor(kWhite);
