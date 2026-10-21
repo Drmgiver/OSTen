@@ -222,3 +222,9 @@ decorator.colors.resize_01=216,216,216
 decorator.colors.resize_02=224,224,224
 decorator.colors.resize_03=71,71,71
 decorator.colors.resize_04=139,139,139
+
+# Additional native System dialogs and error strings
+dialog.notifications.title=Notifications
+dialog.notifications.unavailable=The notification service is unavailable.
+dialog.power.error=The system could not shut down: 
+dialog.system.title=System

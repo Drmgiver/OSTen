@@ -149,7 +149,7 @@ public:
         StrokeRect(Bounds().InsetByCopy(1, 1));
         if (!fValid) {
             SetHighColor(70, 70, 70);
-            DrawString("Select a rectangle resource to preview and drag.",
+            DrawString(EditorResources().String("editor.preview_hint", "Select a rectangle resource to preview and drag."),
                 BPoint(20, 37));
             return;
         }
@@ -175,7 +175,7 @@ public:
         StrokeRect(visual);
         SetPenSize(1);
         SetHighColor(15, 56, 102);
-        DrawString("Drag to reposition", BPoint(visual.left + 8,
+        DrawString(EditorResources().String("editor.drag_hint", "Drag to reposition"), BPoint(visual.left + 8,
             std::min(visual.bottom - 5, visual.top + 21)));
     }
 
@@ -267,7 +267,7 @@ public:
             B_FOLLOW_LEFT | B_FOLLOW_TOP_BOTTOM, 0, false, true));
 
         background->AddChild(new BStringView(EditorResources().Rect("editor.geometry.06", BRect(339, 52, 935, 74)),
-            "hint", "Select a resource. Apply edits, then Save."));
+            "hint", EditorResources().String("editor.property_hint", "Select a resource. Apply edits, then Save.")));
         fKey = new BTextControl(EditorResources().Rect("editor.geometry.07", BRect(339, 80, 941, 108)),
             "key", EditorResources().String("editor.key", "Key:"), "", NULL);
         fKey->SetDivider(75);
@@ -279,7 +279,7 @@ public:
         fAssetMenu = new BPopUpMenu("Artwork");
         BMenuField* assets = new BMenuField(EditorResources().Rect(
                 "editor.geometry.09", BRect(339, 155, 626, 189)),
-            "artwork", "Artwork:", fAssetMenu);
+            "artwork", EditorResources().String("editor.artwork", "Artwork:"), fAssetMenu);
         assets->SetDivider(75);
         background->AddChild(assets);
         fArtImport = new BButton(EditorResources().Rect(
@@ -298,7 +298,7 @@ public:
         fPreview = new RectanglePreview(EditorResources().Rect("editor.geometry.12", BRect(339, 202, 941, 445)));
         background->AddChild(fPreview);
         background->AddChild(new BStringView(EditorResources().Rect("editor.geometry.13", BRect(342, 456, 923, 480)),
-            "ordering", "Menu or module order (select an item to move it):"));
+            "ordering", EditorResources().String("editor.order_hint", "Menu or module order (select an item to move it):")));
         fOrder = new BListView(EditorResources().Rect("editor.geometry.14", BRect(339, 485, 752, 566)),
             "Order", B_SINGLE_SELECTION_LIST);
         background->AddChild(new BScrollView("Order list", fOrder,
@@ -308,7 +308,7 @@ public:
         background->AddChild(new BButton(EditorResources().Rect("editor.geometry.16", BRect(771, 530, 853, 559)),
             "down", EditorResources().String("editor.down", "Down"), new BMessage(kMoveDown)));
         fStatus = new BStringView(EditorResources().Rect("editor.geometry.17", BRect(14, 587, 940, 614)),
-            "status", "Choose a resource set.");
+            "status", EditorResources().String("editor.status_no_resource", "Choose a resource set."));
         background->AddChild(fStatus);
         _RefreshAssets();
         Show();
@@ -794,16 +794,15 @@ private:
             _Status("Graphic import failed. Existing resource preserved.");
             return;
         }
+        // Installing a resource does not require making a backup.
         std::string backup = path + ".bak";
-        if (access(path.c_str(), F_OK) == 0) {
-            if (rename(path.c_str(), backup.c_str()) != 0) {
-                unlink(&filename[0]);
-                _Status("Cannot back up previous graphic.");
-                return;
-            }
-        }
+        bool keptBackup = EditorResources().Number(
+            "editor.keep_backup", 0, 0, 1) >= 0.5f
+            && access(path.c_str(), F_OK) == 0
+            && rename(path.c_str(), backup.c_str()) == 0;
         if (rename(&filename[0], path.c_str()) != 0) {
-            rename(backup.c_str(), path.c_str());
+            if (keptBackup)
+                rename(backup.c_str(), path.c_str());
             unlink(&filename[0]);
             _Status("Cannot install graphic. Previous resource restored.");
             return;
@@ -878,22 +877,22 @@ private:
             return;
         }
 
-        // Keep a revertible previous version, even when this is a system UI.
-        // If final replacement fails, restore the original manifest.
+        // The Owner decides whether to keep backups. A backup failure
+        // must not veto a permitted resource modification.
         std::string backup = fPath + ".bak";
-        if (rename(fPath.c_str(), backup.c_str()) != 0) {
-            unlink(&name[0]);
-            _Status("Could not back up original resources.");
-            return;
-        }
+        bool keptBackup = EditorResources().Number(
+            "editor.keep_backup", 0, 0, 1) >= 0.5f
+            && rename(fPath.c_str(), backup.c_str()) == 0;
         if (rename(&name[0], fPath.c_str()) != 0) {
-            rename(backup.c_str(), fPath.c_str());
+            if (keptBackup)
+                rename(backup.c_str(), fPath.c_str());
             unlink(&name[0]);
-            _Status("Could not install edited resources. Original restored.");
+            _Status("Could not install edited resources. Original preserved.");
             return;
         }
         fDirty = false;
-        _Status("Saved. Backup: " + backup + ". Restart the edited app.");
+        _Status(keptBackup ? "Saved with backup. Restart the edited app."
+            : "Saved. Restart the edited app.");
     }
 
     void _Status(const std::string& text)

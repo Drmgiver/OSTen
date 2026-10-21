@@ -310,17 +310,16 @@ TransferEntries(const BMessage* message, const entry_ref& targetRef,
 	if (firstError != B_OK) {
 		BString explanation;
 		if (firstError == B_PERMISSION_DENIED) {
-			explanation = "The System Folder is locked.\n\n"
-				"Use Special > System Folder Access... to unlock it.";
+			explanation = OSTenFinderResources().String("dialog.transfer.locked", "The System Folder is locked.\n\nUse Special > System Folder Access... to unlock it.");
 		} else {
-			explanation = "The item could not be moved or copied.\n\n";
+			explanation = OSTenFinderResources().String("dialog.transfer.error", "The item could not be moved or copied.\n\n");
 			explanation << strerror(firstError);
 		}
 		if (!recoveryPath.IsEmpty()) {
-			explanation << "\n\nFiles were kept for recovery in:\n"
+			explanation << OSTenFinderResources().String("dialog.transfer.recovery", "\n\nFiles were kept for recovery in:\n")
 				<< recoveryPath;
 		}
-		(new BAlert("Finder", explanation.String(), "OK"))->Go();
+		(new BAlert(OSTenFinderResources().String("dialog.finder.title", "Finder"), explanation.String(), "OK"))->Go();
 	}
 	be_app->PostMessage(kFinderRefreshAll);
 }
@@ -907,7 +906,7 @@ private:
                 details << "An item with this name already exists.";
             else
                 details << strerror(error);
-            (new BAlert("Rename", details.String(), "OK"))->Go();
+            (new BAlert(OSTenFinderResources().String("dialog.rename.title", "Rename"), details.String(), "OK"))->Go();
             Refresh(previous.String());
             return;
         }
@@ -1939,22 +1938,21 @@ private:
 		if (!sSystemFolderUnlocked.load()
 			&& current.GetPath(&currentPath) == B_OK
 			&& IsOSTenSystemFolderPath(currentPath)) {
-			(new BAlert("System Folder",
-				"The System Folder is locked. Use Special > "
-				"System Folder Access... to unlock it.", "OK"))->Go();
+			(new BAlert(OSTenFinderResources().String("dialog.folder.locked_title", "System Folder"),
+				OSTenFinderResources().String("dialog.folder.locked", "The System Folder is locked. Use Special > System Folder Access... to unlock it."), "OK"))->Go();
 			return;
 		}
 		BDirectory directory(&fDirectory);
-		BString name("untitled folder");
+		BString name(OSTenFinderResources().String("dialog.folder.default_name", "untitled folder"));
 		int32 suffix = 2;
 		while (directory.Contains(name.String())) {
-			name.SetToFormat("untitled folder %ld", (long)suffix);
+			name.SetToFormat("%s %ld", OSTenFinderResources().String("dialog.folder.default_name", "untitled folder"), (long)suffix);
 			suffix++;
 		}
 		if (directory.CreateDirectory(name.String(), NULL) == B_OK)
 			fView->Refresh(name.String());
 		else {
-			(new BAlert("New Folder", "The folder could not be created.",
+			(new BAlert(OSTenFinderResources().String("dialog.folder.new_title", "New Folder"), OSTenFinderResources().String("dialog.folder.create_failed", "The folder could not be created."),
 				"OK"))->Go();
 		}
 	}
@@ -2083,9 +2081,9 @@ OpenFinderEntry(const entry_ref& ref, int32 depth)
     } else {
         status_t error = be_roster->Launch(&ref);
         if (error != B_OK) {
-            BString reason("The file could not be opened.\n\n");
+            BString reason(OSTenFinderResources().String("dialog.open.failed", "The file could not be opened.\n\n"));
             reason << strerror(error);
-            (new BAlert("Finder", reason.String(), "OK"))->Go();
+            (new BAlert(OSTenFinderResources().String("dialog.finder.title", "Finder"), reason.String(), "OK"))->Go();
         }
     }
 }
@@ -2492,13 +2490,13 @@ private:
         BDirectory desktop("/boot/home/Desktop");
         if (desktop.InitCheck() != B_OK)
             return;
-        BString name("untitled folder");
+        BString name(OSTenFinderResources().String("dialog.folder.default_name", "untitled folder"));
         for (int32 suffix = 2; desktop.Contains(name.String()); suffix++)
-            name.SetToFormat("untitled folder %ld", (long)suffix);
+            name.SetToFormat("%s %ld", OSTenFinderResources().String("dialog.folder.default_name", "untitled folder"), (long)suffix);
         if (desktop.CreateDirectory(name.String(), NULL) == B_OK)
             fFolderView->Refresh(name.String());
         else
-            (new BAlert("New Folder", "The folder could not be created.",
+            (new BAlert(OSTenFinderResources().String("dialog.folder.new_title", "New Folder"), OSTenFinderResources().String("dialog.folder.create_failed", "The folder could not be created."),
                 "OK"))->Go();
     }
 

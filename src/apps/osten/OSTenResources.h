@@ -58,8 +58,10 @@ public:
                     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-")
                 != std::string::npos)
                 continue;
+            // Escaped newlines/tabs keep multi-line UI strings editable
+            // in a single-line .ostr manifest without executable logic.
             if (fValues.size() < 2048)
-                fValues[key] = value;
+                fValues[key] = _Unescape(value);
         }
         fclose(file);
     }
@@ -194,6 +196,32 @@ public:
     }
 
 private:
+    static std::string _Unescape(const std::string& text)
+    {
+        std::string output;
+        output.reserve(text.size());
+        for (size_t i = 0; i < text.size(); ++i) {
+            if (text[i] != '\\' || i + 1 >= text.size()) {
+                output += text[i];
+                continue;
+            }
+            char next = text[i + 1];
+            if (next == 'n') {
+                output += '\n';
+                ++i;
+            } else if (next == 't') {
+                output += '\t';
+                ++i;
+            } else if (next == '\\') {
+                output += '\\';
+                ++i;
+            } else {
+                output += text[i]; // Unknown escapes remain literal.
+            }
+        }
+        return output;
+    }
+
     std::string fDirectory;
     std::map<std::string, std::string> fValues;
 };

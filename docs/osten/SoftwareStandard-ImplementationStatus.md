@@ -67,3 +67,17 @@ modifying or removing permitted resources.
 The active implementation resides in draft pull request
 [#1](https://github.com/Drmgiver/OSTen/pull/1).
 **Do not merge into `osten/main` before Owner approval.**
+
+## Native compliance audit (October 21, 2026)
+
+The source-level compliance audit is recorded in
+[NativeComplianceAudit.md](NativeComplianceAudit.md). Resource Editor,
+Finder and System remain **partially compliant**—the current alpha
+does not meet the universal requirement.
+
+The latest revision makes Resource Editor's browser appearance,
+paint swatches, and selected Finder/System dialog text editable
+through their respective manifests. Multi-line UI strings may be
+encoded as `\\n`, tabs as `\\t`, and literal backslashes as `\\\\`
+in a one-line manifest. Resource writes no longer depend on a
+successful automatic backup. Backups are opt-in and Owner-managed.

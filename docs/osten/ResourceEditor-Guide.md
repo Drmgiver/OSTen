@@ -103,3 +103,18 @@ and automated booted-OS interaction tests are also still needed.
 
 The definition of OSTen-native compliance remains in
 [SoftwareStandard.md](SoftwareStandard.md).
+
+## Owner-directed saving
+
+ResEdit saves the selected resource directly and atomically by default.
+Automatic backup creation is **not required**. To opt into `.bak`
+copies, edit `browser.pixel.keep_backup=1` and
+`editor.keep_backup=1` in the Resource Editor's own catalog, then
+restart Resource Editor. Failed backup creation does not block an
+otherwise permitted edit. Existing Undo Save/Undo Art only work where
+a backup file actually exists. Make a working copy first if you want
+to keep the original unchanged.
+
+The current implementation still requires complete resource-ID, schema,
+menu/dialog and global-menu work before it can claim full compliance.
+See [NativeComplianceAudit.md](NativeComplianceAudit.md).

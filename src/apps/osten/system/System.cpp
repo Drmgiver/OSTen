@@ -454,9 +454,9 @@ public:
                     "The native notification system is connected."));
 			test.SetGroup("OSTen");
 			if (test.Send() != B_OK)
-				(new BAlert("Notifications",
-					"The notification service is unavailable.",
-					"OK"))->Go(NULL);
+				(new BAlert(OSTenSystemResources().String("dialog.notifications.title", "Notifications"),
+                    OSTenSystemResources().String("dialog.notifications.unavailable", "The notification service is unavailable."),
+                    OSTenSystemResources().String("dialog.ok", "OK")))->Go(NULL);
 			return;
 		}
 		if (message->what == kOSTenNewNotice) {
@@ -556,9 +556,9 @@ public:
 			BRoster::Private privateRoster(roster);
 			status_t error = privateRoster.ShutDown(restart, false, false);
 			if (error != B_OK) {
-				BString explanation("The system could not shut down: ");
+				BString explanation(OSTenSystemResources().String("dialog.power.error", "The system could not shut down: "));
 				explanation << strerror(error);
-				(new BAlert("System", explanation.String(), "OK"))->Go();
+				(new BAlert(OSTenSystemResources().String("dialog.system.title", "System"), explanation.String(), OSTenSystemResources().String("dialog.ok", "OK")))->Go();
 			}
 			return;
 		}

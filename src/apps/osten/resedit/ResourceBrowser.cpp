@@ -4,6 +4,7 @@
 // is defined. Raw RGBA images are genuine editable resource entries.
 #include "ResourceBrowser.h"
 #include "OSTenMessages.h"
+#include "OSTenResources.h"
 
 #include <Alert.h>
 #include <Application.h>
@@ -36,6 +37,12 @@
 #include <vector>
 
 namespace {
+
+static const OSTenResourceCatalog& BrowserUI()
+{
+    static OSTenResourceCatalog ui("ResourceEditor");
+    return ui;
+}
 
 enum {
     kOpenFile = 'rbOp', kFileChosen = 'rbFc', kOpenType = 'rbTy',
@@ -135,8 +142,8 @@ OwnerMayWrite(const std::string& path)
     bool unlocked = false;
     if (finder.SendMessage(&query, &reply, 500000, 500000) != B_OK
         || reply.FindBool("unlocked", &unlocked) != B_OK || !unlocked) {
-        (new BAlert("System Folder locked",
-            "Unlock System Folder Access from Finder's Special menu first.",
+        (new BAlert(BrowserUI().String("browser.alert.locked_title", "System Folder locked"),
+            BrowserUI().String("browser.alert.locked_message", "Unlock System Folder Access from Finder's Special menu first."),
             "OK"))->Go();
         return false;
     }
@@ -213,8 +220,9 @@ public:
 
     void DrawItem(BView* view, BRect rect, bool) override
     {
-        view->SetHighColor(IsSelected() ? rgb_color{192, 217, 243, 255}
-            : rgb_color{250, 250, 249, 255});
+        view->SetHighColor(IsSelected()
+            ? BrowserUI().Color("browser.types.selected", rgb_color{192, 217, 243, 255})
+            : BrowserUI().Color("browser.types.item_background", rgb_color{250, 250, 249, 255}));
         view->FillRect(rect);
         BRect emblem(rect.left + 9, rect.top + 7,
             rect.left + 53, rect.top + 51);
@@ -255,8 +263,9 @@ public:
 
     void DrawItem(BView* view, BRect rect, bool) override
     {
-        view->SetHighColor(IsSelected() ? rgb_color{192, 217, 243, 255}
-            : rgb_color{252, 252, 252, 255});
+        view->SetHighColor(IsSelected()
+            ? BrowserUI().Color("browser.entries.selected", rgb_color{192, 217, 243, 255})
+            : BrowserUI().Color("browser.entries.item_background", rgb_color{252, 252, 252, 255}));
         view->FillRect(rect);
         if (fBitmap != NULL) {
             BRect picture(rect.left + 9, rect.top + 7,
@@ -273,7 +282,7 @@ public:
             view->FillRect(icon);
             view->SetHighColor(100, 110, 120);
             view->StrokeRect(icon);
-            view->DrawString("TXT", BPoint(rect.left + 19, rect.top + 34));
+            view->DrawString(BrowserUI().String("browser.entries.generic_icon", "TXT"), BPoint(rect.left + 19, rect.top + 34));
         }
         view->SetHighColor(25, 25, 25);
         view->DrawString(fEntry.label.c_str(),
@@ -293,7 +302,7 @@ private:
     BBitmap* fBitmap;
 };
 
-static const rgb_color kPalette[] = {
+static const rgb_color kDefaultPalette[] = {
     {0, 0, 0, 0}, {0, 0, 0, 255}, {255, 255, 255, 255},
     {220, 42, 47, 255}, {255, 140, 44, 255},
     {252, 214, 47, 255}, {76, 166, 72, 255},
@@ -303,6 +312,16 @@ static const rgb_color kPalette[] = {
     {133, 206, 223, 255}, {105, 65, 110, 255},
     {222, 209, 175, 255}
 };
+
+static rgb_color
+PaletteColor(int slot)
+{
+    if (slot <= 0) return rgb_color{0, 0, 0, 0};
+    if (slot >= 16) return rgb_color{0, 0, 0, 255};
+    char key[64];
+    snprintf(key, sizeof(key), "browser.palette.%02d", slot);
+    return BrowserUI().Color(key, kDefaultPalette[slot]);
+}
 
 class PixelCanvas : public BView {
 public:
@@ -314,7 +333,7 @@ public:
     {
         fScale = std::max(1, std::min(8, std::min(
             485 / entry.width, 480 / entry.height)));
-        SetViewColor(245, 245, 245);
+        SetViewColor(BrowserUI().Color("browser.pixel.canvas_background", rgb_color{245, 245, 245, 255}));
     }
 
     bool Dirty() const { return fDirty; }
@@ -332,7 +351,7 @@ public:
     void Draw(BRect) override
     {
         // The canvas, a usable 1:1 preview, and a selectable color palette.
-        SetHighColor(225, 225, 225);
+        SetHighColor(BrowserUI().Color("browser.pixel.board_background", rgb_color{225, 225, 225, 255}));
         FillRect(Bounds());
         for (int y = 0; y < fEntry.height; ++y) {
             for (int x = 0; x < fEntry.width; ++x) {
@@ -360,13 +379,13 @@ public:
         StrokeRect(BRect(15, 15, 16 + fEntry.width * fScale,
             16 + fEntry.height * fScale));
         SetHighColor(40, 40, 40);
-        DrawString("Palette (click a color)", BPoint(545, 25));
+        DrawString(BrowserUI().String("browser.pixel.palette_hint", "Palette (click a color)"), BPoint(545, 25));
         for (int i = 0; i < 16; ++i) {
             int x = 546 + (i % 4) * 34;
             int y = 39 + (i / 4) * 34;
             BRect swatch(x, y, x + 27, y + 27);
-            SetHighColor(kPalette[i].alpha == 0
-                ? rgb_color{248, 248, 248, 255} : kPalette[i]);
+            SetHighColor(i == 0
+                ? BrowserUI().Color("browser.pixel.transparent_swatch", rgb_color{248, 248, 248, 255}) : PaletteColor(i));
             FillRect(swatch);
             SetHighColor(i == fColor
                 ? rgb_color{0, 95, 200, 255}
@@ -374,7 +393,7 @@ public:
             SetPenSize(i == fColor ? 3 : 1);
             StrokeRect(swatch);
             SetPenSize(1);
-            if (kPalette[i].alpha == 0) {
+            if (i == 0) {
                 SetHighColor(200, 40, 40);
                 StrokeLine(BPoint(x + 2, y + 25),
                     BPoint(x + 25, y + 2));
@@ -382,7 +401,7 @@ public:
         }
 
         SetHighColor(40, 40, 40);
-        DrawString("Actual pixels", BPoint(545, 224));
+        DrawString(BrowserUI().String("browser.pixel.actual_hint", "Actual pixels"), BPoint(545, 224));
         int scale = std::max(1, std::min(2,
             std::min(198 / fEntry.width, 180 / fEntry.height)));
         for (int y = 0; y < fEntry.height; ++y) {
@@ -397,7 +416,7 @@ public:
             }
         }
         SetHighColor(80, 80, 80);
-        DrawString("Transparent swatch = eraser",
+        DrawString(BrowserUI().String("browser.pixel.transparent_hint", "Transparent swatch = eraser"),
             BPoint(545, 460));
     }
 
@@ -434,7 +453,7 @@ private:
             || x < 0 || x >= fEntry.width || y < 0 || y >= fEntry.height)
             return false;
         size_t i = ((size_t)y * fEntry.width + x) * 4;
-        const rgb_color& paint = kPalette[fColor];
+        const rgb_color paint = PaletteColor(fColor);
         if (fPixels[i] == paint.red && fPixels[i + 1] == paint.green
             && fPixels[i + 2] == paint.blue && fPixels[i + 3] == paint.alpha)
             return true;
@@ -459,53 +478,53 @@ private:
 class PixelEditorWindow : public BWindow {
 public:
     explicit PixelEditorWindow(const ResourceEntry& entry)
-        : BWindow(BRect(135, 75, 905, 711),
-              (entry.label + " — Pixel Editor").c_str(), B_TITLED_WINDOW, 0),
+        : BWindow(BrowserUI().Rect("browser.pixel.window", BRect(135, 75, 905, 711)),
+              (entry.label + BrowserUI().String("browser.pixel.title_suffix", " — Pixel Editor")).c_str(), B_TITLED_WINDOW, 0),
           fEntry(entry), fCanvas(NULL), fStatus(NULL)
     {
         std::vector<uint8> rgba;
         if (!ReadPixels(entry, rgba)) {
-            (new BAlert("Cannot open artwork",
-                "The RGBA image is missing or has the wrong dimensions.",
+            (new BAlert(BrowserUI().String("browser.alert.cannot_open_title", "Cannot open artwork"),
+                BrowserUI().String("browser.alert.cannot_open_message", "The RGBA image is missing or has the wrong dimensions."),
                 "OK"))->Go();
             PostMessage(B_QUIT_REQUESTED);
             return;
         }
         BView* background = new BView(Bounds(), "background",
             B_FOLLOW_ALL, B_WILL_DRAW);
-        background->SetViewColor(239, 239, 236);
+        background->SetViewColor(BrowserUI().Color("browser.pixel.background", rgb_color{239, 239, 236, 255}));
         AddChild(background);
-        fCanvas = new PixelCanvas(BRect(10, 10, 758, 548), entry, rgba);
+        fCanvas = new PixelCanvas(BrowserUI().Rect("browser.pixel.canvas", BRect(10, 10, 758, 548)), entry, rgba);
         background->AddChild(fCanvas);
         char heading[256];
         snprintf(heading, sizeof(heading),
             "%s  |  %d x %d RGBA  |  paint with mouse",
             entry.label.c_str(), entry.width, entry.height);
-        fStatus = new BStringView(BRect(20, 557, 745, 584),
+        fStatus = new BStringView(BrowserUI().Rect("browser.pixel.status_frame", BRect(20, 557, 745, 584)),
             "pixel-status", heading);
         background->AddChild(fStatus);
-        background->AddChild(new BButton(BRect(390, 590, 505, 624),
-            "undo-pixel", "Undo Save", new BMessage(kUndoPixels)));
-        background->AddChild(new BButton(BRect(511, 590, 614, 624),
-            "revert-pixel", "Revert", new BMessage(kRevertPixels)));
-        background->AddChild(new BButton(BRect(626, 590, 744, 624),
-            "save-pixel", "Save", new BMessage(kSavePixels)));
+        background->AddChild(new BButton(BrowserUI().Rect("browser.pixel.undo_frame", BRect(390, 590, 505, 624)),
+            "undo-pixel", BrowserUI().String("browser.pixel.undo", "Undo Save"), new BMessage(kUndoPixels)));
+        background->AddChild(new BButton(BrowserUI().Rect("browser.pixel.revert_frame", BRect(511, 590, 614, 624)),
+            "revert-pixel", BrowserUI().String("browser.pixel.revert", "Revert"), new BMessage(kRevertPixels)));
+        background->AddChild(new BButton(BrowserUI().Rect("browser.pixel.save_frame", BRect(626, 590, 744, 624)),
+            "save-pixel", BrowserUI().String("browser.pixel.save", "Save"), new BMessage(kSavePixels)));
         Show();
     }
 
     bool QuitRequested() override
     {
         return fCanvas == NULL || !fCanvas->Dirty()
-            || (new BAlert("Unsaved icon",
-                "Discard the unsaved pixel changes?",
-                "Cancel", "Discard"))->Go() == 1;
+            || (new BAlert(BrowserUI().String("browser.alert.unsaved_title", "Unsaved icon"),
+                BrowserUI().String("browser.alert.unsaved_message", "Discard the unsaved pixel changes?"),
+                BrowserUI().String("browser.alert.cancel", "Cancel"), BrowserUI().String("browser.alert.discard", "Discard")))->Go() == 1;
     }
 
     void MessageReceived(BMessage* message) override
     {
         switch (message->what) {
             case kPixelsChanged:
-                fStatus->SetText("Pixel artwork changed — Save to write.");
+                fStatus->SetText(BrowserUI().String("browser.pixel.changed", "Pixel artwork changed — Save to write."));
                 return;
             case kSavePixels: _Save(); return;
             case kRevertPixels: _Revert(); return;
@@ -520,9 +539,9 @@ private:
         std::vector<uint8> bytes;
         if (ReadPixels(fEntry, bytes)) {
             fCanvas->Reload(bytes);
-            fStatus->SetText("Reloaded saved artwork.");
+            fStatus->SetText(BrowserUI().String("browser.pixel.reloaded", "Reloaded saved artwork."));
         } else
-            fStatus->SetText("Unable to reload original artwork.");
+            fStatus->SetText(BrowserUI().String("browser.pixel.reload_failed", "Unable to reload original artwork."));
     }
 
     void _UndoSave()
@@ -531,7 +550,7 @@ private:
             return;
         std::string backup = fEntry.path + ".bak";
         if (!ExistingFile(backup)) {
-            fStatus->SetText("No saved backup exists.");
+            fStatus->SetText(BrowserUI().String("browser.pixel.no_backup", "No saved backup exists."));
             return;
         }
         std::string swap = fEntry.path + ".undo.XXXXXX";
@@ -539,7 +558,7 @@ private:
         temp.push_back('\0');
         int fd = mkstemp(temp.data());
         if (fd < 0) {
-            fStatus->SetText("Could not prepare undo.");
+            fStatus->SetText(BrowserUI().String("browser.pixel.undo_failed", "Could not prepare undo."));
             return;
         }
         close(fd);
@@ -547,18 +566,18 @@ private:
         if (rename(fEntry.path.c_str(), temp.data()) != 0
             || rename(backup.c_str(), fEntry.path.c_str()) != 0) {
             rename(temp.data(), fEntry.path.c_str());
-            fStatus->SetText("Unable to restore backup.");
+            fStatus->SetText(BrowserUI().String("browser.pixel.restore_failed", "Unable to restore backup."));
             return;
         }
         rename(temp.data(), backup.c_str());
         _Revert();
-        fStatus->SetText("Previous artwork restored; restart the target app.");
+        fStatus->SetText(BrowserUI().String("browser.pixel.restored", "Previous artwork restored; restart the target app."));
     }
 
     void _Save()
     {
         if (!fCanvas->Dirty()) {
-            fStatus->SetText("No pixel changes to save.");
+            fStatus->SetText(BrowserUI().String("browser.pixel.no_changes", "No pixel changes to save."));
             return;
         }
         if (!OwnerMayWrite(fEntry.path))
@@ -569,7 +588,7 @@ private:
         temp.push_back('\0');
         int fd = mkstemp(temp.data());
         if (fd < 0) {
-            fStatus->SetText("Could not create temporary image file.");
+            fStatus->SetText(BrowserUI().String("browser.pixel.tmp_failed", "Could not create temporary image file."));
             return;
         }
         size_t done = 0;
@@ -585,23 +604,24 @@ private:
             ok = false;
         if (!ok) {
             unlink(temp.data());
-            fStatus->SetText("Could not write image; original preserved.");
+            fStatus->SetText(BrowserUI().String("browser.pixel.write_failed", "Could not write image; original preserved."));
             return;
         }
+        // Backups are opt-in. Never require one before an Owner edit.
+        // Rename the completed temporary file over the original atomically.
         std::string backup = fEntry.path + ".bak";
-        if (rename(fEntry.path.c_str(), backup.c_str()) != 0) {
-            unlink(temp.data());
-            fStatus->SetText("Could not back up original artwork.");
-            return;
-        }
+        bool keptBackup = BrowserUI().Number(
+            "browser.pixel.keep_backup", 0, 0, 1) >= 0.5f
+            && rename(fEntry.path.c_str(), backup.c_str()) == 0;
         if (rename(temp.data(), fEntry.path.c_str()) != 0) {
-            rename(backup.c_str(), fEntry.path.c_str());
+            if (keptBackup)
+                rename(backup.c_str(), fEntry.path.c_str());
             unlink(temp.data());
-            fStatus->SetText("Could not install image; original restored.");
+            fStatus->SetText(BrowserUI().String("browser.pixel.install_failed", "Could not install image; original restored."));
             return;
         }
         fCanvas->MarkSaved();
-        fStatus->SetText("Artwork saved. Restart the edited application.");
+        fStatus->SetText(BrowserUI().String("browser.pixel.saved", "Artwork saved. Restart the edited application."));
     }
 
     ResourceEntry fEntry;
@@ -613,17 +633,17 @@ class ResourceListWindow : public BWindow {
 public:
     ResourceListWindow(const std::string& kind,
         const std::vector<ResourceEntry>& resources)
-        : BWindow(BRect(125, 105, 705, 605),
-              (kind + " — Resources").c_str(), B_TITLED_WINDOW, 0),
+        : BWindow(BrowserUI().Rect("browser.entries.window", BRect(125, 105, 705, 605)),
+              (kind + BrowserUI().String("browser.entries.title_suffix", " — Resources")).c_str(), B_TITLED_WINDOW, 0),
           fResources(resources)
     {
         BView* background = new BView(Bounds(), "background",
             B_FOLLOW_ALL, B_WILL_DRAW);
-        background->SetViewColor(238, 238, 236);
+        background->SetViewColor(BrowserUI().Color("browser.entries.background", rgb_color{238, 238, 236, 255}));
         AddChild(background);
-        background->AddChild(new BStringView(BRect(15, 8, 555, 36),
-            "info", "Double-click a resource to open its editor"));
-        fList = new BListView(BRect(12, 40, 554, 481),
+        background->AddChild(new BStringView(BrowserUI().Rect("browser.entries.hint_frame", BRect(15, 8, 555, 36)),
+            "info", BrowserUI().String("browser.entries.hint", "Double-click a resource to open its editor")));
+        fList = new BListView(BrowserUI().Rect("browser.entries.list_frame", BRect(12, 40, 554, 481)),
             "resource-entries", B_SINGLE_SELECTION_LIST);
         fList->SetInvocationMessage(new BMessage(kOpenEntry));
         background->AddChild(new BScrollView("resource-scroll", fList,
@@ -658,25 +678,25 @@ private:
 class ResourceBrowserWindow : public BWindow {
 public:
     ResourceBrowserWindow()
-        : BWindow(BRect(90, 75, 620, 595),
-              "OSTen ResEdit — Resource Types", B_TITLED_WINDOW,
+        : BWindow(BrowserUI().Rect("browser.types.window", BRect(90, 75, 620, 595)),
+              BrowserUI().String("browser.types.title", "OSTen ResEdit — Resource Types"), B_TITLED_WINDOW,
               B_NORMAL_WINDOW_FEEL, B_QUIT_ON_WINDOW_CLOSE),
           fPicker(NULL)
     {
         BView* bg = new BView(Bounds(), "background",
             B_FOLLOW_ALL, B_WILL_DRAW);
-        bg->SetViewColor(239, 239, 237);
+        bg->SetViewColor(BrowserUI().Color("browser.types.background", rgb_color{239, 239, 237, 255}));
         AddChild(bg);
-        bg->AddChild(new BButton(BRect(12, 10, 117, 43),
-            "open", "Open...", new BMessage(kOpenFile)));
-        bg->AddChild(new BButton(BRect(125, 10, 226, 43),
-            "refresh", "Refresh", new BMessage(kRefresh)));
-        fCaption = new BStringView(BRect(235, 11, 500, 41),
-            "current", "No file opened");
+        bg->AddChild(new BButton(BrowserUI().Rect("browser.types.open_frame", BRect(12, 10, 117, 43)),
+            "open", BrowserUI().String("browser.types.open", "Open..."), new BMessage(kOpenFile)));
+        bg->AddChild(new BButton(BrowserUI().Rect("browser.types.refresh_frame", BRect(125, 10, 226, 43)),
+            "refresh", BrowserUI().String("browser.types.refresh", "Refresh"), new BMessage(kRefresh)));
+        fCaption = new BStringView(BrowserUI().Rect("browser.types.caption_frame", BRect(235, 11, 500, 41)),
+            "current", BrowserUI().String("browser.types.no_file", "No file opened"));
         bg->AddChild(fCaption);
-        bg->AddChild(new BStringView(BRect(18, 47, 502, 72),
-            "hint", "Double-click a resource type to browse its contents"));
-        fTypesList = new BListView(BRect(12, 77, 501, 486),
+        bg->AddChild(new BStringView(BrowserUI().Rect("browser.types.hint_frame", BRect(18, 47, 502, 72)),
+            "hint", BrowserUI().String("browser.types.hint", "Double-click a resource type to browse its contents")));
+        fTypesList = new BListView(BrowserUI().Rect("browser.types.list_frame", BRect(12, 77, 501, 486)),
             "resource-types", B_SINGLE_SELECTION_LIST);
         fTypesList->SetInvocationMessage(new BMessage(kOpenType));
         bg->AddChild(new BScrollView("types-scroll", fTypesList,
@@ -774,10 +794,11 @@ private:
             _Scan();
             return;
         }
-        (new BAlert("Unsupported application",
-            "This selection has no editable OSTen resource catalog.\n"
-            "Choose a native OSTen app or an .ostr file. Editing arbitrary "
-            "compiled Haiku resources is not implemented yet.",
+        (new BAlert(BrowserUI().String("browser.alert.unsupported_title", "Unsupported application"),
+            BrowserUI().String("browser.alert.unsupported_message",
+                "This selection has no editable OSTen resource catalog.\n"
+                "Choose a native OSTen app or an .ostr file. Editing arbitrary "
+                "compiled Haiku resources is not implemented yet."),
             "OK"))->Go();
     }
 
@@ -787,8 +808,8 @@ private:
             return;
         FILE* file = fopen(fPath.c_str(), "rb");
         if (file == NULL) {
-            (new BAlert("Resource file unavailable",
-                "Could not read the selected resource manifest.", "OK"))->Go();
+            (new BAlert(BrowserUI().String("browser.alert.file_unavailable_title", "Resource file unavailable"),
+                BrowserUI().String("browser.alert.file_unavailable_message", "Could not read the selected resource manifest."), "OK"))->Go();
             return;
         }
         std::vector<ResourceEntry> entries;
@@ -816,8 +837,8 @@ private:
         bool readOK = !ferror(file);
         fclose(file);
         if (!readOK) {
-            (new BAlert("Resource read failed",
-                "The resource manifest could not be read completely.",
+            (new BAlert(BrowserUI().String("browser.alert.read_failed_title", "Resource read failed"),
+                BrowserUI().String("browser.alert.read_failed_message", "The resource manifest could not be read completely."),
                 "OK"))->Go();
             return;
         }
@@ -882,7 +903,7 @@ private:
             fTypesList->AddItem(new TypeItem(fTypeNames[i], count));
         }
         fCaption->SetText(fApplication.c_str());
-        SetTitle((fApplication + " — Resource Types").c_str());
+        SetTitle((fApplication + BrowserUI().String("browser.types.title_suffix", " — Resource Types")).c_str());
     }
 
     BFilePanel* fPicker;
