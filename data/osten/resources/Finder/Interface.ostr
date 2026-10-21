@@ -22,3 +22,6 @@ dialog.system_folder_access.keep_unlocked=Keep Unlocked
 layout.popup_tab.width=105
 layout.popup_tab.height=17
 layout.popup_tab.bottom_offset=20
+menu.context.selection=open,rename,get_info,separator,move_to_trash
+menu.context.background=new_folder,separator,select_all,separator,arrange_name,arrange_kind
+label.context.empty_trash=Empty Trash...
