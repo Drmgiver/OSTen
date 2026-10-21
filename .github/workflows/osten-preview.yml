@@ -1,6 +1,9 @@
 name: OSTen preview image
 
 on:
+  # Validate the resource framework before changing the known-good desktop.
+  pull_request:
+    branches: [osten/main]
   push:
     branches: [osten/main]
     paths:
@@ -13,6 +16,8 @@ on:
       - data/launch/user
       - src/apps/Jamfile
       - src/apps/osten/**
+      - data/osten/resources/**
+      - docs/osten/SoftwareStandard.md
       - src/apps/deskbar/**
       - src/add-ons/decorators/**
       - src/servers/app/Jamfile
