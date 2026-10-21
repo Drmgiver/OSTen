@@ -381,10 +381,14 @@ public:
             "font.system_notices", be_plain_font);
         SetFont(&font);
         BString label(OSTenSystemResources().String("notification.notices", "Notices"));
-        if (fUnread > 0)
-            label.SetToFormat(OSTenSystemResources().String(
-                "notification.notices_count", "Notices (%" B_PRId32 ")"),
-                fUnread);
+        if (fUnread > 0) {
+            // Editable strings are data, never printf format strings.
+            BString number;
+            number.SetToFormat("%" B_PRId32, fUnread);
+            label = OSTenSystemResources().String(
+                "notification.notices_count", "Notices ({count})");
+            label.ReplaceAll("{count}", number.String());
+        }
         DrawString(label.String(), BPoint(
             OSTenSystemResources().Number("notification.text_left", 9, 0, 60),
             OSTenSystemResources().Number("notification.text_baseline", 17, 10, 35)));
