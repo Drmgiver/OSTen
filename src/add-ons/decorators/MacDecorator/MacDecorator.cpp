@@ -533,7 +533,8 @@ MacDecorator::_DrawFrame(BRect invalid)
 				pt2.y--;
 			} else {
 				r.top -= 3;
-				RGBColor inactive(82, 82, 82);
+				RGBColor inactive(OSTenSystemResources().Color("decorator.colors.inactive_hatch",
+                rgb_color{82, 82, 82, 255}));
 
 				fDrawingEngine->StrokeLine(r.LeftTop(), r.LeftBottom(),
 					inactive);
@@ -588,12 +589,13 @@ MacDecorator::_DrawResizeCorner(BRect invalid)
 	BRect box(fResizeRect);
 	const bool focused = fTopTab != NULL && IsFocus(fTopTab);
 	const rgb_color background = focused
-		? (rgb_color){ 216, 216, 216, 255 }
-		: (rgb_color){ 224, 224, 224, 255 };
+		? OSTenSystemResources().Color("decorator.colors.resize_01", rgb_color{216, 216, 216, 255})
+		: OSTenSystemResources().Color("decorator.colors.resize_02", rgb_color{224, 224, 224, 255});
 	const rgb_color dark = focused
-		? (rgb_color){ 71, 71, 71, 255 }
-		: (rgb_color){ 139, 139, 139, 255 };
-	const rgb_color light = { 255, 255, 255, 255 };
+		? OSTenSystemResources().Color("decorator.colors.resize_03", rgb_color{71, 71, 71, 255})
+		: OSTenSystemResources().Color("decorator.colors.resize_04", rgb_color{139, 139, 139, 255});
+	const rgb_color light = OSTenSystemResources().Color(
+        "decorator.colors.resize_light", rgb_color{255, 255, 255, 255});
 
 	fDrawingEngine->FillRect(box, background);
 	fDrawingEngine->StrokeLine(box.LeftTop(), box.RightTop(),
@@ -664,7 +666,8 @@ MacDecorator::_DrawTab(Decorator::Tab* tab, BRect invalid)
 			right = tab->tabRect.right;
 
 		if (tab->tabRect.left + tab->textOffset > left + 5) {
-			RGBColor dark(115, 115, 115);
+			RGBColor dark(OSTenSystemResources().Color("decorator.colors.tab_hatch_dark",
+                rgb_color{115, 115, 115, 255}));
 
 			// Left side
 
@@ -723,7 +726,8 @@ MacDecorator::_DrawTab(Decorator::Tab* tab, BRect invalid)
 
 		_DrawButtons(tab, rect);
 	} else {
-		RGBColor inactive(82, 82, 82);
+		RGBColor inactive(OSTenSystemResources().Color("decorator.colors.inactive_hatch",
+                rgb_color{82, 82, 82, 255}));
 		// Not focused - Just draw a plain light grey area with the title
 		// in the middle
 		fDrawingEngine->StrokeLine(rect.LeftTop(), rect.RightTop(),
@@ -792,7 +796,7 @@ MacDecorator::_DrawZoom(Decorator::Tab* tab, bool direct, BRect rect)
 	rect.bottom = rect.top + 6;
 	rect.right = rect.left + 6;
 
-	fDrawState.SetHighColor(RGBColor(33, 33, 33));
+	fDrawState.SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_01", rgb_color{33, 33, 33, 255})));
 	fDrawingEngine->StrokeRect(rect, fDrawState.HighColor());
 }
 
@@ -804,7 +808,7 @@ MacDecorator::_DrawMinimize(Decorator::Tab* tab, bool direct, BRect rect)
 
 	rect.InsetBy(1, 5);
 
-	fDrawState.SetHighColor(RGBColor(33, 33, 33));
+	fDrawState.SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_02", rgb_color{33, 33, 33, 255})));
 	fDrawingEngine->StrokeRect(rect, fDrawState.HighColor());
 }
 
@@ -1055,7 +1059,7 @@ MacDecorator::_DrawButton(Decorator::Tab* tab, bool direct, BRect r,
 
 	// Topleft dark grey border
 	pt2.x--;
-	fDrawingEngine->SetHighColor(RGBColor(136, 136, 136));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_03", rgb_color{136, 136, 136, 255})));
 	fDrawingEngine->StrokeLine(offset, pt2);
 
 	pt2 = r.LeftBottom();
@@ -1066,7 +1070,7 @@ MacDecorator::_DrawButton(Decorator::Tab* tab, bool direct, BRect r,
 	offset = r.RightBottom();
 	pt2 = r.RightTop();
 	pt2.y++;
-	fDrawingEngine->SetHighColor(RGBColor(255, 255, 255));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_04", rgb_color{255, 255, 255, 255})));
 	fDrawingEngine->StrokeLine(offset, pt2);
 
 	pt2 = r.LeftBottom();
@@ -1075,18 +1079,18 @@ MacDecorator::_DrawButton(Decorator::Tab* tab, bool direct, BRect r,
 
 	// Black outline
 	rect.InsetBy(1, 1);
-	fDrawingEngine->SetHighColor(RGBColor(33, 33, 33));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_05", rgb_color{33, 33, 33, 255})));
 	fDrawingEngine->StrokeRect(rect);
 
 	// Double-shaded button
 	rect.InsetBy(1, 1);
-	fDrawingEngine->SetHighColor(RGBColor(140, 140, 140));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_06", rgb_color{140, 140, 140, 255})));
 	fDrawingEngine->StrokeLine(rect.RightBottom(), rect.RightTop());
 	fDrawingEngine->StrokeLine(rect.RightBottom(), rect.LeftBottom());
-	fDrawingEngine->SetHighColor(RGBColor(206, 206, 206));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_07", rgb_color{206, 206, 206, 255})));
 	fDrawingEngine->StrokeLine(rect.LeftBottom(), rect.LeftTop());
 	fDrawingEngine->StrokeLine(rect.LeftTop(), rect.RightTop());
-	fDrawingEngine->SetHighColor(RGBColor(255, 255, 255));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_08", rgb_color{255, 255, 255, 255})));
 	fDrawingEngine->StrokeLine(rect.LeftTop(), rect.LeftTop());
 
 	rect.InsetBy(1, 1);
