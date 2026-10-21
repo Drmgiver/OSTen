@@ -13,6 +13,10 @@
 #include <Window.h>
 
 #include "ControlStrip.h"
+#include "OSTenResources.h"
+#include <stdio.h>
+#include <sstream>
+#include <set>
 
 namespace {
 
@@ -37,9 +41,57 @@ const StripModule kModules[] = {
     {"Settings", "Set", "Control Strip preferences will be added here."}
 };
 const int kModuleCount = sizeof(kModules) / sizeof(kModules[0]);
-const float kHandleWidth = 23;
-const float kModuleWidth = 42;
-const float kStripHeight = 30;
+static float _HandleWidth() {
+    return OSTenSystemResources().Number("strip.handle.width", 23, 18, 60);
+}
+static float _ModuleWidth() {
+    return OSTenSystemResources().Number("strip.module.width", 42, 28, 100);
+}
+static float _StripHeight() {
+    return OSTenSystemResources().Number("layout.control_strip.height", 30, 24, 60);
+}
+
+// Resource editor may rearrange slots, but slot IDs never change their meaning.
+// Invalid or duplicate slot lists revert to the approved original order.
+static int _ModuleForSlot(int position)
+{
+    static int order[kModuleCount];
+    static bool initialized = false;
+    if (!initialized) {
+        for (int i = 0; i < kModuleCount; ++i)
+            order[i] = i;
+        const char* raw = OSTenSystemResources().String(
+            "strip.module.order", "0,1,2,3,4,5,6");
+        std::stringstream source(raw);
+        std::string token;
+        std::set<int> used;
+        int proposed[kModuleCount];
+        int count = 0;
+        while (std::getline(source, token, ',') && count < kModuleCount) {
+            char* end = NULL;
+            long number = strtol(token.c_str(), &end, 10);
+            if (end == token.c_str() || *end != '\0'
+                || number < 0 || number >= kModuleCount
+                || !used.insert((int)number).second)
+                break;
+            proposed[count++] = (int)number;
+        }
+        if (count == kModuleCount && source.eof())
+            for (int i = 0; i < kModuleCount; ++i)
+                order[i] = proposed[i];
+        initialized = true;
+    }
+    return order[position];
+}
+
+static const char* _ModuleText(int index, const char* suffix,
+    const char* fallback)
+{
+    char key[64];
+    snprintf(key, sizeof(key), "strip.module.%d.%s", index, suffix);
+    return OSTenSystemResources().String(key, fallback);
+}
+
 
 class StripView : public BView {
 public:
@@ -71,36 +123,41 @@ public:
 
         SetFont(be_plain_font);
         for (int i = 0; i < kModuleCount; ++i) {
-            const float left = kHandleWidth + i * kModuleWidth;
+            const float left = _HandleWidth() + i * _ModuleWidth();
             SetHighColor(130, 130, 134);
             StrokeLine(BPoint(left, 4), BPoint(left, bounds.bottom - 4));
             SetHighColor(250, 250, 250);
             StrokeLine(BPoint(left + 1, 4),
                 BPoint(left + 1, bounds.bottom - 4));
             SetHighColor(20, 20, 25);
-            const char* label = kModules[i].shortLabel;
+            const int module = _ModuleForSlot(i);
+            const char* label = _ModuleText(module, "label",
+                kModules[module].shortLabel);
             const float width = StringWidth(label);
-            DrawString(label, BPoint(left + (kModuleWidth - width) / 2, 20));
+            DrawString(label, BPoint(left + (_ModuleWidth() - width) / 2, 20));
         }
     }
 
     void MouseDown(BPoint point) override
     {
-        if (point.x < kHandleWidth) {
+        if (point.x < _HandleWidth()) {
             Window()->PostMessage(kToggleStrip);
             return;
         }
         if (fCollapsed)
             return;
-        int index = (int)((point.x - kHandleWidth) / kModuleWidth);
+        int index = (int)((point.x - _HandleWidth()) / _ModuleWidth());
         if (index < 0 || index >= kModuleCount)
             return;
-        BPopUpMenu* menu = new BPopUpMenu(kModules[index].name, false, false);
-        BMenuItem* title = new BMenuItem(kModules[index].name, NULL);
+        index = _ModuleForSlot(index);
+        const char* name = _ModuleText(index, "name", kModules[index].name);
+        BPopUpMenu* menu = new BPopUpMenu(name, false, false);
+        BMenuItem* title = new BMenuItem(name, NULL);
         title->SetEnabled(false);
         menu->AddItem(title);
         menu->AddSeparatorItem();
-        BMenuItem* info = new BMenuItem(kModules[index].summary, NULL);
+        BMenuItem* info = new BMenuItem(_ModuleText(index,
+            "summary", kModules[index].summary), NULL);
         info->SetEnabled(false);
         menu->AddItem(info);
         if (index == kModuleCount - 1) {
@@ -129,7 +186,8 @@ private:
 class ControlStripWindow : public BWindow {
 public:
     ControlStripWindow()
-        : BWindow(_Frame(true), "Control Strip",
+        : BWindow(_Frame(true),
+            OSTenSystemResources().String("strip.title", "Control Strip"),
             B_NO_BORDER_WINDOW_LOOK, B_FLOATING_ALL_WINDOW_FEEL,
             B_NOT_CLOSABLE | B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE
                 | B_NOT_RESIZABLE | B_NOT_MOVABLE
@@ -145,7 +203,7 @@ public:
         switch (message->what) {
             case kToggleStrip:
                 fCollapsed = !fCollapsed;
-                ResizeTo(_Width(fCollapsed), kStripHeight - 1);
+                ResizeTo(_Width(fCollapsed), _StripHeight() - 1);
                 MoveTo(_Frame(fCollapsed).LeftTop());
                 fView->SetCollapsed(fCollapsed);
                 return;
@@ -161,7 +219,7 @@ public:
 private:
     static float _Width(bool collapsed)
     {
-        return collapsed ? kHandleWidth : kHandleWidth + kModuleCount * kModuleWidth;
+        return collapsed ? _HandleWidth() : _HandleWidth() + kModuleCount * _ModuleWidth();
     }
 
     static BRect _Frame(bool collapsed)
@@ -173,9 +231,10 @@ private:
         // retaining the classic fixed-left edge and rightward expansion.
         const float left = screen.left + 5;
         const float tabTop = screen.bottom - 20;
-        const float top = tabTop - 2 - kStripHeight;
+        const float top = tabTop - OSTenSystemResources().Number(
+            "layout.control_strip.gap", 2, 0, 20) - _StripHeight();
         return BRect(left, top, left + width - 1,
-            top + kStripHeight - 1);
+            top + _StripHeight() - 1);
     }
 
     StripView* fView;
