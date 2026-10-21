@@ -231,7 +231,9 @@ class SystemBar : public BWindow {
 public:
 	SystemBar()
 		:
-		BWindow(BRect(0, 0, BScreen().Frame().Width(), 25), "System",
+		BWindow(BRect(0, 0, BScreen().Frame().Width(),
+                OSTenSystemResources().Number("layout.bar.height", 25, 24, 40)),
+            OSTenSystemResources().String("layout.bar.title", "System"),
 			B_NO_BORDER_WINDOW_LOOK, B_FLOATING_ALL_WINDOW_FEEL,
 			B_NOT_CLOSABLE | B_NOT_MOVABLE | B_NOT_RESIZABLE
 				| B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE
@@ -272,18 +274,23 @@ public:
 		// File/Edit/View menu. Reserve separate space for all three controls.
 		AddChild(bar);
 		BRect bounds = Bounds();
-		fTray = new BView(BRect(
-            bounds.right - 225, 1, bounds.right - 193, 24),
-            "Native Application Tray Slot", B_FOLLOW_RIGHT | B_FOLLOW_TOP,
-            B_WILL_DRAW);
+        BRect trayFrame = OSTenSystemResources().Rect(
+            "layout.bar.tray", BRect(-225, 1, -193, 24));
+        trayFrame.OffsetBy(bounds.right, 0);
+        fTray = new BView(trayFrame, "Native Application Tray Slot",
+            B_FOLLOW_RIGHT | B_FOLLOW_TOP, B_WILL_DRAW);
         fTray->SetViewColor(ui_color(B_MENU_BACKGROUND_COLOR));
         AddChild(fTray);
-		fClock = CreateOSTenClockView(BRect(
-			bounds.right - 191, 1, bounds.right - 44, 24));
+        BRect clockFrame = OSTenSystemResources().Rect(
+            "layout.bar.clock", BRect(-191, 1, -44, 24));
+        clockFrame.OffsetBy(bounds.right, 0);
+        fClock = CreateOSTenClockView(clockFrame);
 		AddChild(fClock);
 		// Classic Mac-style icon-only switcher at the far right.
-		fSwitcher = CreateOSTenApplicationSwitcher(BRect(
-			bounds.right - 43, 1, bounds.right - 2, 24));
+        BRect switcherFrame = OSTenSystemResources().Rect(
+            "layout.bar.switcher", BRect(-43, 1, -2, 24));
+        switcherFrame.OffsetBy(bounds.right, 0);
+        fSwitcher = CreateOSTenApplicationSwitcher(switcherFrame);
 		AddChild(fSwitcher);
 		BMessage tick(kClockTick);
 		// A two-second pulse also refreshes app labels after activations
@@ -307,10 +314,13 @@ public:
 		if (width < 32)
 			width = 32;
 		BRect bounds = Bounds();
-		float left = bounds.right - 193 - width;
+        float left = (fClock != NULL ? fClock->Frame().left
+            : bounds.right - 191) - width
+            - OSTenSystemResources().Number("layout.bar.tray_clock_gap",
+                2, 0, 16);
 		if (fTray != NULL) {
-			fTray->MoveTo(left, 1);
-			fTray->ResizeTo(width, 23);
+			fTray->MoveTo(left, fTray->Frame().top);
+			fTray->ResizeTo(width, fTray->Bounds().Height());
 		}
 		BView* menus = FindView("System menu bar");
 		if (menus != NULL)
@@ -402,14 +412,18 @@ public:
 					report << "\nReplicant screen: " << (int)point.x
 						<< ", " << (int)point.y;
 			}
-			(new BAlert("System Tray Diagnostics", report.String(), "OK"))->Go(NULL);
+			(new BAlert(OSTenSystemResources().String("dialog.tray_diagnostics.title",
+                "System Tray Diagnostics"), report.String(),
+                OSTenSystemResources().String("dialog.ok", "OK")))->Go(NULL);
 			return;
 		}
 		if (message->what == kOSTenShowNotices) {
 			if (fCenter == NULL) {
 				BRect screen = BScreen().Frame();
-				BRect popup(screen.right - 425, 32,
-					screen.right - 14, 379);
+                BRect popup = OSTenSystemResources().Rect(
+                    "notification.window_frame",
+                    BRect(-425, 32, -14, 379));
+                popup.OffsetBy(screen.right, 0);
 				fCenter = CreateOSTenNotificationCenter(
 					BMessenger(this), popup);
 				UpdateOSTenNotifications(fCenter, fNotices);
@@ -433,8 +447,11 @@ public:
 		}
 		if (message->what == kOSTenTestNotice) {
 			BNotification test(B_INFORMATION_NOTIFICATION);
-			test.SetTitle("OSTen Notification Test");
-			test.SetContent("The native notification system is connected.");
+			test.SetTitle(OSTenSystemResources().String(
+                    "notification.test.title", "OSTen Notification Test"));
+			test.SetContent(OSTenSystemResources().String(
+                    "notification.test.message",
+                    "The native notification system is connected."));
 			test.SetGroup("OSTen");
 			if (test.Send() != B_OK)
 				(new BAlert("Notifications",
@@ -452,7 +469,8 @@ public:
 			if (message->FindString("_sourceName", &value) == B_OK)
 				notice.source = value;
 			if (notice.title.IsEmpty())
-				notice.title = "System Notification";
+				notice.title = OSTenSystemResources().String(
+                    "notification.default_title", "System Notification");
 			notice.when = time(NULL);
 			fNotices.push_back(notice);
 			if (fNotices.size() > 100)
