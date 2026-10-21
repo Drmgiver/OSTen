@@ -1,151 +1,129 @@
 # OSTen Software Standard
-**Working Draft 0.1 | Resource architecture migration in progress**
+**Working Draft 0.2 | Normative standard for OSTen-native software and system components**
 
-## Purpose
+## 1. Fundamental Principle
 
-OSTen evolves the classic Macintosh software philosophy on Haiku. Every
-application written specifically for OSTen must be intelligible, portable,
-visually coherent, and fully configurable through the **OSTen Resource Editor**.
+**Software belongs to the user, not the developer.**
 
-**The target is universal resource editing:** every menu, menu order, shortcut,
-graphic, string, dialog, window layout, font choice, color, sound, and other
-user-facing resource of a native OSTen application must be inspectable and
-editable without changing or recompiling executable code. Native controls may
-be arranged or replaced by compatible alternatives. Resource IDs remain stable
-when labels, ordering, or layout are changed.
+Every application designed specifically for OSTen—and every OSTen-native
+component of the operating system—must be understandable, customizable,
+portable where applicable, and manageable through OSTen's native tools.
 
-This document is a normative design target, **not a claim that the current
-alpha already supports every resource category**.
+Applications must behave as participants in the OSTen environment rather
+than imposing incompatible conventions.
 
-## Native application requirements
+## 2. Universal Resource Editing
 
-1. **Resources, not fixed UI:** User-facing interface elements must be defined
-   in documented, editable resources. Program code may keep safe defaults for
-   recovery but must prefer valid edited resources.
-2. **Stable actions:** A menu or button resource names a stable application
-   action ID. Rearranging or renaming it does not change the action's behavior.
-   New executable behaviors require appropriately installed application code.
-3. **Uniform shortcuts:** Application and global menus use the same shortcut
-   mapping where they share a command. A changed shortcut must behave the same
-   in the active window and in the visible menu. Reserved global keys, duplicate
-   bindings, and invalid modifiers must be detected.
-4. **Editable graphics:** Icons, cursors, toolbars, wordmarks, interface artwork,
-   and their states are resource assets. The original approved art remains
-   available as a recovery default. Edits must not degrade unrelated assets.
-5. **Editable layouts:** Dialogs, buttons, menus, Control Strip modules, window
-   templates, and user-facing control placement must be described by resources.
-   Validate dimensions and preserve access to essential recovery controls.
-6. **Application portability:** Prefer self-contained visible application
-   folders and application-local settings. Install or remove through ordinary
-   visible file operations.
-7. **Owner control:** Resource Editor operations must respect OSTen's System
-   Folder Access workflow. The existing Finder lock is a Finder-level editing
-   guard, not an OS permission boundary.
-8. **Safety:** Validate all resource data before use; provide reliable revert
-   and recovery paths. Never interpret a resource label as executable code.
-   Corrupt, absent or unrecognized resources must fall back safely.
-9. **Compatibility:** Existing Haiku applications can run without satisfying
-   OSTen-native compliance. Native compliance must be opt-in and verifiable.
-10. **Extensibility:** Resource type identifiers, format versions, and APIs
-    must remain documented for third-party apps and Control Strip modules.
+Every compliant OSTen application and native operating-system component
+must expose its **non-executable, user-facing resources** through the
+standard OSTen resource system.
 
-## Resource storage, alpha implementation
+The OSTen Resource Editor shall allow the Owner to inspect and modify:
 
-Current resource bindings for the OSTen System and Finder use visible files:
+- Icons, cursors, and graphical assets
+- Menus and menu commands
+- Dialog boxes and their layouts
+- Window layouts and interface controls
+- Application strings and labels
+- Keyboard shortcut assignments
+- Colors, fonts, and appearance resources
+- Sound assets and notifications
+- Toolbars and other configurable interface components
+- Application resource metadata
 
-- `/boot/System Folder/Resources/System/Interface.ostr`
-- `/boot/System Folder/Resources/Finder/Interface.ostr`
-- `/boot/System Folder/Resources/<Application>/<asset>.rgba`
+Resources must use **documented, discoverable, extensible formats**.
+A resource's identity must remain stable when its label, ordering,
+appearance, or position is changed.
 
-`Interface.ostr` is a UTF-8, line-oriented `key=value` manifest with `#`
-comments. Keys have stable identifiers; values are text, command-ID lists,
-numeric layout properties, `left,top,right,bottom` rectangles or `R,G,B`
-colors. Each command list is comma-delimited, with `separator` for dividers.
-Unknown keys are ignored. Supported values are validated with safe fallback
-defaults inside the application.
+**No native OSTen application or operating-system component should require
+source-code modification merely to change its appearance or interface layout.**
 
-`*.rgba` is an exact-sized raw 8-bit RGBA bitmap, top-to-bottom,
-left-to-right, four bytes per pixel, without headers or compression.
-The graphical Resource Editor will eventually provide image import/export so
-that users do not manipulate pixel files by hand. Resource replacement never
-changes executable logic. Incorrectly sized assets are ignored.
+Developers must not unnecessarily hardcode user-facing interface elements
+that belong in the resource system. Executable application behavior is
+distinct from editable resources; changing a resource does not magically
+implement a new application command.
 
-The preview image installs the stock manifests into the visible System Folder.
-Files are **currently loaded at application startup**, so edited resources
-require restarting System or Finder to take effect. Live reload remains a
-future standard requirement.
+## 3. Application Structure
 
-### Initial bindings
+Native applications must be self-contained and recognizable as complete
+applications.
 
-- **System:** global menu order, menu sections, command order and labels,
-  Finder-shared shortcuts, shutdown/restart dialogs, menu reservation width,
-  Control Strip labels and module order, its palette and geometry, About window
-  title/labels/geometry/wordmark, notification text and selected layouts.
-- **Finder:** shared shortcuts in folder and desktop windows, selected menu
-  text and ordering, Rename dialog dimensions and labels, System Folder Access
-  dialogs, pop-up tab sizing, Finder icon overrides, and disk/Trash states.
-- Source-compiled, approved desktop artwork remains the safe fallback if
-  no corresponding RGBA resource exists.
+- Applications should reside in a single, visible application folder.
+- Application-specific preferences belong with the application.
+- Installation should normally require extracting an archive and moving
+  the application into place.
+- Removal should not require a proprietary uninstaller.
+- System-wide components must be explicitly identifiable and must expose
+  their user-facing resources under this standard.
 
-### Current limitations that must be resolved for full compliance
+## 4. Native Interface Consistency
 
-A native graphical Resource Editor now exists. It prompts for an
-application or an `.ostr` file on launch and loads the selected manifest.
-The known System, Finder and Resource Editor executables resolve to their
-installed catalogs. Third-party `.ostr` files can be opened directly.
-This does **not** make arbitrary compiled Haiku executables editable, nor
-does it mean every OSTen UI property has been abstracted into resources.
+OSTen-native applications must support the established desktop conventions,
+including:
 
-Remaining work includes resource definitions for all visual geometry, fonts,
-colors, menus and dialogs; fully editable desktop contextual menus; full icon
-state handling; preference storage rules; stable container metadata; schema
-versioning; atomic editing; live reload; comprehensive validation, undo and
-revert; and third-party developer libraries and conformance tests.
+- The global menu bar
+- Standard Finder interactions
+- Consistent keyboard shortcuts
+- Standard window behavior
+- Native dialogs and interface controls
+- System-wide appearance settings
+- Drag-and-drop file operations
 
-Do not label the System or Finder **fully standard-compliant** until these
-items are implemented and tested on a booted development image.
+Developers may introduce additional functionality without discarding
+established OSTen conventions.
 
-## Milestone acceptance tests
+## 5. User Control and Transparency
 
-- Reorder File menu commands without code changes, and confirm each retains its
-  action.
-- Change an accelerator in the Finder catalog and confirm it updates both
-  System's displayed menu and the active Finder window and desktop.
-- Replace a disk or Trash RGBA resource with another correctly sized image,
-  restart Finder, and verify the new asset appears without recompiling.
-- Reposition Rename dialog buttons through its resource rectangle keys.
-- Alter Control Strip colors, labels and module order while retaining working
-  collapse/expand behavior.
-- Remove or corrupt a resource and verify safe fallbacks.
-- Confirm user-visible resources survive reboot and Owner locking behaves as
-  documented.
-- Confirm malformed resource values cannot break startup or execute code.
+Applications must not secretly install background components, alter system
+files, or change startup behavior.
 
-## Preservation
+Background functionality must be discoverable and controllable by the
+system Owner.
 
-Do not alter the approved System and Finder visual identity, disk/Trash
-artwork, Control Strip positioning, or established shortcut semantics
-during migration except where a resource override explicitly requests it.
+System modifications must respect OSTen's System Folder Access mechanism
+and applicable filesystem permissions.
 
-## Credits and licensing
+**The Owner may intentionally edit, replace, or remove any resource they
+are permitted to access—including resources belonging to OSTen and to the
+Resource Editor itself.** The Resource Editor must not deny such edits
+merely because the chosen result could make an application unusable.
 
-Haiku, the BeOS tradition, and classic Macintosh interface design inform
-OSTen. Preserve upstream copyright notices and individual resource licenses.
-New native OSTen source follows the relevant per-file licensing declarations.
+Creating backup copies is the Owner's responsibility. Automatic backups,
+undo, recovery mechanisms, and forced safety modes are **not requirements**
+of the OSTen Software Standard. If provided, such conveniences must not
+remove the Owner's authority over accessible resources.
 
-## Browser milestone: typed discovery and Finder pixels (October 21, 2026)
+Resource-editing tools must still accurately read and write the selected
+resources without unintentionally altering unrelated data or executable
+code.
 
-The first classic-ResEdit-inspired browser now opens an OSTen document, then
-opens resource-type lists on double-click, then opens individual resources.
-Resource types are inferred from the current text manifest; this is not yet
-a versioned typed binary resource format. Actual raw-RGBA images staged in
-Finder's resource folder are dynamically enumerated with thumbnails and
-opened in a drawing editor. The six Finder images are reconstructed from the
-approved source-embedded art byte-for-byte; the original appearance remains
-unchanged. The icon editor supports painting, transparency, save, revert,
-and restore from a backup. Other properties still use the interim inspector.
+## 6. Compatibility
 
-Future work: stable resource IDs and resource schemas; dedicated editors for
-menus, dialogs, sound, fonts, and native vector artwork; import/export;
-cross-file change management; proper window lifecycle and interaction tests;
-safe handling of additional arbitrary application binary resources.
+OSTen-native compliance applies to applications intentionally built for
+the OSTen environment and to OSTen's own native system components.
+
+Compatibility with existing Haiku applications is a separate objective.
+Running an existing Haiku application does not automatically make that
+application compliant with the OSTen Software Standard.
+
+## 7. Extensibility
+
+The standard must support future resource types, application extensions,
+Control Strip modules, Control Panels, and other native components without
+requiring a redesign of the application model.
+
+Resource formats, type identifiers, format versions, and associated
+application interfaces must be publicly documented.
+
+---
+
+## Guiding Principle
+
+*An OSTen application should never be a mysterious black box. The Owner
+should be able to inspect it, customize its experience, understand its
+components, and remove it without surrendering control of the system.*
+
+This standard defines the required design of compliant native software.
+It does **not** assert that the present development preview is fully
+compliant. For current implementation details and outstanding work, see
+[SoftwareStandard-ImplementationStatus.md](SoftwareStandard-ImplementationStatus.md).
