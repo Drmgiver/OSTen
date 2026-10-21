@@ -682,7 +682,7 @@ private:
         if (fPath.empty() || !_OwnerAllowsChanges())
             return;
         if (_SwapBackup(fPath)) {
-            _Load(fApplication);
+            _LoadPath(fPath, fApplication);
             _Status("Previous interface restored. Restart edited application.");
         }
     }
