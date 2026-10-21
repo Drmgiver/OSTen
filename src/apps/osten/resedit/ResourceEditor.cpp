@@ -4,6 +4,13 @@
 #include <Alert.h>
 #include <Application.h>
 #include <Button.h>
+#include <Bitmap.h>
+#include <Entry.h>
+#include <FilePanel.h>
+#include <MenuField.h>
+#include <MenuItem.h>
+#include <PopUpMenu.h>
+#include <TranslationUtils.h>
 #include <InterfaceDefs.h>
 #include <ListView.h>
 #include <Message.h>
@@ -34,7 +41,28 @@ enum {
     kLoadSystem = 'rSys', kLoadFinder = 'rFnd',
     kSelected = 'rSel', kApply = 'rApl', kSave = 'rSav',
     kDiscard = 'rDis', kMoveUp = 'rUp1', kMoveDown = 'rDn1',
-    kRectangleChanged = 'rRct'
+    kRectangleChanged = 'rRct', kImportGraphic = 'rImp',
+    kAssetSelected = 'rAst', kImageChosen = 'rImg'
+};
+
+struct AssetDefinition {
+    const char* application;
+    const char* label;
+    const char* filename;
+    int width;
+    int height;
+};
+
+static const AssetDefinition kAssets[] = {
+    {"Finder", "Disk (48 x 48)", "disk", 48, 48},
+    {"Finder", "Trash empty (48 x 48)", "trash-empty", 48, 48},
+    {"Finder", "Trash full (48 x 48)", "trash-full", 48, 48},
+    {"Finder", "Folder (40 x 40)", "folder", 40, 40},
+    {"Finder", "Finder (40 x 40)", "finder", 40, 40},
+    {"Finder", "System (40 x 40)", "system", 40, 40},
+    {"System", "Menu wordmark (71 x 20)", "wordmark", 71, 20},
+    {"System", "About wordmark (248 x 69)", "about-wordmark", 248, 69},
+    {"System", "Finder switcher (22 x 22)", "switcher-finder", 22, 22}
 };
 
 struct ResourceLine {
@@ -188,7 +216,7 @@ public:
     EditorWindow()
         : BWindow(BRect(70, 65, 1025, 700), "OSTen Resource Editor",
             B_TITLED_WINDOW, B_NORMAL_WINDOW_FEEL, B_QUIT_ON_WINDOW_CLOSE),
-        fDirty(false), fSelection(-1)
+        fDirty(false), fSelection(-1), fAssetIndex(0), fPicker(NULL)
     {
         BView* background = new BView(Bounds(), "background",
             B_FOLLOW_ALL, B_WILL_DRAW);
@@ -220,6 +248,20 @@ public:
             "value", "Value:", "", NULL);
         fValue->SetDivider(75);
         background->AddChild(fValue);
+        BPopUpMenu* assetMenu = new BPopUpMenu("Artwork");
+        for (size_t i = 0; i < sizeof(kAssets) / sizeof(kAssets[0]); ++i) {
+            BMessage* choose = new BMessage(kAssetSelected);
+            choose->AddInt32("index", (int32)i);
+            assetMenu->AddItem(new BMenuItem(kAssets[i].label, choose));
+        }
+        assetMenu->SetTargetForItems(this);
+        assetMenu->ItemAt(0)->SetMarked(true);
+        BMenuField* assets = new BMenuField(BRect(339, 155, 626, 189),
+            "artwork", "Artwork:", assetMenu);
+        assets->SetDivider(75);
+        background->AddChild(assets);
+        background->AddChild(new BButton(BRect(639, 156, 735, 186),
+            "import", "Import...", new BMessage(kImportGraphic)));
         background->AddChild(new BButton(BRect(842, 156, 942, 186),
             "apply", "Apply", new BMessage(kApply)));
 
@@ -240,6 +282,11 @@ public:
         background->AddChild(fStatus);
         _Load("System");
         Show();
+    }
+
+    ~EditorWindow() override
+    {
+        delete fPicker;
     }
 
     bool QuitRequested() override
@@ -269,6 +316,21 @@ public:
             case kSave: _Save(); return;
             case kMoveUp: _Move(-1); return;
             case kMoveDown: _Move(1); return;
+            case kAssetSelected: {
+                int32 index = -1;
+                if (message->FindInt32("index", &index) == B_OK
+                    && index >= 0 && (size_t)index
+                        < sizeof(kAssets) / sizeof(kAssets[0]))
+                    fAssetIndex = index;
+                return;
+            }
+            case kImportGraphic: _PickGraphic(); return;
+            case kImageChosen: {
+                entry_ref ref;
+                if (message->FindRef("refs", &ref) == B_OK)
+                    _ImportGraphic(ref);
+                return;
+            }
             case kRectangleChanged: {
                 const char* value = NULL;
                 if (message->FindString("value", &value) == B_OK)
@@ -424,6 +486,97 @@ private:
         fOrder->Select(next);
     }
 
+    void _PickGraphic()
+    {
+        if (!fPicker) {
+            BMessenger target(this);
+            BMessage selected(kImageChosen);
+            fPicker = new BFilePanel(B_OPEN_PANEL, &target, NULL,
+                B_FILE_NODE, false, &selected);
+        }
+        fPicker->Show();
+    }
+
+    void _ImportGraphic(const entry_ref& ref)
+    {
+        if (!_OwnerAllowsChanges())
+            return;
+        const AssetDefinition& asset = kAssets[fAssetIndex];
+        BBitmap* bitmap = BTranslationUtils::GetBitmap(&ref);
+        if (bitmap == NULL) {
+            _Status("Image translator could not load that file.");
+            return;
+        }
+        const int width = (int)bitmap->Bounds().Width() + 1;
+        const int height = (int)bitmap->Bounds().Height() + 1;
+        if (width != asset.width || height != asset.height
+            || (bitmap->ColorSpace() != B_RGBA32
+                && bitmap->ColorSpace() != B_RGB32)) {
+            delete bitmap;
+            _Status("Graphic must match the listed pixel dimensions and be 32-bit.");
+            return;
+        }
+
+        const uint8* pixels = (const uint8*)bitmap->Bits();
+        const int stride = bitmap->BytesPerRow();
+        const bool alpha = bitmap->ColorSpace() == B_RGBA32;
+        std::vector<uint8> rgba((size_t)width * height * 4);
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                const uint8* pixel = pixels + y * stride + x * 4;
+                uint8* target = &rgba[((size_t)y * width + x) * 4];
+                target[0] = pixel[2];
+                target[1] = pixel[1];
+                target[2] = pixel[0];
+                target[3] = alpha ? pixel[3] : 255;
+            }
+        }
+        delete bitmap;
+
+        std::string path = std::string("/boot/System Folder/Resources/")
+            + asset.application + "/" + asset.filename + ".rgba";
+        std::string temporary = path + ".tmp.XXXXXX";
+        std::vector<char> filename(temporary.begin(), temporary.end());
+        filename.push_back(0);
+        int fd = mkstemp(&filename[0]);
+        if (fd < 0) {
+            _Status("Cannot save graphic. Check System Folder access.");
+            return;
+        }
+        size_t offset = 0;
+        bool success = true;
+        while (offset < rgba.size()) {
+            ssize_t written = write(fd, &rgba[offset], rgba.size() - offset);
+            if (written <= 0) { success = false; break; }
+            offset += (size_t)written;
+        }
+        if (fsync(fd) != 0)
+            success = false;
+        if (close(fd) != 0)
+            success = false;
+        if (!success) {
+            unlink(&filename[0]);
+            _Status("Graphic import failed. Existing resource preserved.");
+            return;
+        }
+        std::string backup = path + ".bak";
+        if (access(path.c_str(), F_OK) == 0) {
+            if (rename(path.c_str(), backup.c_str()) != 0) {
+                unlink(&filename[0]);
+                _Status("Cannot back up previous graphic.");
+                return;
+            }
+        }
+        if (rename(&filename[0], path.c_str()) != 0) {
+            rename(backup.c_str(), path.c_str());
+            unlink(&filename[0]);
+            _Status("Cannot install graphic. Previous resource restored.");
+            return;
+        }
+        _Status(std::string("Imported ") + asset.label
+            + ". Restart the target application.");
+    }
+
     bool _OwnerAllowsChanges()
     {
         BMessenger finder("application/x-vnd.OSTen-Finder");
@@ -516,6 +669,8 @@ private:
     BStringView* fStatus;
     bool fDirty;
     int32 fSelection;
+    int32 fAssetIndex;
+    BFilePanel* fPicker;
 };
 
 class ResourceEditorApp : public BApplication {
