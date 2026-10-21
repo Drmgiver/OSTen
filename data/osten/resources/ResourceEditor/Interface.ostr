@@ -35,3 +35,9 @@ editor.geometry.14=339,485,752,566
 editor.geometry.15=771,493,853,522
 editor.geometry.16=771,530,853,559
 editor.geometry.17=14,587,940,614
+
+# Reversible edits and graphic imports
+editor.geometry.undo_save=624,11,727,40
+editor.geometry.undo_graphic=743,156,834,186
+editor.undo_save=Undo Save
+editor.undo_graphic=Undo Art
