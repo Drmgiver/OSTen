@@ -212,3 +212,32 @@ browser.layout.paper=252,252,251
 browser.layout.frame_color=80,90,103
 browser.layout.selected=191,220,250
 browser.layout.control=234,234,232
+
+# Resource Editor's type browser is composed from its own editable controls
+browser.types.controls=open,refresh,current,hint,resource_types
+browser.types.control.open.type=button
+browser.types.control.open.frame_key=browser.types.open_frame
+browser.types.control.open.caption_key=browser.types.open
+browser.types.control.open.action=browser.open
+browser.types.control.refresh.type=button
+browser.types.control.refresh.frame_key=browser.types.refresh_frame
+browser.types.control.refresh.caption_key=browser.types.refresh
+browser.types.control.refresh.action=browser.refresh
+browser.types.control.current.type=label
+browser.types.control.current.frame_key=browser.types.caption_frame
+browser.types.control.current.caption_key=browser.types.no_file
+browser.types.control.hint.type=label
+browser.types.control.hint.frame_key=browser.types.hint_frame
+browser.types.control.hint.caption_key=browser.types.hint
+browser.types.control.resource_types.type=list
+browser.types.control.resource_types.frame_key=browser.types.list_frame
+browser.types.control.resource_types.action=browser.open_type
+
+# Resource instance browser uses the same native control composer
+browser.entries.controls=info,resource_entries
+browser.entries.control.info.type=label
+browser.entries.control.info.frame_key=browser.entries.hint_frame
+browser.entries.control.info.caption_key=browser.entries.hint
+browser.entries.control.resource_entries.type=list
+browser.entries.control.resource_entries.frame_key=browser.entries.list_frame
+browser.entries.control.resource_entries.action=browser.open_entry

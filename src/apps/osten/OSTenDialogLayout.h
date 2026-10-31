@@ -68,7 +68,10 @@ OSTenCreateDialogControls(BView* parent, const OSTenResourceCatalog& catalog,
             (base + "caption_key").c_str(), "");
         const char* label = captionKey[0]
             ? catalog.String(captionKey, "") : "";
-        const BRect frame = catalog.Rect((base + "frame").c_str(),
+        const char* alias = catalog.String(
+            (base + "frame_key").c_str(), "");
+        const std::string frameKey = alias[0] ? alias : base + "frame";
+        const BRect frame = catalog.Rect(frameKey.c_str(),
             BRect(0, 0, 80, 28));
         const char* action = catalog.String((base + "action").c_str(), "");
         const uint32 what = OSTenDialogActionMessage(

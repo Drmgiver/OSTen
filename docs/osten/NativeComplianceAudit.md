@@ -159,3 +159,13 @@ the Owner approves the implementation and the required tests pass.
 Do not merge until the Owner approves and remaining standard requirements
 have been independently verified.
 
+### ResEdit self-composition extension
+
+Resource Editor now constructs its type-browser and resource-list
+windows through the shared native control factory as well.
+Their controls have owner-editable type, ordering, caption reference,
+action binding and frame alias metadata. The graphical layout editor
+supports \`frame_key\` references to existing geometry values, avoiding
+duplicate resources. This is a concrete self-editing milestone; other
+ResEdit windows, advanced controls and the global menu still require
+conversion.

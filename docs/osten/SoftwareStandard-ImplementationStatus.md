@@ -133,3 +133,7 @@ System UI conversion, active-application global menus, application
 folders, fonts/sounds/HVIF editors and interactive GUI verification
 are still outstanding.
 
+Resource Editor's browser type and instance windows now also use the
+shared control composer, making the application itself a consumer of
+the same structured resources. Frame aliases avoid duplicating
+existing layout keys. No special safeguards restrict Owner edits.

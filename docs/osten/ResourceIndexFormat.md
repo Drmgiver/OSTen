@@ -140,3 +140,23 @@ The UI editor does not create executable behavior. The first builder
 also does not support tab controls, hierarchical widgets, sound assets,
 layout constraints, live reload, or every Haiku native control type.
 
+### Reusing an existing frame resource
+
+A control declaration may provide \`frame_key\` instead of \`frame\`.
+The value identifies an existing frame resource, which remains the
+single source of truth for layout geometry. This supports migration of
+existing OSTen interfaces without duplicating coordinate data:
+
+\`\`\`ini
+browser.types.controls=open,refresh,current,hint,resource_types
+browser.types.control.open.type=button
+browser.types.control.open.frame_key=browser.types.open_frame
+browser.types.control.open.caption_key=browser.types.open
+browser.types.control.open.action=browser.open
+\`\`\`
+
+Resource Editor's type-browser **and** resource-list windows are built
+through this same shared runtime composer. Their \`*.controls\` resources
+open in ResEdit's graphical layout editor, which saves the referenced
+frame values rather than introducing copies. These resources let the
+Owner redesign the browser with ResEdit itself.

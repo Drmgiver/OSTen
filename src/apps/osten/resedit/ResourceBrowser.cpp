@@ -6,6 +6,7 @@
 #include "OSTenMessages.h"
 #include "OSTenResources.h"
 #include "OSTenResourceIndex.h"
+#include "OSTenDialogLayout.h"
 
 #include <Alert.h>
 #include <Application.h>
@@ -1255,7 +1256,9 @@ private:
             previous = i + 1;
             if (id.empty()) continue;
             const std::string base = prefix + ".control." + id + ".";
-            const std::string frameKey = base + "frame";
+            const std::string aliasKey = base + "frame_key";
+            const std::string frameKey = fields.find(aliasKey) == fields.end()
+                ? base + "frame" : fields[aliasKey];
             std::map<std::string, std::string>::const_iterator frame
                 = fields.find(frameKey);
             if (frame == fields.end()) continue;
@@ -1310,27 +1313,33 @@ public:
         const std::vector<ResourceEntry>& resources)
         : BWindow(BrowserUI().Rect("browser.entries.window", BRect(125, 105, 705, 605)),
               (kind + BrowserUI().String("browser.entries.title_suffix", " — Resources")).c_str(), B_TITLED_WINDOW, 0),
-          fResources(resources)
+          fResources(resources), fList(NULL)
     {
         BView* background = new BView(Bounds(), "background",
             B_FOLLOW_ALL, B_WILL_DRAW);
         background->SetViewColor(BrowserUI().Color("browser.entries.background", rgb_color{238, 238, 236, 255}));
         AddChild(background);
-        background->AddChild(new BStringView(BrowserUI().Rect("browser.entries.hint_frame", BRect(15, 8, 555, 36)),
-            "info", BrowserUI().String("browser.entries.hint", "Double-click a resource to open its editor")));
-        fList = new BListView(BrowserUI().Rect("browser.entries.list_frame", BRect(12, 40, 554, 481)),
-            "resource-entries", B_SINGLE_SELECTION_LIST);
-        fList->SetInvocationMessage(new BMessage(kOpenEntry));
-        background->AddChild(new BScrollView("resource-scroll", fList,
-            B_FOLLOW_ALL, 0, false, true));
-        for (size_t i = 0; i < resources.size(); ++i)
-            fList->AddItem(new EntryItem(resources[i]));
+        const OSTenDialogAction actions[] = {
+            {"browser.open_entry", kOpenEntry}
+        };
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            background, BrowserUI(), "browser.entries", actions,
+            sizeof(actions) / sizeof(actions[0]));
+        OSTenDialogControls::const_iterator list = controls.find("resource_entries");
+        if (list != controls.end())
+            fList = static_cast<BListView*>(list->second);
+        if (fList != NULL) {
+            for (size_t i = 0; i < resources.size(); ++i)
+                fList->AddItem(new EntryItem(resources[i]));
+        }
         Show();
     }
 
     void MessageReceived(BMessage* message) override
     {
         if (message->what == kOpenEntry) {
+            if (fList == NULL)
+                return;
             int32 index = fList->CurrentSelection();
             if (index < 0 || (size_t)index >= fResources.size())
                 return;
@@ -1364,26 +1373,29 @@ public:
         : BWindow(BrowserUI().Rect("browser.types.window", BRect(90, 75, 620, 595)),
               BrowserUI().String("browser.types.title", "OSTen ResEdit — Resource Types"), B_TITLED_WINDOW,
               B_NORMAL_WINDOW_FEEL, B_QUIT_ON_WINDOW_CLOSE),
-          fPicker(NULL)
+          fPicker(NULL), fTypesList(NULL), fCaption(NULL)
     {
         BView* bg = new BView(Bounds(), "background",
             B_FOLLOW_ALL, B_WILL_DRAW);
         bg->SetViewColor(BrowserUI().Color("browser.types.background", rgb_color{239, 239, 237, 255}));
         AddChild(bg);
-        bg->AddChild(new BButton(BrowserUI().Rect("browser.types.open_frame", BRect(12, 10, 117, 43)),
-            "open", BrowserUI().String("browser.types.open", "Open..."), new BMessage(kOpenFile)));
-        bg->AddChild(new BButton(BrowserUI().Rect("browser.types.refresh_frame", BRect(125, 10, 226, 43)),
-            "refresh", BrowserUI().String("browser.types.refresh", "Refresh"), new BMessage(kRefresh)));
-        fCaption = new BStringView(BrowserUI().Rect("browser.types.caption_frame", BRect(235, 11, 500, 41)),
-            "current", BrowserUI().String("browser.types.no_file", "No file opened"));
-        bg->AddChild(fCaption);
-        bg->AddChild(new BStringView(BrowserUI().Rect("browser.types.hint_frame", BRect(18, 47, 502, 72)),
-            "hint", BrowserUI().String("browser.types.hint", "Double-click a resource type to browse its contents")));
-        fTypesList = new BListView(BrowserUI().Rect("browser.types.list_frame", BRect(12, 77, 501, 486)),
-            "resource-types", B_SINGLE_SELECTION_LIST);
-        fTypesList->SetInvocationMessage(new BMessage(kOpenType));
-        bg->AddChild(new BScrollView("types-scroll", fTypesList,
-            B_FOLLOW_ALL, 0, false, true));
+        // Even the Resource Editor's own browser is a structured OSTen
+        // resource. The Owner may reorder, resize, replace or delete its
+        // controls through the same Resource Editor used for Finder/System.
+        const OSTenDialogAction actions[] = {
+            {"browser.open", kOpenFile},
+            {"browser.refresh", kRefresh},
+            {"browser.open_type", kOpenType}
+        };
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            bg, BrowserUI(), "browser.types", actions,
+            sizeof(actions) / sizeof(actions[0]));
+        OSTenDialogControls::const_iterator caption = controls.find("current");
+        fCaption = caption == controls.end() ? NULL
+            : static_cast<BStringView*>(caption->second);
+        OSTenDialogControls::const_iterator types = controls.find("resource_types");
+        fTypesList = types == controls.end() ? NULL
+            : static_cast<BListView*>(types->second);
         Show();
         _PickFile();
     }
@@ -1406,6 +1418,8 @@ public:
                 return;
             case kRefresh: _Scan(); return;
             case kOpenType: {
+                if (fTypesList == NULL)
+                    return;
                 int32 selection = fTypesList->CurrentSelection();
                 if (selection < 0 || (size_t)selection >= fTypeNames.size())
                     return;
@@ -1488,7 +1502,7 @@ private:
 
     void _Scan()
     {
-        if (fPath.empty())
+        if (fPath.empty() || fTypesList == NULL)
             return;
         FILE* file = fopen(fPath.c_str(), "rb");
         if (file == NULL) {
@@ -1607,7 +1621,8 @@ private:
             }
             fTypesList->AddItem(new TypeItem(fTypeNames[i], count));
         }
-        fCaption->SetText(fApplication.c_str());
+        if (fCaption != NULL)
+            fCaption->SetText(fApplication.c_str());
         SetTitle((fApplication + BrowserUI().String("browser.types.title_suffix", " — Resource Types")).c_str());
     }
 

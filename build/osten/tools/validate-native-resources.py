@@ -127,7 +127,8 @@ def validate_composed_dialog(app: str, prefix: str) -> None:
         kind = values.get(stem + "type")
         check(kind in {"text", "label", "button", "list"},
               f"{app}/{prefix}/{ident}: unsupported declared control {kind}")
-        frame = values.get(stem + "frame", "")
+        frameField = values.get(stem + "frame_key") or (stem + "frame")
+        frame = values.get(frameField, "")
         pieces = frame.split(",")
         try:
             coords = tuple(float(value) for value in pieces)
@@ -136,9 +137,13 @@ def validate_composed_dialog(app: str, prefix: str) -> None:
                   f"{app}/{prefix}/{ident}: bad frame {frame}")
         except ValueError:
             errors.append(f"{app}/{prefix}/{ident}: non-numeric frame {frame}")
-        for required in ("type", "frame"):
-            check(stem + required in index,
-                  f"{app}/{prefix}/{ident}: no indexed {required} resource")
+        check(stem + "type" in index,
+              f"{app}/{prefix}/{ident}: no indexed type resource")
+        check(frameField in index,
+              f"{app}/{prefix}/{ident}: no indexed frame resource")
+        if values.get(stem + "frame_key"):
+            check(stem + "frame_key" in index,
+                  f"{app}/{prefix}/{ident}: unindexed frame alias")
         captionKey = values.get(stem + "caption_key", "")
         if captionKey:
             check(captionKey in values,
@@ -155,6 +160,8 @@ def main() -> int:
     check_editor_bindings()
     validate_composed_dialog("Finder", "dialog.rename")
     validate_composed_dialog("System", "notification.center")
+    validate_composed_dialog("ResourceEditor", "browser.types")
+    validate_composed_dialog("ResourceEditor", "browser.entries")
     if errors:
         print("\nFAILED", file=sys.stderr)
         for error in errors:
