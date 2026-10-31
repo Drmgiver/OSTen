@@ -88,3 +88,55 @@ fully OSTen Software Standard compliant.
 
 See [NativeComplianceAudit.md](NativeComplianceAudit.md) for the current
 compliance blockers.
+
+## Native dialog and window control composition (revision 1)
+
+The public header \`src/apps/osten/OSTenDialogLayout.h\` constructs
+native BeAPI controls from the same indexed \`Interface.ostr\` resources.
+An application supplies **only** a stable action ID to \`BMessage\`
+binding table; the Owner controls appearance, order, labels, type, and
+position through its resource data.
+
+Example from Finder:
+
+\`\`\`ini
+dialog.rename.controls=name,cancel,ok
+dialog.rename.control.name.type=text
+dialog.rename.control.name.frame=20,27,365,57
+dialog.rename.control.name.caption_key=dialog.rename.label
+dialog.rename.control.name.divider=56
+dialog.rename.control.cancel.type=button
+dialog.rename.control.cancel.frame=185,100,268,129
+dialog.rename.control.cancel.caption_key=dialog.rename.cancel
+dialog.rename.control.cancel.action=rename.cancel
+dialog.rename.control.ok.type=button
+dialog.rename.control.ok.frame=278,100,370,129
+dialog.rename.control.ok.caption_key=dialog.rename.ok
+dialog.rename.control.ok.action=rename.accept
+dialog.rename.control.ok.default=1
+\`\`\`
+
+The controlling \`*.controls\` value is a comma-separated ordered list
+of stable control IDs. Each \`*.control.<id>\` structure defines \`type\`,
+\`frame\` (left,top,right,bottom), optional \`caption_key\`, \`divider\`,
+\`background\` and \`default\`, and an action ID used for binding.
+Type v1 supports \`text\` (BTextControl), \`button\` (BButton),
+\`label\` (BStringView), and \`list\` (BListView with a scroll view).
+The builder also returns a map of control IDs to instantiated native
+views so application behavior remains separate from presentation.
+
+The Finder Rename and System Notification Center windows are the first
+runtime consumers of this common builder. Their appearance declarations
+are in their respective \`Interface.ostr\` files, with matching entries
+in \`ResourceIndex.osti\`. The Resource Editor recognizes any indexed
+\`DLOG\`/\`NTFY\` resource whose key ends in \`.controls\` and opens a
+drag-and-resize layout editor. Saving rewrites all modified \`*.frame\`
+values in one atomic file replacement without changing unrelated data
+or source code.
+
+This is **not** yet a universal command system: arbitrary action strings
+must be implemented and registered by their respective applications.
+The UI editor does not create executable behavior. The first builder
+also does not support tab controls, hierarchical widgets, sound assets,
+layout constraints, live reload, or every Haiku native control type.
+

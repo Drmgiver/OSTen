@@ -3,6 +3,7 @@
 
 #include "SystemExtras.h"
 #include "OSTenResources.h"
+#include "OSTenDialogLayout.h"
 
 #include "FinderSwitcherIcon.h"
 
@@ -416,27 +417,19 @@ public:
             B_FOLLOW_ALL, B_WILL_DRAW);
         background->SetViewColor(OSTenSystemResources().Color("color.system_notifications_window.1", rgb_color{242, 242, 238, 255}));
         AddChild(background);
-        fList = new BListView(OSTenSystemResources().Rect(
-                "notification.list_frame",
-                BRect(12, 12, Bounds().right - 34,
-                    Bounds().bottom - 60)), "Recent notifications",
-            B_SINGLE_SELECTION_LIST, B_FOLLOW_ALL);
-        fList->SetViewColor(OSTenSystemResources().Color("color.system_notifications_window.2", rgb_color{255, 255, 255, 255}));
-        fList->SetInvocationMessage(new BMessage('osnd'));
-        background->AddChild(new BScrollView("Notice history", fList,
-            B_FOLLOW_ALL, 0, false, true));
-        background->AddChild(new BButton(OSTenSystemResources().Rect(
-                "notification.clear_frame",
-                BRect(14, Bounds().bottom - 42,
-                    118, Bounds().bottom - 14)), "Clear",
-            OSTenSystemResources().String("notification.clear", "Clear All"),
-            new BMessage(kOSTenClearNotices)));
-        background->AddChild(new BButton(OSTenSystemResources().Rect(
-                "notification.test_frame",
-                BRect(Bounds().right - 166, Bounds().bottom - 42,
-                    Bounds().right - 14, Bounds().bottom - 14)),
-            "Test", OSTenSystemResources().String("notification.test",
-                "Test Notification"), new BMessage(kOSTenTestNotice)));
+        // System notifications use the same resource-described native
+        // controls as Finder dialogs and third-party OSTen applications.
+        const OSTenDialogAction actions[] = {
+            {"notices.open", 'osnd'},
+            {"notices.clear", kOSTenClearNotices},
+            {"notices.test", kOSTenTestNotice}
+        };
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            background, OSTenSystemResources(), "notification.center",
+            actions, sizeof(actions) / sizeof(actions[0]));
+        OSTenDialogControls::const_iterator list = controls.find("history");
+        if (list != controls.end())
+            fList = static_cast<BListView*>(list->second);
     }
 
     bool QuitRequested() override
@@ -453,6 +446,8 @@ public:
             return;
         }
         if (message->what == 'osnd') {
+            if (fList == NULL)
+                return;
             int32 index = fList->CurrentSelection();
             if (index >= 0 && (size_t)index < fDisplayed.size()) {
                 const OSTenNotice& n = fDisplayed[index];
@@ -467,6 +462,8 @@ public:
 
     void SetEntries(const std::vector<OSTenNotice>& notices)
     {
+        if (fList == NULL)
+            return;
         fDisplayed.assign(notices.rbegin(), notices.rend());
         while (fList->CountItems() > 0)
             delete fList->RemoveItem((int32)0);

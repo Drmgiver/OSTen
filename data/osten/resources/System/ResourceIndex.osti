@@ -206,3 +206,16 @@ OSTEN-RESOURCE-INDEX/1
 0xc4d0019c|DLOG|dialog.notifications.unavailable|dialog.notifications.unavailable|0|0
 0x65b5e6ed|DLOG|dialog.power.error|dialog.power.error|0|0
 0xd0f564b5|DLOG|dialog.system.title|dialog.system.title|0|0
+0x44d4e298|DLOG|notification.center.controls|notification.center.controls|0|0
+0x4291b8e5|DLOG|notification.center.control.history.type|notification.center.control.history.type|0|0
+0x422249ce|WLAY|notification.center.control.history.frame|notification.center.control.history.frame|0|0
+0x2e40eeb5|COLR|notification.center.control.history.background|notification.center.control.history.background|0|0
+0x2f679d17|DLOG|notification.center.control.history.action|notification.center.control.history.action|0|0
+0xeb590e8a|DLOG|notification.center.control.clear.type|notification.center.control.clear.type|0|0
+0xa4c64b1b|WLAY|notification.center.control.clear.frame|notification.center.control.clear.frame|0|0
+0xf3a3a5f8|DLOG|notification.center.control.clear.caption_key|notification.center.control.clear.caption_key|0|0
+0xc9d2da08|DLOG|notification.center.control.clear.action|notification.center.control.clear.action|0|0
+0x43eb2e57|DLOG|notification.center.control.test.type|notification.center.control.test.type|0|0
+0xf1a2dbf4|WLAY|notification.center.control.test.frame|notification.center.control.test.frame|0|0
+0xf513151f|DLOG|notification.center.control.test.caption_key|notification.center.control.test.caption_key|0|0
+0x23d44f15|DLOG|notification.center.control.test.action|notification.center.control.test.action|0|0

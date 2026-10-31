@@ -3,6 +3,7 @@
 #include "FinderActions.h"
 #include "FileOperations.h"
 #include "OSTenResources.h"
+#include "OSTenDialogLayout.h"
 #include "OSTenMessages.h"
 
 #include <Alert.h>
@@ -39,28 +40,31 @@ public:
             B_TITLED_WINDOW_LOOK, B_MODAL_APP_WINDOW_FEEL,
             B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE),
         fRef(ref),
-        fOwnerUnlocked(ownerUnlocked)
+        fOwnerUnlocked(ownerUnlocked), fName(NULL)
     {
         const OSTenResourceCatalog& ui = OSTenFinderResources();
         BEntry entry(&ref, false);
         char name[B_FILE_NAME_LENGTH] = "";
         entry.GetName(name);
-        fName = new BTextControl(ui.Rect("dialog.rename.input",
-                BRect(20, 27, 365, 57)), "name",
-            ui.String("dialog.rename.label", "Name:"), name, NULL);
-        fName->SetDivider(ui.Number("dialog.rename.divider", 56, 20, 140));
-        AddChild(fName);
-        BButton* cancel = new BButton(ui.Rect("dialog.rename.cancel_frame",
-                BRect(185, 100, 268, 129)), "cancel",
-            ui.String("dialog.rename.cancel", OSTenFinderResources().String("dialog.common.cancel", "Cancel")),
-            new BMessage(kRenameCancel));
-        BButton* rename = new BButton(ui.Rect("dialog.rename.ok_frame",
-                BRect(278, 100, 370, 129)), "rename",
-            ui.String("dialog.rename.ok", "Rename"),
-            new BMessage(kRenameAccept));
-        AddChild(cancel);
-        AddChild(rename);
-        SetDefaultButton(rename);
+        // All visible controls are constructed from Finder's dialog
+        // declaration, not a compiled list of buttons and rectangles.
+        const OSTenDialogAction actions[] = {
+            {"rename.cancel", kRenameCancel},
+            {"rename.accept", kRenameAccept}
+        };
+        BView* background = new BView(Bounds(), "rename-interface",
+            B_FOLLOW_ALL, B_WILL_DRAW);
+        background->SetViewColor(ui.Color("dialog.rename.background",
+            rgb_color{239, 239, 236, 255}));
+        AddChild(background);
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            background, ui, "dialog.rename", actions,
+            sizeof(actions) / sizeof(actions[0]));
+        OSTenDialogControls::const_iterator input = controls.find("name");
+        if (input != controls.end()) {
+            fName = static_cast<BTextControl*>(input->second);
+            fName->SetText(name);
+        }
         CenterOnScreen();
     }
 
@@ -71,6 +75,8 @@ public:
             return;
         }
         if (message->what == kRenameAccept) {
+            if (fName == NULL)
+                return;
             status_t error = RenameFinderEntry(fRef, fName->Text(),
                 fOwnerUnlocked);
             if (error == B_OK) {

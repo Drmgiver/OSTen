@@ -112,3 +112,24 @@ Neither test proves full runtime conformance.
 **Full OSTen Software Standard compliance remains unachieved.**
 The unresolved blockers are documented in
 [NativeComplianceAudit.md](NativeComplianceAudit.md).
+
+## Shared native dialog composition milestone (October 31, 2026)
+
+A new public \`OSTenDialogLayout.h\` creates native text fields,
+buttons, static labels, and list views from ordered, typed control
+records in each application's editable resource catalog. Finder's
+Rename dialog and System's Notification Center now consume the same
+resource-driven builder. ResEdit's graphical layout editor reads those
+same records and lets the Owner drag and resize their frames, then
+save all changes in a single atomic manifest update. The file's
+permissions are preserved.
+
+CI now validates the packaged dialog declarations before the full
+image build. The general resource-index and smoke tests remain.
+
+**This is a significant step toward—but not completion of—universal
+native compliance.** Additional widget families, complete Finder and
+System UI conversion, active-application global menus, application
+folders, fonts/sounds/HVIF editors and interactive GUI verification
+are still outstanding.
+

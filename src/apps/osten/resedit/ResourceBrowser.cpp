@@ -38,6 +38,8 @@
 
 #include <string>
 #include <vector>
+#include <map>
+#include <set>
 
 namespace {
 
@@ -55,7 +57,8 @@ enum {
     kMenuSelected = 'mnSl', kMenuAdd = 'mnAd', kMenuRemove = 'mnRm',
     kMenuUp = 'mnUp', kMenuDown = 'mnDn', kMenuSave = 'mnSv',
     kMenuRevert = 'mnRv', kMenuSeparator = 'mnSp', kMenuReplace = 'mnRp',
-    kColorChange = 'clCh', kColorSave = 'clSv', kColorRevert = 'clRv'
+    kColorChange = 'clCh', kColorSave = 'clSv', kColorRevert = 'clRv',
+    kLayoutSave = 'lySv', kLayoutRevert = 'lyRv', kLayoutSelected = 'lySl'
 };
 
 struct ResourceEntry {
@@ -645,44 +648,63 @@ private:
 // Preserve all unrelated lines exactly. The completed temporary file is
 // atomically renamed over the selected manifest; the Owner owns backups.
 static bool
-WriteResourceValue(const ResourceEntry& item, const std::string& value)
+WriteResourceValues(const std::string& path,
+    const std::map<std::string, std::string>& replacements)
 {
-    FILE* input = fopen(item.path.c_str(), "rb");
-    if (!input) return false;
+    if (replacements.empty()) return false;
+    FILE* input = fopen(path.c_str(), "rb");
+    if (input == NULL) return false;
+    struct stat previous;
+    bool haveMode = fstat(fileno(input), &previous) == 0;
     std::string output;
     char row[8192];
-    bool found = false;
+    std::set<std::string> found;
     while (fgets(row, sizeof(row), input) != NULL) {
         std::string line(row);
-        if (line.compare(0, item.key.size(), item.key) == 0
-            && line.size() > item.key.size()
-            && line[item.key.size()] == '=') {
-            output += item.key + "=" + value + "\n";
-            found = true;
-        } else output += line;
+        size_t equals = line.find('=');
+        std::string key = equals == std::string::npos
+            ? "" : line.substr(0, equals);
+        std::map<std::string, std::string>::const_iterator changed
+            = replacements.find(key);
+        if (changed != replacements.end()) {
+            output += key + "=" + changed->second + "\n";
+            found.insert(key);
+        } else {
+            output += line;
+        }
     }
     bool readOK = !ferror(input);
     fclose(input);
-    if (!found || !readOK) return false;
-    std::string tmp = item.path + ".tmp.XXXXXX";
-    std::vector<char> name(tmp.begin(), tmp.end());
+    if (!readOK || found.size() != replacements.size())
+        return false;
+    std::string temporary = path + ".tmp.XXXXXX";
+    std::vector<char> name(temporary.begin(), temporary.end());
     name.push_back('\0');
     int fd = mkstemp(name.data());
     if (fd < 0) return false;
+    // An atomic replacement must preserve the original file's permissions.
+    bool ok = !haveMode || fchmod(fd, previous.st_mode & 07777) == 0;
     size_t written = 0;
-    bool ok = true;
-    while (written < output.size()) {
+    while (ok && written < output.size()) {
         ssize_t count = write(fd, output.data() + written,
             output.size() - written);
         if (count <= 0) { ok = false; break; }
         written += (size_t)count;
     }
-    if (fsync(fd) != 0) ok = false;
+    if (ok && fsync(fd) != 0) ok = false;
     if (close(fd) != 0) ok = false;
-    if (ok && rename(name.data(), item.path.c_str()) == 0)
+    if (ok && rename(name.data(), path.c_str()) == 0)
         return true;
     unlink(name.data());
     return false;
+}
+
+static bool
+WriteResourceValue(const ResourceEntry& item, const std::string& value)
+{
+    std::map<std::string, std::string> changes;
+    changes[item.key] = value;
+    return WriteResourceValues(item.path, changes);
 }
 
 class MenuEditorWindow : public BWindow {
@@ -1054,6 +1076,234 @@ private:
     BStringView* fStatus;
 };
 
+// Structured dialog/window layout designer. The preview controls are
+// dragged or resized as resource data; executable handler code is untouched.
+struct LayoutHandle {
+    std::string id;
+    std::string frameKey;
+    std::string caption;
+    BRect frame;
+};
+
+class LayoutCanvas : public BView {
+public:
+    LayoutCanvas(BRect bounds, std::vector<LayoutHandle>* handles)
+        : BView(bounds, "layout-canvas", B_FOLLOW_ALL, B_WILL_DRAW),
+          fHandles(handles), fSelected(-1), fTracking(false), fResize(false)
+    {
+        SetViewColor(BrowserUI().Color("browser.layout.paper",
+            rgb_color{252, 252, 251, 255}));
+    }
+
+    int32 Selected() const { return fSelected; }
+
+    void Draw(BRect) override
+    {
+        SetHighColor(BrowserUI().Color("browser.layout.frame_color",
+            rgb_color{80, 90, 103, 255}));
+        StrokeRect(Bounds());
+        for (size_t i = 0; i < fHandles->size(); ++i) {
+            BRect rect = (*fHandles)[i].frame;
+            rect.OffsetBy(20, 20);
+            SetHighColor(i == (size_t)fSelected
+                ? BrowserUI().Color("browser.layout.selected",
+                    rgb_color{191, 220, 250, 255})
+                : BrowserUI().Color("browser.layout.control",
+                    rgb_color{234, 234, 232, 255}));
+            FillRect(rect);
+            SetHighColor(BrowserUI().Color("browser.layout.frame_color",
+                rgb_color{80, 90, 103, 255}));
+            StrokeRect(rect);
+            MovePenTo(rect.left + 6, rect.top + 18);
+            DrawString((*fHandles)[i].caption.c_str());
+            if (i == (size_t)fSelected) {
+                FillRect(BRect(rect.right - 10, rect.bottom - 10,
+                    rect.right, rect.bottom));
+            }
+        }
+    }
+
+    void MouseDown(BPoint where) override
+    {
+        fSelected = -1;
+        for (int32 i = (int32)fHandles->size() - 1; i >= 0; --i) {
+            BRect rect = (*fHandles)[i].frame;
+            rect.OffsetBy(20, 20);
+            if (rect.Contains(where)) {
+                fSelected = i;
+                fOrigin = where;
+                fInitial = (*fHandles)[i].frame;
+                fResize = where.x >= rect.right - 12
+                    && where.y >= rect.bottom - 12;
+                fTracking = true;
+                SetMouseEventMask(B_POINTER_EVENTS, B_NO_POINTER_HISTORY);
+                break;
+            }
+        }
+        Invalidate();
+        Window()->PostMessage(kLayoutSelected);
+    }
+
+    void MouseMoved(BPoint where, uint32, const BMessage*) override
+    {
+        if (!fTracking || fSelected < 0) return;
+        BRect frame = fInitial;
+        const float dx = where.x - fOrigin.x;
+        const float dy = where.y - fOrigin.y;
+        if (fResize) {
+            frame.right = std::max(frame.left + 20, frame.right + dx);
+            frame.bottom = std::max(frame.top + 15, frame.bottom + dy);
+        } else frame.OffsetBy(dx, dy);
+        (*fHandles)[fSelected].frame = frame;
+        Invalidate();
+    }
+
+    void MouseUp(BPoint) override { fTracking = false; }
+private:
+    std::vector<LayoutHandle>* fHandles;
+    int32 fSelected;
+    bool fTracking;
+    bool fResize;
+    BPoint fOrigin;
+    BRect fInitial;
+};
+
+class LayoutEditorWindow : public BWindow {
+public:
+    explicit LayoutEditorWindow(const ResourceEntry& item)
+        : BWindow(BrowserUI().Rect("browser.layout.window",
+            BRect(160, 105, 920, 690)),
+            (item.label + BrowserUI().String("browser.layout.title_suffix",
+                " — Dialog Layout Editor")).c_str(), B_TITLED_WINDOW, 0),
+          fEntry(item)
+    {
+        BView* panel = new BView(Bounds(), "layout-editor",
+            B_FOLLOW_ALL, B_WILL_DRAW);
+        panel->SetViewColor(BrowserUI().Color("browser.layout.background",
+            rgb_color{239, 239, 236, 255}));
+        AddChild(panel);
+        panel->AddChild(new BStringView(BrowserUI().Rect(
+                "browser.layout.hint_frame", BRect(16, 10, 733, 38)),
+            "layout-hint", BrowserUI().String("browser.layout.hint",
+                "Drag a control to move it; drag its lower-right handle to resize")));
+        fCanvas = new LayoutCanvas(BrowserUI().Rect(
+                "browser.layout.canvas_frame", BRect(14, 42, 737, 493)),
+            &fHandles);
+        panel->AddChild(fCanvas);
+        panel->AddChild(new BButton(BrowserUI().Rect(
+                "browser.layout.revert_frame", BRect(495, 502, 605, 537)),
+            "revert", BrowserUI().String("browser.layout.revert", "Revert"),
+            new BMessage(kLayoutRevert)));
+        panel->AddChild(new BButton(BrowserUI().Rect(
+                "browser.layout.save_frame", BRect(619, 502, 728, 537)),
+            "save", BrowserUI().String("browser.layout.save", "Save"),
+            new BMessage(kLayoutSave)));
+        fStatus = new BStringView(BrowserUI().Rect(
+                "browser.layout.status_frame", BRect(16, 500, 478, 544)),
+            "layout-status", "");
+        panel->AddChild(fStatus);
+        _Load();
+        Show();
+    }
+
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+            case kLayoutSelected: {
+                int32 selected = fCanvas->Selected();
+                if (selected >= 0 && (size_t)selected < fHandles.size())
+                    fStatus->SetText(fHandles[selected].id.c_str());
+                return;
+            }
+            case kLayoutRevert: _Load(); return;
+            case kLayoutSave: _Save(); return;
+        }
+        BWindow::MessageReceived(message);
+    }
+
+private:
+    void _Load()
+    {
+        FILE* input = fopen(fEntry.path.c_str(), "rb");
+        if (input == NULL) return;
+        std::map<std::string, std::string> fields;
+        char row[8192];
+        while (fgets(row, sizeof(row), input) != NULL) {
+            std::string line(row);
+            if (line.empty() || line[0] == '#' || line[0] == ';') continue;
+            size_t eq = line.find('=');
+            if (eq == std::string::npos) continue;
+            std::string value = line.substr(eq + 1);
+            while (!value.empty() && (value.back() == '\n'
+                || value.back() == '\r'))
+                value.pop_back();
+            fields[line.substr(0, eq)] = value;
+        }
+        fclose(input);
+        fHandles.clear();
+        if (!EndsWith(fEntry.key, ".controls")) return;
+        const std::string prefix = fEntry.key.substr(0,
+            fEntry.key.size() - strlen(".controls"));
+        std::map<std::string, std::string>::const_iterator source
+            = fields.find(fEntry.key);
+        if (source == fields.end()) return;
+        const std::string& order = source->second;
+        size_t previous = 0;
+        for (size_t i = 0; i <= order.size(); ++i) {
+            if (i != order.size() && order[i] != ',') continue;
+            std::string id = order.substr(previous, i - previous);
+            previous = i + 1;
+            if (id.empty()) continue;
+            const std::string base = prefix + ".control." + id + ".";
+            const std::string frameKey = base + "frame";
+            std::map<std::string, std::string>::const_iterator frame
+                = fields.find(frameKey);
+            if (frame == fields.end()) continue;
+            float l, t, r, b;
+            char tail;
+            if (sscanf(frame->second.c_str(), "%f,%f,%f,%f%c",
+                    &l, &t, &r, &b, &tail) != 4) continue;
+            LayoutHandle handle;
+            handle.id = id;
+            handle.frameKey = frameKey;
+            handle.frame = BRect(l, t, r, b);
+            const std::string captionKey = base + "caption_key";
+            const std::string key = fields[captionKey];
+            std::map<std::string, std::string>::const_iterator caption
+                = fields.find(key);
+            handle.caption = caption != fields.end() ? caption->second : id;
+            fHandles.push_back(handle);
+        }
+        fCanvas->Invalidate();
+        fStatus->SetText(BrowserUI().String("browser.layout.ready",
+            "Control frames loaded from the application's resources"));
+    }
+
+    void _Save()
+    {
+        if (!OwnerMayWrite(fEntry.path)) return;
+        std::map<std::string, std::string> edits;
+        for (size_t i = 0; i < fHandles.size(); ++i) {
+            const LayoutHandle& handle = fHandles[i];
+            char coords[160];
+            snprintf(coords, sizeof(coords), "%.0f,%.0f,%.0f,%.0f",
+                handle.frame.left, handle.frame.top,
+                handle.frame.right, handle.frame.bottom);
+            edits[handle.frameKey] = coords;
+        }
+        bool saved = WriteResourceValues(fEntry.path, edits);
+        fStatus->SetText(BrowserUI().String(saved
+                ? "browser.layout.saved" : "browser.layout.failed", saved
+                ? "Layout saved. Restart the application to reload"
+                : "Layout save failed; original document unchanged"));
+    }
+
+    ResourceEntry fEntry;
+    std::vector<LayoutHandle> fHandles;
+    LayoutCanvas* fCanvas;
+    BStringView* fStatus;
+};
+
 class ResourceListWindow : public BWindow {
 public:
     ResourceListWindow(const std::string& kind,
@@ -1089,6 +1339,10 @@ public:
                 new PixelEditorWindow(item);
             else if (IsMenuSequence(item))
                 new MenuEditorWindow(item);
+            else if (EndsWith(item.key, ".controls")
+                && (item.type == "DLOG" || item.type == "NTFY"
+                    || item.type == "WLAY"))
+                new LayoutEditorWindow(item);
             else if (item.type == "COLR")
                 new ColorEditorWindow(item);
             else

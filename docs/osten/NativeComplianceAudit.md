@@ -133,3 +133,29 @@ the Owner approves the implementation and the required tests pass.
   construction and editing, system-wide active-app menus, sound/HVIF
   editing, packaging and comprehensive OS resource coverage still block
   compliance.
+
+## Resource-composed dialogs milestone (October 31, 2026)
+
+**Implemented on the draft branch; not yet a full compliance signoff.**
+
+- Introduced a single publicly documented \`OSTenDialogLayout.h\`
+  runtime builder for resource-declared text controls, labels, buttons,
+  and list views. Actions remain explicit stable IDs bound by the app.
+- Converted Finder's Rename window and System's Notification Center to
+  the **same runtime builder**, removing their source-defined layouts
+  and visible control lists.
+- Implemented a graphical editor in ResEdit for structured \`DLOG\` and
+  \`NTFY\` \`.controls\` resources, with selection, dragging, resizing,
+  Revert, and an atomic grouped Save preserving the target's permissions.
+- Added a pre-build test that checks control ordering, types, frames,
+  captions, stable index declarations, and associated action IDs.
+- **Remaining compliance failures**: many Finder windows and dialogs,
+  System accessories, Control Strip, global menu active-app integration,
+  OS window decorator, Resource Editor's own remaining interface elements,
+  complex controls, fonts, sounds, cursors/HVIF and full app packaging.
+  A green CI build verifies the included test gates, not exhaustive
+  conformance or hands-on GUI behavior.
+
+Do not merge until the Owner approves and remaining standard requirements
+have been independently verified.
+

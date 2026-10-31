@@ -228,3 +228,18 @@ dialog.notifications.title=Notifications
 dialog.notifications.unavailable=The notification service is unavailable.
 dialog.power.error=The system could not shut down: 
 dialog.system.title=System
+
+# Structured, owner-editable native control composition
+notification.center.controls=history,clear,test
+notification.center.control.history.type=list
+notification.center.control.history.frame=12,12,378,286
+notification.center.control.history.background=255,255,255
+notification.center.control.history.action=notices.open
+notification.center.control.clear.type=button
+notification.center.control.clear.frame=14,305,118,333
+notification.center.control.clear.caption_key=notification.clear
+notification.center.control.clear.action=notices.clear
+notification.center.control.test.type=button
+notification.center.control.test.frame=245,305,397,333
+notification.center.control.test.caption_key=notification.test
+notification.center.control.test.action=notices.test

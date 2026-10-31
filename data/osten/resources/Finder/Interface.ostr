@@ -143,3 +143,20 @@ dialog.folder.new_title=New Folder
 dialog.folder.locked_title=System Folder
 dialog.finder.title=Finder
 dialog.open.failed=The file could not be opened.\n\n
+
+# Structured, owner-editable native control composition
+dialog.rename.controls=name,cancel,ok
+dialog.rename.background=239,239,236
+dialog.rename.control.name.type=text
+dialog.rename.control.name.frame=20,27,365,57
+dialog.rename.control.name.caption_key=dialog.rename.label
+dialog.rename.control.name.divider=56
+dialog.rename.control.cancel.type=button
+dialog.rename.control.cancel.frame=185,100,268,129
+dialog.rename.control.cancel.caption_key=dialog.rename.cancel
+dialog.rename.control.cancel.action=rename.cancel
+dialog.rename.control.ok.type=button
+dialog.rename.control.ok.frame=278,100,370,129
+dialog.rename.control.ok.caption_key=dialog.rename.ok
+dialog.rename.control.ok.action=rename.accept
+dialog.rename.control.ok.default=1

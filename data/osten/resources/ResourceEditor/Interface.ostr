@@ -192,3 +192,23 @@ browser.color.invalid=This resource is not a valid RGB triple
 browser.color.ready=The preview reflects your selected values
 browser.color.saved=Saved. Restart the application to reload
 browser.color.failed=Could not save the selected RGB resource
+
+# ResEdit's graphical dialog/window layout editor
+browser.layout.window=160,105,920,690
+browser.layout.hint_frame=16,10,733,38
+browser.layout.canvas_frame=14,42,737,493
+browser.layout.revert_frame=495,502,605,537
+browser.layout.save_frame=619,502,728,537
+browser.layout.status_frame=16,500,478,544
+browser.layout.title_suffix= — Dialog Layout Editor
+browser.layout.hint=Drag a control to move it; drag its lower-right handle to resize
+browser.layout.revert=Revert
+browser.layout.save=Save
+browser.layout.ready=Control frames loaded from the application's resources
+browser.layout.saved=Layout saved. Restart the application to reload
+browser.layout.failed=Layout save failed; original document unchanged
+browser.layout.background=239,239,236
+browser.layout.paper=252,252,251
+browser.layout.frame_color=80,90,103
+browser.layout.selected=191,220,250
+browser.layout.control=234,234,232

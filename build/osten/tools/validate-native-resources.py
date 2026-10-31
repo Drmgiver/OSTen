@@ -113,10 +113,48 @@ def check_editor_bindings() -> None:
     print(f"ResourceEditor: {len(used)} literal browser resource references checked")
 
 
+def validate_composed_dialog(app: str, prefix: str) -> None:
+    """Validate packaged default UI schemas; owners may change them at runtime."""
+    values = parse_manifest(BASE / app / "Interface.ostr")
+    index = parse_index(BASE / app / "ResourceIndex.osti")
+    order = values.get(prefix + ".controls", "").split(",")
+    check(bool(order) and all(order),
+          f"{app}/{prefix}: missing or empty declared controls")
+    check(len(order) == len(set(order)),
+          f"{app}/{prefix}: duplicate control IDs")
+    for ident in order:
+        stem = f"{prefix}.control.{ident}."
+        kind = values.get(stem + "type")
+        check(kind in {"text", "label", "button", "list"},
+              f"{app}/{prefix}/{ident}: unsupported declared control {kind}")
+        frame = values.get(stem + "frame", "")
+        pieces = frame.split(",")
+        try:
+            coords = tuple(float(value) for value in pieces)
+            check(len(coords) == 4 and coords[0] < coords[2]
+                  and coords[1] < coords[3],
+                  f"{app}/{prefix}/{ident}: bad frame {frame}")
+        except ValueError:
+            errors.append(f"{app}/{prefix}/{ident}: non-numeric frame {frame}")
+        for required in ("type", "frame"):
+            check(stem + required in index,
+                  f"{app}/{prefix}/{ident}: no indexed {required} resource")
+        captionKey = values.get(stem + "caption_key", "")
+        if captionKey:
+            check(captionKey in values,
+                  f"{app}/{prefix}/{ident}: caption key absent {captionKey}")
+        if kind in {"button", "list"}:
+            check(bool(values.get(stem + "action")),
+                  f"{app}/{prefix}/{ident}: missing command/action ID")
+    print(f"{app}: {prefix} — {len(order)} structured controls verified")
+
+
 def main() -> int:
     for app in APPS:
         validate_app(app)
     check_editor_bindings()
+    validate_composed_dialog("Finder", "dialog.rename")
+    validate_composed_dialog("System", "notification.center")
     if errors:
         print("\nFAILED", file=sys.stderr)
         for error in errors:

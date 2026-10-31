@@ -135,3 +135,22 @@ global active-application menu integration, complete native resource
 coverage and booted-OS interaction tests are still necessary before
 claiming full compliance.
 See [NativeComplianceAudit.md](NativeComplianceAudit.md).
+
+## Graphical dialog-layout editing
+
+Finder's Rename dialog and System's Notification Center are now built
+from public, structured \`Interface.ostr\` declarations using
+\`OSTenDialogLayout.h\`. Their \`*.controls\` resources are indexed
+as \`DLOG\` and \`NTFY\`. Open either in ResEdit, double-click the
+\`*.controls\` entry, and use the graphical layout editor. Drag any
+control to change its position; drag its lower-right handle to resize,
+then Save. All changed frames are committed together, without
+modifying unrelated resource fields or executable logic. The edited
+application must restart to load the changed layouts.
+
+The window and visual editor are resource-editable themselves through
+the Resource Editor catalog. This is a first complete demonstration
+of the same runtime composition model used by more than one OSTen
+system component—not yet coverage for every window and control in
+Finder, System or Resource Editor.
+
