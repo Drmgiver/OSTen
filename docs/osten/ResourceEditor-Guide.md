@@ -233,3 +233,14 @@ editing alone never invents executable handlers.
 This implementation provides genuine structured dialog editing for
 composed dialogs. It does **not** make all OSTen System, Finder or ResEdit
 windows composed or fully compliant. See the compliance audit.
+  
+## Outer window layout
+
+The dialog layout canvas represents the **outer window** as well as its
+child controls. Drag the top edge/title region to reposition the window
+and the lower-right corner to resize it. Enter exact
+`left,top,right,bottom` coordinates in the *Window frame* field and
+press Apply for numeric editing. Save writes the associated native
+window frame resource alongside the control definitions. System
+notification windows use an explicit frame-key alias because their
+screen-relative resource is named separately.

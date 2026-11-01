@@ -24,24 +24,8 @@ namespace {
 const uint32 kToggleStrip = 'cstg';
 const uint32 kCloseStrip = 'csch';
 
-struct StripModule {
-    const char* name;
-    const char* shortLabel;
-    const char* summary;
-};
-
-// Each entry is one independent module slot. Future native modules can replace
-// the information menu without touching the bar's layout or collapse logic.
-const StripModule kModules[] = {
-    {"Volume", "Vol", "Audio controls will be connected to the media system."},
-    {"Display", "Disp", "Resolution and brightness controls are not wired yet."},
-    {"Network", "Net", "Network status and interfaces are not wired yet."},
-    {"Power", "Pwr", "Battery and power information are not wired yet."},
-    {"Bluetooth", "BT", "Bluetooth status and pairing are not wired yet."},
-    {"Drives", "Disk", "Mounted volumes and removable media are not wired yet."},
-    {"Settings", "Set", "Control Strip preferences will be added here."}
-};
-const int kModuleCount = sizeof(kModules) / sizeof(kModules[0]);
+// Control Strip modules are identified by arbitrary stable resource IDs.
+// System no longer has a compiled-in list of permissible module slots.
 static float _HandleWidth() {
     return OSTenSystemResources().Number("strip.handle.width", 23, 18, 60);
 }
@@ -55,9 +39,9 @@ static float _StripHeight() {
 // The Owner can reorder, omit or duplicate module slots. A shortened list
 // changes the actual Control Strip width; the application never restores
 // omitted slots just because a developer considered them essential.
-static const std::vector<int>& _VisibleModules()
+static const std::vector<std::string>& _VisibleModules()
 {
-    static std::vector<int> visible;
+    static std::vector<std::string> visible;
     static bool initialized = false;
     if (!initialized) {
         initialized = true;
@@ -66,31 +50,30 @@ static const std::vector<int>& _VisibleModules()
         std::stringstream source(raw);
         std::string token;
         while (std::getline(source, token, ',')) {
-            if (token.empty()) continue;
-            char* end = NULL;
-            long value = strtol(token.c_str(), &end, 10);
-            if (end != token.c_str() && *end == '\0'
-                && value >= 0 && value < kModuleCount)
-                visible.push_back((int)value);
+            if (token.empty() || token.size() > 128
+                || token.find_first_not_of(
+                    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+                    "0123456789._-") != std::string::npos)
+                continue;
+            visible.push_back(token);
         }
     }
     return visible;
 }
 
-static int _ModuleForSlot(int position)
+static const std::string* _ModuleForSlot(int position)
 {
-    const std::vector<int>& visible = _VisibleModules();
+    const std::vector<std::string>& visible = _VisibleModules();
     if (position < 0 || (size_t)position >= visible.size())
-        return -1;
-    return visible[position];
+        return NULL;
+    return &visible[position];
 }
 
-static const char* _ModuleText(int index, const char* suffix,
+static const char* _ModuleText(const std::string& id, const char* suffix,
     const char* fallback)
 {
-    char key[64];
-    snprintf(key, sizeof(key), "strip.module.%d.%s", index, suffix);
-    return OSTenSystemResources().String(key, fallback);
+    std::string key = "strip.module." + id + "." + suffix;
+    return OSTenSystemResources().String(key.c_str(), fallback);
 }
 
 
@@ -140,9 +123,10 @@ public:
             StrokeLine(BPoint(left + 1, 4),
                 BPoint(left + 1, bounds.bottom - 4));
             SetHighColor(OSTenSystemResources().Color("color.strip.module_text", rgb_color{20, 20, 25, 255}));
-            const int module = _ModuleForSlot(i);
-            const char* label = _ModuleText(module, "label",
-                kModules[module].shortLabel);
+            const std::string* module = _ModuleForSlot(i);
+            if (module == NULL) continue;
+            const char* label = _ModuleText(*module, "label",
+                module->c_str());
             const float width = StringWidth(label);
             DrawString(label, BPoint(left + (_ModuleWidth() - width) / 2,
                 OSTenSystemResources().Number(
@@ -161,18 +145,21 @@ public:
         int index = (int)((point.x - _HandleWidth()) / _ModuleWidth());
         if (index < 0 || (size_t)index >= _VisibleModules().size())
             return;
-        index = _ModuleForSlot(index);
-        const char* name = _ModuleText(index, "name", kModules[index].name);
+        const std::string* module = _ModuleForSlot(index);
+        if (module == NULL) return;
+        const char* name = _ModuleText(*module, "name", module->c_str());
         BPopUpMenu* menu = new BPopUpMenu(name, false, false);
         BMenuItem* title = new BMenuItem(name, NULL);
         title->SetEnabled(false);
         menu->AddItem(title);
         menu->AddSeparatorItem();
-        BMenuItem* info = new BMenuItem(_ModuleText(index,
-            "summary", kModules[index].summary), NULL);
+        BMenuItem* info = new BMenuItem(_ModuleText(*module,
+            "summary", OSTenSystemResources().String(
+                "strip.module.summary_fallback", "Module has no description.")), NULL);
         info->SetEnabled(false);
         menu->AddItem(info);
-        if (index == kModuleCount - 1) {
+        if (*module == OSTenSystemResources().String(
+                "strip.module.settings_id", "6")) {
             menu->AddSeparatorItem();
             menu->AddItem(new BMenuItem(OSTenSystemResources().String(
                 "strip.menu.collapse", "Collapse Control Strip"),

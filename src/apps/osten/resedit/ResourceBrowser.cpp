@@ -1004,6 +1004,9 @@ private:
 static bool
 IsMenuSequence(const ResourceEntry& entry)
 {
+    // Control Strip module ordering is another stable-ID sequence, not a
+    // compiled list of slots. Use the same visual sequence editor.
+    if (entry.key == "strip.module.order") return true;
     if (entry.type != "MENU") return false;
     return entry.key.compare(0, 10, "menu.title") != 0
         && entry.key.compare(0, 9, "menu.item") != 0;
@@ -1167,9 +1170,12 @@ struct LayoutHandle {
 
 class LayoutCanvas : public BView {
 public:
-    LayoutCanvas(BRect bounds, std::vector<LayoutHandle>* handles)
+    LayoutCanvas(BRect bounds, std::vector<LayoutHandle>* handles,
+        BRect* windowFrame)
         : BView(bounds, "layout-canvas", B_FOLLOW_ALL, B_WILL_DRAW),
-          fHandles(handles), fSelected(-1), fTracking(false), fResize(false)
+          fHandles(handles), fWindowFrame(windowFrame),
+          fSelected(-1), fTracking(false), fResize(false),
+          fWindowTracking(false), fWindowResize(false)
     {
         SetViewColor(BrowserUI().Color("browser.layout.paper",
             rgb_color{252, 252, 251, 255}));
@@ -1187,6 +1193,17 @@ public:
         SetHighColor(BrowserUI().Color("browser.layout.frame_color",
             rgb_color{80, 90, 103, 255}));
         StrokeRect(Bounds());
+        if (fWindowFrame != NULL && fWindowFrame->IsValid()) {
+            BRect window(20, 20, 20 + fWindowFrame->Width(),
+                20 + fWindowFrame->Height());
+            SetHighColor(BrowserUI().Color("browser.layout.window_outline",
+                rgb_color{42, 68, 99, 255}));
+            StrokeRect(window);
+            StrokeLine(BPoint(window.left, window.top + 20),
+                BPoint(window.right, window.top + 20));
+            FillRect(BRect(window.right - 11, window.bottom - 11,
+                window.right, window.bottom));
+        }
         for (size_t i = 0; i < fHandles->size(); ++i) {
             BRect rect = (*fHandles)[i].frame;
             rect.OffsetBy(20, 20);
@@ -1214,6 +1231,7 @@ public:
     void MouseDown(BPoint where) override
     {
         fSelected = -1;
+        fWindowTracking = false;
         for (int32 i = (int32)fHandles->size() - 1; i >= 0; --i) {
             BRect rect = (*fHandles)[i].frame;
             rect.OffsetBy(20, 20);
@@ -1228,12 +1246,43 @@ public:
                 break;
             }
         }
+        if (!fTracking && fWindowFrame != NULL && fWindowFrame->IsValid()) {
+            BRect window(20, 20, 20 + fWindowFrame->Width(),
+                20 + fWindowFrame->Height());
+            if (BRect(window.right - 13, window.bottom - 13,
+                    window.right + 5, window.bottom + 5).Contains(where)) {
+                fWindowTracking = true;
+                fWindowResize = true;
+            } else if (BRect(window.left, window.top,
+                    window.right, window.top + 20).Contains(where)) {
+                fWindowTracking = true;
+                fWindowResize = false;
+            }
+            if (fWindowTracking) {
+                fOrigin = where;
+                fInitial = *fWindowFrame;
+                SetMouseEventMask(B_POINTER_EVENTS, B_NO_POINTER_HISTORY);
+            }
+        }
         Invalidate();
         Window()->PostMessage(kLayoutSelected);
     }
 
     void MouseMoved(BPoint where, uint32, const BMessage*) override
     {
+        if (fWindowTracking && fWindowFrame != NULL) {
+            BRect frame = fInitial;
+            float dx = where.x - fOrigin.x;
+            float dy = where.y - fOrigin.y;
+            if (fWindowResize) {
+                frame.right = std::max(frame.left + 40, frame.right + dx);
+                frame.bottom = std::max(frame.top + 35, frame.bottom + dy);
+            } else frame.OffsetBy(dx, dy);
+            *fWindowFrame = frame;
+            Invalidate();
+            Window()->PostMessage(kLayoutSelected);
+            return;
+        }
         if (!fTracking || fSelected < 0) return;
         BRect frame = fInitial;
         const float dx = where.x - fOrigin.x;
@@ -1246,12 +1295,19 @@ public:
         Invalidate();
     }
 
-    void MouseUp(BPoint) override { fTracking = false; }
+    void MouseUp(BPoint) override
+    {
+        fTracking = false;
+        fWindowTracking = false;
+    }
 private:
     std::vector<LayoutHandle>* fHandles;
+    BRect* fWindowFrame;
     int32 fSelected;
     bool fTracking;
     bool fResize;
+    bool fWindowTracking;
+    bool fWindowResize;
     BPoint fOrigin;
     BRect fInitial;
 };
@@ -1265,6 +1321,7 @@ public:
                 " — Dialog Layout Editor")).c_str(), B_TITLED_WINDOW, 0),
           fEntry(item)
     {
+        fWindowFrame = BRect(0, 0, -1, -1);
         BView* panel = new BView(Bounds(), "layout-editor",
             B_FOLLOW_ALL, B_WILL_DRAW);
         panel->SetViewColor(BrowserUI().Color("browser.layout.background",
@@ -1276,7 +1333,7 @@ public:
                 "Drag a control to move it; drag its lower-right handle to resize")));
         fCanvas = new LayoutCanvas(BrowserUI().Rect(
                 "browser.layout.canvas_frame", BRect(14, 42, 737, 493)),
-            &fHandles);
+            &fHandles, &fWindowFrame);
         panel->AddChild(fCanvas);
         // The inspector uses the same editable OSTen resource catalog as
         // the preview itself; stable control IDs are independent of labels.
@@ -1296,7 +1353,13 @@ public:
             BRect(761, 192, 1100, 227)), "layout-action",
             BrowserUI().String("browser.layout.action_label", "Action ID"),
             "", NULL);
-        BTextControl* editors[] = {fID, fType, fCaption, fAction};
+        fWindowGeometry = new BTextControl(BrowserUI().Rect(
+            "browser.layout.window_geometry_frame", BRect(761, 402, 1100, 437)),
+            "layout-window-geometry",
+            BrowserUI().String("browser.layout.window_geometry_label",
+                "Window frame"), "", NULL);
+        BTextControl* editors[] = {
+            fID, fType, fCaption, fAction, fWindowGeometry};
         for (size_t i = 0; i < sizeof(editors) / sizeof(editors[0]); ++i) {
             editors[i]->SetDivider(102);
             panel->AddChild(editors[i]);
@@ -1382,6 +1445,28 @@ private:
         if (!EndsWith(fEntry.key, ".controls")) return;
         const std::string prefix = fEntry.key.substr(0,
             fEntry.key.size() - strlen(".controls"));
+        fWindowKey.clear();
+        const std::string alias = prefix + ".window_frame_key";
+        if (fields.find(alias) != fields.end())
+            fWindowKey = fields[alias];
+        else if (fields.find(prefix + ".frame") != fields.end())
+            fWindowKey = prefix + ".frame";
+        else if (fields.find(prefix + ".window") != fields.end())
+            fWindowKey = prefix + ".window";
+        fWindowFrame = BRect(0, 0, -1, -1);
+        if (!fWindowKey.empty()) {
+            std::map<std::string, std::string>::const_iterator found
+                = fields.find(fWindowKey);
+            if (found != fields.end()) {
+                float l, t, r, b;
+                char extra = 0;
+                if (sscanf(found->second.c_str(), "%f,%f,%f,%f%c",
+                        &l, &t, &r, &b, &extra) == 4
+                    && isfinite(l) && isfinite(t)
+                    && isfinite(r) && isfinite(b) && r > l && b > t)
+                    fWindowFrame = BRect(l, t, r, b);
+            }
+        }
         std::map<std::string, std::string>::const_iterator source
             = fields.find(fEntry.key);
         if (source == fields.end()) return;
@@ -1436,6 +1521,13 @@ private:
 
     void _Select(int32 index)
     {
+        if (!fWindowKey.empty() && fWindowFrame.IsValid()) {
+            char coords[144];
+            snprintf(coords, sizeof(coords), "%.0f,%.0f,%.0f,%.0f",
+                fWindowFrame.left, fWindowFrame.top,
+                fWindowFrame.right, fWindowFrame.bottom);
+            fWindowGeometry->SetText(coords);
+        } else fWindowGeometry->SetText("");
         if (index < 0 || (size_t)index >= fHandles.size()) {
             fID->SetText("");
             fType->SetText("");
@@ -1453,8 +1545,20 @@ private:
 
     void _Apply()
     {
+        if (!fWindowKey.empty() && fWindowGeometry->Text()[0] != 0) {
+            float l, t, r, b;
+            char extra = 0;
+            if (sscanf(fWindowGeometry->Text(), "%f,%f,%f,%f%c",
+                    &l, &t, &r, &b, &extra) == 4
+                && isfinite(l) && isfinite(t) && isfinite(r) && isfinite(b)
+                && r > l && b > t)
+                fWindowFrame = BRect(l, t, r, b);
+        }
         int32 index = fCanvas->Selected();
-        if (index < 0 || (size_t)index >= fHandles.size()) return;
+        if (index < 0 || (size_t)index >= fHandles.size()) {
+            fCanvas->Invalidate();
+            return;
+        }
         // IDs are stable resource identities: change the caption, not the ID.
         LayoutHandle& item = fHandles[index];
         const std::string type = fType->Text();
@@ -1566,6 +1670,13 @@ private:
             order += fHandles[i].id;
         }
         edits[fEntry.key] = order;
+        if (!fWindowKey.empty() && fWindowFrame.IsValid()) {
+            char window[144];
+            snprintf(window, sizeof(window), "%.0f,%.0f,%.0f,%.0f",
+                fWindowFrame.left, fWindowFrame.top,
+                fWindowFrame.right, fWindowFrame.bottom);
+            edits[fWindowKey] = window;
+        }
         // Track newly authored resource fields so they receive stable IDs
         // in the same public index used by the browser and native clients.
         std::map<std::string, std::string> additions;
@@ -1593,6 +1704,8 @@ private:
     }
 
     ResourceEntry fEntry;
+    std::string fWindowKey;
+    BRect fWindowFrame;
     std::map<std::string, std::string> fValues;
     std::vector<LayoutHandle> fHandles;
     LayoutCanvas* fCanvas;
@@ -1601,6 +1714,7 @@ private:
     BTextControl* fType;
     BTextControl* fCaption;
     BTextControl* fAction;
+    BTextControl* fWindowGeometry;
 };
 
 class ResourceListWindow : public BWindow {

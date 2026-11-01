@@ -295,3 +295,6 @@ OSTEN-RESOURCE-INDEX/1
 0x40a4be85|TEXT|browser.layout.duplicate|browser.layout.duplicate|0|0
 0x97dcf579|TEXT|browser.layout.applied|browser.layout.applied|0|0
 0xa2da5bfc|TEXT|browser.layout.index_failed|browser.layout.index_failed|0|0
+0xa48819bb|WLAY|browser.layout.window_geometry_frame|browser.layout.window_geometry_frame|0|0
+0x5cec0cf0|TEXT|browser.layout.window_geometry_label|browser.layout.window_geometry_label|0|0
+0xdc593dbd|COLR|browser.layout.window_outline|browser.layout.window_outline|0|0

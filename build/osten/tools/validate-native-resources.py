@@ -203,8 +203,8 @@ def validate_strip_order() -> None:
     for module in modules:
         if not module:
             continue
-        check(module.isdecimal() and 0 <= int(module) <= 6,
-              f"System: Control Strip references unknown module {module}")
+        check(bool(re.fullmatch(r"[A-Za-z0-9._-]{1,128}", module)),
+              f"System: invalid Control Strip resource ID {module}")
     # Deliberately allow empty/subset/repeated modules. The Owner controls
     # their visibility, even when the entire row is removed.
     print("System: Owner-controlled Control Strip module order checked")

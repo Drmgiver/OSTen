@@ -243,3 +243,6 @@ notification.center.control.test.type=button
 notification.center.control.test.frame=245,305,397,333
 notification.center.control.test.caption_key=notification.test
 notification.center.control.test.action=notices.test
+strip.module.settings_id=6
+strip.module.summary_fallback=Module has no description.
+notification.center.window_frame_key=notification.window_frame

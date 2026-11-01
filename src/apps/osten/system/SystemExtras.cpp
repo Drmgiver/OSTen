@@ -428,7 +428,10 @@ public:
             background, OSTenSystemResources(), "notification.center",
             actions, sizeof(actions) / sizeof(actions[0]));
         OSTenDialogControls::const_iterator list = controls.find("history");
-        if (list != controls.end())
+        if (list != controls.end()
+            && strcmp(OSTenSystemResources().String(
+                "notification.center.control.history.type", ""),
+                "list") == 0)
             fList = static_cast<BListView*>(list->second);
     }
 

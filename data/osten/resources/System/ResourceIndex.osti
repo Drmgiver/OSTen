@@ -222,3 +222,6 @@ OSTEN-RESOURCE-INDEX/1
 0x402e0ff7|IMAG|wordmark|wordmark|71|20
 0xc7c522b7|IMAG|about-wordmark|about-wordmark|248|69
 0xe0979878|ICON|switcher-finder|switcher-finder|22|22
+0x9c3ae55f|CTRL|strip.module.settings_id|strip.module.settings_id|0|0
+0x1893fb57|CTRL|strip.module.summary_fallback|strip.module.summary_fallback|0|0
+0x0dbba458|WLAY|notification.center.window_frame_key|notification.center.window_frame_key|0|0

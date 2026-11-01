@@ -318,3 +318,6 @@ browser.layout.invalid=Type and action must be resource identifiers
 browser.layout.duplicate=A control with this ID already exists
 browser.layout.applied=Properties applied. Save to write the manifest
 browser.layout.index_failed=Layout saved but resource index could not be updated
+browser.layout.window_geometry_frame=761,402,1100,437
+browser.layout.window_geometry_label=Window frame
+browser.layout.window_outline=42,68,99

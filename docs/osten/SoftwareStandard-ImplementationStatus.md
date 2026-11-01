@@ -190,3 +190,35 @@ The implementation still requires broad conversion of Finder, System
 and ResEdit's remaining built-in windows, richer standard resource
 types, and live booted interaction tests. It is not yet a claim of
 universal OSTen Software Standard compliance.
+
+## Control Strip resource module IDs (November 1, 2026)
+
+System's Control Strip no longer enforces a compiled seven-slot module
+table. `strip.module.order` accepts named, repeatable resource IDs, and
+the descriptor for each module is read from editable keys
+`strip.module.<id>.name`, `.label`, and `.summary`. The Settings
+module identity comes from `strip.module.settings_id`; it no longer
+depends on its position in a fixed array. Missing descriptors display
+the Owner-supplied ID and a configurable fallback summary.
+
+This makes module presentation extensible without modifying System C++.
+**It is not yet a native executable Control Strip module plugin
+protocol**; dynamic module code loading, permission contracts and
+lifecycle APIs still need to be implemented.
+
+## Composed window-frame editing (November 1, 2026)
+
+ResEdit's graphical layout canvas now outlines the selected dialog's
+resource-defined **outer window frame**. Dragging the title region
+repositions it; dragging the lower-right handle resizes it.
+The side inspector also accepts direct left, top, right, bottom
+coordinates. Edits save to the actual frame resource key for Finder's
+Rename/Get Info and Resource Editor's own browser windows. For System
+notifications an explicit `notification.center.window_frame_key` alias
+binds the window's existing `notification.window_frame` resource.
+
+Edits remain Owner-controlled, while the loader consumes saved geometry
+on application restart. Large windows may extend beyond the current
+preview canvas; scrolling and whole-window live preview are still
+future improvements. Full conformance requires conversion of all
+remaining native C++-defined windows.
