@@ -1637,8 +1637,8 @@ private:
 
 } // namespace
 
-void
+BWindow*
 StartOSTenResourceBrowser()
 {
-    new ResourceBrowserWindow();
+    return new ResourceBrowserWindow();
 }

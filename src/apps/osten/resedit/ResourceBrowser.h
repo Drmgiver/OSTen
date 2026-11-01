@@ -3,8 +3,9 @@
 #define OSTEN_RESOURCE_BROWSER_H
 
 #include <string>
+#include <Window.h>
 
-void StartOSTenResourceBrowser();
+BWindow* StartOSTenResourceBrowser();
 void OpenOSTenResourceProperty(const std::string& file,
     const std::string& application, const std::string& key);
 

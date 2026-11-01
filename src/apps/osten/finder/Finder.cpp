@@ -43,6 +43,7 @@
 #include "DiskArtwork48.h"
 #include "HighResDesktopArtwork.h"
 #include "OSTenResources.h"
+#include "OSTenGlobalMenu.h"
 #include <sstream>
 
 
@@ -2523,6 +2524,42 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+        if (message->what == kOSTenGlobalMenuQuery) {
+            OSTenAnswerGlobalMenuQuery(message, OSTenFinderResources());
+            return;
+        }
+        if (message->what == kOSTenGlobalMenuInvoke) {
+            const char* action = NULL;
+            if (message->FindString("action", &action) != B_OK
+                || action == NULL)
+                return;
+            struct MenuCommand { const char* id; uint32 what; };
+            static const MenuCommand commands[] = {
+                {"new_folder", kOSTenNewFolder},
+                {"open", kOSTenOpen},
+                {"rename", kOSTenRename},
+                {"get_info", kOSTenGetInfo},
+                {"close", kOSTenClose},
+                {"select_all", kOSTenSelectAll},
+                {"view_icons", kOSTenViewAsIcons},
+                {"view_list", kOSTenViewAsList},
+                {"arrange_name", kOSTenArrangeName},
+                {"arrange_kind", kOSTenArrangeKind},
+                {"clean_up", kOSTenCleanUp},
+                {"empty_trash", kOSTenEmptyTrash},
+                {"toggle_popup", kOSTenTogglePopupFolder},
+                {"system_folder_access", kOSTenSystemFolderAccess}
+            };
+            for (size_t i = 0;
+                i < sizeof(commands) / sizeof(commands[0]); ++i) {
+                if (strcmp(action, commands[i].id) == 0) {
+                    BMessage command(commands[i].what);
+                    PostMessage(&command);
+                    break;
+                }
+            }
+            return;
+        }
         if (message->what == kOSTenQuerySystemFolderAccess) {
             // This reflects Finder's existing Owner editing state. It does
             // not claim filesystem-level security or grant any OS privilege.

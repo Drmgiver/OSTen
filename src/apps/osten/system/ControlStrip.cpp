@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <sstream>
 #include <set>
+#include <vector>
 
 namespace {
 
@@ -51,37 +52,37 @@ static float _StripHeight() {
     return OSTenSystemResources().Number("layout.control_strip.height", 30, 24, 60);
 }
 
-// Resource editor may rearrange slots, but slot IDs never change their meaning.
-// Invalid or duplicate slot lists revert to the approved original order.
-static int _ModuleForSlot(int position)
+// The Owner can reorder, omit or duplicate module slots. A shortened list
+// changes the actual Control Strip width; the application never restores
+// omitted slots just because a developer considered them essential.
+static const std::vector<int>& _VisibleModules()
 {
-    static int order[kModuleCount];
+    static std::vector<int> visible;
     static bool initialized = false;
     if (!initialized) {
-        for (int i = 0; i < kModuleCount; ++i)
-            order[i] = i;
+        initialized = true;
         const char* raw = OSTenSystemResources().String(
             "strip.module.order", "0,1,2,3,4,5,6");
         std::stringstream source(raw);
         std::string token;
-        std::set<int> used;
-        int proposed[kModuleCount];
-        int count = 0;
-        while (std::getline(source, token, ',') && count < kModuleCount) {
+        while (std::getline(source, token, ',')) {
+            if (token.empty()) continue;
             char* end = NULL;
-            long number = strtol(token.c_str(), &end, 10);
-            if (end == token.c_str() || *end != '\0'
-                || number < 0 || number >= kModuleCount
-                || !used.insert((int)number).second)
-                break;
-            proposed[count++] = (int)number;
+            long value = strtol(token.c_str(), &end, 10);
+            if (end != token.c_str() && *end == '\0'
+                && value >= 0 && value < kModuleCount)
+                visible.push_back((int)value);
         }
-        if (count == kModuleCount && source.eof())
-            for (int i = 0; i < kModuleCount; ++i)
-                order[i] = proposed[i];
-        initialized = true;
     }
-    return order[position];
+    return visible;
+}
+
+static int _ModuleForSlot(int position)
+{
+    const std::vector<int>& visible = _VisibleModules();
+    if (position < 0 || (size_t)position >= visible.size())
+        return -1;
+    return visible[position];
 }
 
 static const char* _ModuleText(int index, const char* suffix,
@@ -131,7 +132,7 @@ public:
         BFont moduleFont = OSTenSystemResources().Font(
             "strip.font.modules", be_plain_font);
         SetFont(&moduleFont);
-        for (int i = 0; i < kModuleCount; ++i) {
+        for (size_t i = 0; i < _VisibleModules().size(); ++i) {
             const float left = _HandleWidth() + i * _ModuleWidth();
             SetHighColor(OSTenSystemResources().Color("color.strip.divider", rgb_color{130, 130, 134, 255}));
             StrokeLine(BPoint(left, 4), BPoint(left, bounds.bottom - 4));
@@ -158,7 +159,7 @@ public:
         if (fCollapsed)
             return;
         int index = (int)((point.x - _HandleWidth()) / _ModuleWidth());
-        if (index < 0 || index >= kModuleCount)
+        if (index < 0 || (size_t)index >= _VisibleModules().size())
             return;
         index = _ModuleForSlot(index);
         const char* name = _ModuleText(index, "name", kModules[index].name);
@@ -232,7 +233,8 @@ public:
 private:
     static float _Width(bool collapsed)
     {
-        return collapsed ? _HandleWidth() : _HandleWidth() + kModuleCount * _ModuleWidth();
+        return collapsed ? _HandleWidth() : _HandleWidth()
+            + _VisibleModules().size() * _ModuleWidth();
     }
 
     static BRect _Frame(bool collapsed)

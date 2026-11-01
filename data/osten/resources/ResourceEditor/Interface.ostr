@@ -241,3 +241,14 @@ browser.entries.control.info.caption_key=browser.entries.hint
 browser.entries.control.resource_entries.type=list
 browser.entries.control.resource_entries.frame_key=browser.entries.list_frame
 browser.entries.control.resource_entries.action=browser.open_entry
+
+# Active-application global menu publication
+menu.order=file
+menu.title.file=File
+menu.file=open,refresh,separator,quit
+menu.item.open=Open...
+menu.item.refresh=Refresh Resources
+menu.item.quit=Quit Resource Editor
+shortcut.open=O
+shortcut.refresh=R
+shortcut.quit=Q

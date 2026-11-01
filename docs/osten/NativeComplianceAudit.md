@@ -169,3 +169,25 @@ supports \`frame_key\` references to existing geometry values, avoiding
 duplicate resources. This is a concrete self-editing milestone; other
 ResEdit windows, advanced controls and the global menu still require
 conversion.
+
+## Active-app global menu milestone (October 31, 2026)
+
+- System now queries the foreground application's native menu model
+  using the public \`OSTenGlobalMenu.h\` protocol. It displays the
+  application's own File/Edit/View/etc. sections beside the OSTen
+  system menu and dispatches selected stable command IDs back to
+  the publishing application.
+- Finder and ResEdit publish their owner-editable menu model through
+  the same API. Labels, section and item order, and shortcuts live
+  in each application's \`Interface.ostr\` and \`ResourceIndex.osti\`.
+- The System Control Strip now accepts owner-selected subsets and
+  reordered/duplicated module IDs rather than automatically forcing
+  all seven modules to reappear. No safety-mode limitation is imposed.
+- New pre-build tests verify published menu models, indexed commands,
+  one-character shortcut uniqueness within each native application,
+  and the Control Strip's chosen module IDs.
+
+**These changes do not certify compliance.** Dynamic menu presentation,
+keyboard routing and focus transitions require interactive boot tests.
+Further complete resource conversion, advanced resource editors,
+self-contained native app packaging, and extensibility tests remain.

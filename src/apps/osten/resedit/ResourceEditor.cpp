@@ -18,6 +18,7 @@
 #include <Messenger.h>
 #include "OSTenMessages.h"
 #include "OSTenResources.h"
+#include "OSTenGlobalMenu.h"
 #include "ResourceBrowser.h"
 #include <ScrollView.h>
 #include <StringItem.h>
@@ -926,7 +927,36 @@ public:
     ResourceEditorApp()
         : BApplication("application/x-vnd.OSTen-ResourceEditor") {}
 
-    void ReadyToRun() override { StartOSTenResourceBrowser(); }
+    void ReadyToRun() override
+    {
+        BWindow* window = StartOSTenResourceBrowser();
+        fBrowser = BMessenger(window);
+    }
+
+    void MessageReceived(BMessage* message) override
+    {
+        if (message->what == kOSTenGlobalMenuQuery) {
+            OSTenAnswerGlobalMenuQuery(message, EditorResources());
+            return;
+        }
+        if (message->what == kOSTenGlobalMenuInvoke) {
+            const char* action = NULL;
+            if (message->FindString("action", &action) != B_OK)
+                return;
+            if (strcmp(action, "open") == 0) {
+                BMessage open('rbOp');
+                fBrowser.SendMessage(&open);
+            } else if (strcmp(action, "refresh") == 0) {
+                BMessage refresh('rbRf');
+                fBrowser.SendMessage(&refresh);
+            } else if (strcmp(action, "quit") == 0)
+                PostMessage(B_QUIT_REQUESTED);
+            return;
+        }
+        BApplication::MessageReceived(message);
+    }
+private:
+    BMessenger fBrowser;
 };
 }
 

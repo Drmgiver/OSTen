@@ -31,6 +31,7 @@
 #include "SystemExtras.h"
 #include "OSTenWordmark.h"
 #include "OSTenResources.h"
+#include "OSTenGlobalMenu.h"
 #include <string>
 #include <sstream>
 #include <set>
@@ -239,7 +240,8 @@ public:
 				| B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE
 				| B_WILL_ACCEPT_FIRST_CLICK),
 		fClock(NULL), fTray(NULL), fSwitcher(NULL), fCenter(NULL),
-		fUnread(0), fClockRunner(NULL)
+		fUnread(0), fClockRunner(NULL), fMenuBar(NULL),
+        fActiveMenuTeam(-2), fMenuTargetTeam(-1)
 	{
 		// The bar must not cover the status controls to its right.
 		// Haiku hit-tests sibling views front-to-back (first child first),
@@ -250,6 +252,7 @@ public:
             "layout.menu.reserve", 289, 240, 500);
 		BMenuBar* bar = new BMenuBar(menuArea, "System menu bar",
 			B_FOLLOW_LEFT_TOP, B_ITEMS_IN_ROW, false);
+        fMenuBar = bar;
         // The menu structure, labels, order and shortcuts come from editable
         // System and Finder resource catalogs. Action IDs remain fixed.
         const OSTenResourceCatalog& resources = OSTenSystemResources();
@@ -331,6 +334,22 @@ public:
 
 	void MessageReceived(BMessage* message) override
 	{
+        if (message->what == kOSTenGlobalMenuInvoke) {
+            const char* action = NULL;
+            if (message->FindString("action", &action) == B_OK
+                && action != NULL && OSTenIsMenuIdentifier(action)
+                && fMenuTargetTeam >= 0 && !fMenuTargetSignature.empty()) {
+                // Clicking the global menu may activate OSTen System.
+                // Dispatch to the published menu owner, not the currently
+                // focused system window.
+                BMessage invoke(kOSTenGlobalMenuInvoke);
+                invoke.AddString("action", action);
+                BMessenger target(fMenuTargetSignature.c_str(),
+                    fMenuTargetTeam);
+                target.SendMessage(&invoke);
+            }
+            return;
+        }
 		if (message->what == kOSTenFinderViewModeChanged) {
 			bool listMode = false;
 			if (message->FindBool("list_mode", &listMode) == B_OK) {
@@ -342,6 +361,7 @@ public:
 			return;
 		}
 		if (message->what == kClockTick) {
+            _RefreshActiveAppMenu();
 			RefreshOSTenClock(fClock);
 			RefreshOSTenApplicationSwitcher(fSwitcher);
             BMessenger deskbar("application/x-vnd.Be-TSKB");
@@ -584,6 +604,118 @@ public:
 	}
 
 private:
+    void _ClearMenuBar()
+    {
+        if (fMenuBar == NULL)
+            return;
+        while (fMenuBar->CountItems() > 0) {
+            BMenuItem* old = fMenuBar->RemoveItem((int32)0);
+            delete old;
+        }
+        fIconsMenuItem = NULL;
+        fListMenuItem = NULL;
+    }
+
+    void _InstallDefaultMenus()
+    {
+        const OSTenResourceCatalog& ui = OSTenSystemResources();
+        std::istringstream list(ui.String("menu.order",
+            "system,file,edit,view,special"));
+        std::set<std::string> added;
+        std::string section;
+        while (std::getline(list, section, ',')) {
+            if (!added.insert(section).second)
+                continue;
+            BMenu* menu = _ResourceMenu(section, fIconsMenuItem,
+                fListMenuItem);
+            if (menu != NULL) {
+                if (section == "system")
+                    fMenuBar->AddItem(new OSTenLogoMenuItem(menu));
+                else fMenuBar->AddItem(menu);
+            }
+        }
+    }
+
+    void _InstallPublishedMenus(const BMessage& response)
+    {
+        // System's own menu remains independent of the active app.
+        BMenu* system = _ResourceMenu("system", fIconsMenuItem,
+            fListMenuItem);
+        if (system != NULL)
+            fMenuBar->AddItem(new OSTenLogoMenuItem(system));
+        BMessage section;
+        for (int32 i = 0; response.FindMessage("menu", i, &section) == B_OK;
+                ++i) {
+            const char *id = NULL, *title = NULL;
+            if (section.FindString("id", &id) != B_OK
+                || section.FindString("title", &title) != B_OK
+                || id == NULL || title == NULL
+                || !OSTenIsMenuIdentifier(id) || strcmp(id, "system") == 0)
+                continue;
+            BMenu* menu = new BMenu(title);
+            BMessage item;
+            for (int32 j = 0; section.FindMessage("item", j, &item) == B_OK;
+                    ++j) {
+                bool separator = false;
+                if (item.FindBool("separator", &separator) == B_OK
+                    && separator) {
+                    menu->AddSeparatorItem();
+                    continue;
+                }
+                const char *action = NULL, *label = NULL;
+                if (item.FindString("action", &action) != B_OK
+                    || item.FindString("label", &label) != B_OK
+                    || action == NULL || label == NULL
+                    || !OSTenIsMenuIdentifier(action))
+                    continue;
+                const char* key = NULL;
+                char shortcut = 0;
+                if (item.FindString("shortcut", &key) == B_OK
+                    && key != NULL && strlen(key) == 1)
+                    shortcut = key[0];
+                BMessage* command = new BMessage(kOSTenGlobalMenuInvoke);
+                command->AddString("action", action);
+                menu->AddItem(new BMenuItem(label, command, shortcut));
+            }
+            if (menu->CountItems() != 0) {
+                menu->SetTargetForItems(this);
+                fMenuBar->AddItem(menu);
+            } else delete menu;
+        }
+    }
+
+    void _RefreshActiveAppMenu()
+    {
+        BRoster roster;
+        app_info info;
+        if (roster.GetActiveAppInfo(&info) != B_OK)
+            return;
+        if (strcmp(info.signature, "application/x-vnd.OSTen-System") == 0
+            || strcmp(info.signature, "application/x-vnd.Be-TSKB") == 0)
+            return;
+        if (info.team == fActiveMenuTeam)
+            return;
+        fActiveMenuTeam = info.team;
+        BMessage query(kOSTenGlobalMenuQuery), reply;
+        BMessenger app(info.signature, info.team);
+        bool published = app.SendMessage(&query, &reply,
+            150000, 150000) == B_OK;
+        BMessage first;
+        published = published && reply.FindMessage("menu", 0, &first) == B_OK;
+        _ClearMenuBar();
+        fMenuTargetTeam = -1;
+        fMenuTargetSignature.clear();
+        if (published) {
+            fMenuTargetTeam = info.team;
+            fMenuTargetSignature = info.signature;
+            _InstallPublishedMenus(reply);
+        } else {
+            // Haiku apps without the OSTen menu protocol keep the
+            // existing Finder-oriented compatibility menu.
+            _InstallDefaultMenus();
+        }
+    }
+
 	BMessenger fAboutMessenger;
 	BMenuItem* fIconsMenuItem = NULL;
 	BMenuItem* fListMenuItem = NULL;
@@ -593,6 +725,10 @@ private:
 	BWindow* fCenter;
 	int32 fUnread;
 	BMessageRunner* fClockRunner;
+    BMenuBar* fMenuBar;
+    team_id fActiveMenuTeam;
+    team_id fMenuTargetTeam;
+    std::string fMenuTargetSignature;
 	std::vector<OSTenNotice> fNotices;
 };
 

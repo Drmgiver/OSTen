@@ -154,3 +154,17 @@ of the same runtime composition model used by more than one OSTen
 system component—not yet coverage for every window and control in
 Finder, System or Resource Editor.
 
+## OSTen global menu support
+
+ResEdit and Finder now publish their own resource-defined menus to
+OSTen System. When either becomes the active application, the
+System menu bar requests that application's menu model. Use ResEdit
+to change \`menu.order\`, \`menu.<section>\`, \`menu.item.<action>\` and
+\`shortcut.<action>\` in the application's \`Interface.ostr\`. Stable
+action IDs preserve command behavior; new action names do not create
+executable application commands. Restart the edited application and
+reselect it to apply the changes.
+
+Finder and ResEdit menu publications use the same public
+\`OSTenGlobalMenu.h\` protocol. Detailed interactive focus and
+shortcut verification remains necessary.

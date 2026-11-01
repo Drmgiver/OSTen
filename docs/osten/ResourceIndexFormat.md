@@ -160,3 +160,45 @@ through this same shared runtime composer. Their \`*.controls\` resources
 open in ResEdit's graphical layout editor, which saves the referenced
 frame values rather than introducing copies. These resources let the
 Owner redesign the browser with ResEdit itself.
+
+## Active-application global menus (revision 1)
+
+The public \`OSTenGlobalMenu.h\` defines \`kOSTenGlobalMenuQuery\`,
+\`kOSTenGlobalMenuInvoke\`, and \`OSTenAnswerGlobalMenuQuery\`. An
+OSTen-native \`BApplication\` implements the query and invoke cases
+in its \`MessageReceived\` handler. It **publishes resources, not code**.
+The system bar discovers the active application through the roster,
+asks it for its menu model, creates ordinary native \`BMenu\` items,
+and dispatches an invoked stable action ID back to that same app.
+
+The application defines the resource-backed menu layout:
+
+\`\`\`ini
+menu.order=file
+menu.title.file=File
+menu.file=open,refresh,separator,quit
+menu.item.open=Open...
+menu.item.refresh=Refresh Resources
+menu.item.quit=Quit Resource Editor
+shortcut.open=O
+shortcut.refresh=R
+shortcut.quit=Q
+\`\`\`
+
+Sections and command order, names, and shortcuts are owner-editable.
+An application's handler registers the **meaning** of each known
+action ID; changing its label or moving it does not change behavior.
+Unrecognized IDs do not acquire executable behavior.
+
+System keeps the OS menu; an active app supplies its own remaining
+menus. Legacy Haiku apps without the protocol use the existing
+Finder-oriented compatibility menus. The current implementation
+rechecks the active application on System's periodic menu-bar tick;
+native apps must restart to reload edited resource manifests.
+The protocol uses \`BMessage\` as a typed data transport, not binary
+patching or command execution.
+
+**Current limitations:** menu publication has been implemented for
+Finder and ResEdit, not every OSTen-native or legacy application.
+Shortcut collisions across applications, menu activation focus and
+live mutation still require comprehensive booted GUI tests.

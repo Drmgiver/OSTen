@@ -224,3 +224,12 @@ OSTEN-RESOURCE-INDEX/1
 0x24258d16|DLOG|browser.entries.control.resource_entries.type|browser.entries.control.resource_entries.type|0|0
 0x9ed57347|DLOG|browser.entries.control.resource_entries.frame_key|browser.entries.control.resource_entries.frame_key|0|0
 0x14791fec|DLOG|browser.entries.control.resource_entries.action|browser.entries.control.resource_entries.action|0|0
+0x2f95e437|MENU|menu.order|menu.order|0|0
+0x07bad403|MENU|menu.title.file|menu.title.file|0|0
+0xf0b58c63|MENU|menu.file|menu.file|0|0
+0xf96c8c20|MENU|menu.item.open|menu.item.open|0|0
+0xeabb0583|MENU|menu.item.refresh|menu.item.refresh|0|0
+0xc4a9e027|MENU|menu.item.quit|menu.item.quit|0|0
+0xbf823982|KEYS|shortcut.open|shortcut.open|0|0
+0x3e881451|KEYS|shortcut.refresh|shortcut.refresh|0|0
+0x91bcd331|KEYS|shortcut.quit|shortcut.quit|0|0

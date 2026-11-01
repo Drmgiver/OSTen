@@ -154,6 +154,62 @@ def validate_composed_dialog(app: str, prefix: str) -> None:
     print(f"{app}: {prefix} — {len(order)} structured controls verified")
 
 
+def validate_global_menu(app: str, supported_actions: set[str]) -> None:
+    """Check built-in menu models have stable, dispatched action identities."""
+    values = parse_manifest(BASE / app / "Interface.ostr")
+    index = parse_index(BASE / app / "ResourceIndex.osti")
+    order = values.get("menu.order", "").split(",")
+    check(bool(order) and all(order),
+          f"{app}: native menu publisher has no ordered menu sections")
+    check(len(order) == len(set(order)),
+          f"{app}: repeated top-level menu section")
+    for section in order:
+        check(bool(re.fullmatch("[A-Za-z0-9._-]+", section)),
+              f"{app}: invalid section {section}")
+        for key in ("menu." + section, "menu.title." + section):
+            check(key in values and key in index,
+                  f"{app}: missing indexed menu resource {key}")
+        actions = values.get("menu." + section, "").split(",")
+        seen = set()
+        for action in actions:
+            if action == "separator":
+                continue
+            check(bool(re.fullmatch("[A-Za-z0-9._-]+", action)),
+                  f"{app}: invalid menu action {action}")
+            check(action not in seen,
+                  f"{app}/{section}: duplicate action {action}")
+            seen.add(action)
+            check(action in supported_actions,
+                  f"{app}: published action has no implemented dispatch: {action}")
+            key = "menu.item." + action
+            check(key in values and key in index,
+                  f"{app}: missing indexed label for {action}")
+    shortcuts: dict[str, str] = {}
+    for key, value in values.items():
+        if not key.startswith("shortcut."):
+            continue
+        check(len(value) <= 1,
+              f"{app}/{key}: shortcuts must be single characters")
+        if value:
+            previous = shortcuts.setdefault(value.upper(), key)
+            check(previous == key,
+                  f"{app}: shortcut collision {previous} and {key}")
+    print(f"{app}: {len(order)} globally published native menu sections checked")
+
+
+def validate_strip_order() -> None:
+    values = parse_manifest(BASE / "System" / "Interface.ostr")
+    modules = values.get("strip.module.order", "").split(",")
+    for module in modules:
+        if not module:
+            continue
+        check(module.isdecimal() and 0 <= int(module) <= 6,
+              f"System: Control Strip references unknown module {module}")
+    # Deliberately allow empty/subset/repeated modules. The Owner controls
+    # their visibility, even when the entire row is removed.
+    print("System: Owner-controlled Control Strip module order checked")
+
+
 def main() -> int:
     for app in APPS:
         validate_app(app)
@@ -162,6 +218,16 @@ def main() -> int:
     validate_composed_dialog("System", "notification.center")
     validate_composed_dialog("ResourceEditor", "browser.types")
     validate_composed_dialog("ResourceEditor", "browser.entries")
+    validate_global_menu("Finder", {
+        "new_folder", "open", "rename", "get_info", "close",
+        "select_all", "view_icons", "view_list", "arrange_name",
+        "arrange_kind", "clean_up", "empty_trash", "toggle_popup",
+        "system_folder_access",
+    })
+    validate_global_menu("ResourceEditor", {
+        "open", "refresh", "quit",
+    })
+    validate_strip_order()
     if errors:
         print("\nFAILED", file=sys.stderr)
         for error in errors:

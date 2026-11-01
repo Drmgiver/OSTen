@@ -137,3 +137,23 @@ Resource Editor's browser type and instance windows now also use the
 shared control composer, making the application itself a consumer of
 the same structured resources. Frame aliases avoid duplicating
 existing layout keys. No special safeguards restrict Owner edits.
+
+## Active application menu protocol and Owner-owned Strip (October 31, 2026)
+
+The public \`OSTenGlobalMenu.h\` introduces an application-to-System
+native menu publication protocol. System requests the active app's
+resource-backed menus, installs them in its global bar, and sends
+selected action IDs back to the app. Finder and ResEdit are the first
+native publishers; compatibility with existing Haiku binaries remains
+separate. A fast conformance check covers declared menus, labels,
+shortcuts and known command bindings.
+
+The Control Strip accepts a resource-defined visible subset or
+reordering of the built-in modules; an empty list leaves the
+collapsible handle only. Previously it forcibly restored seven
+module slots. Control Strip extensibility to independently installed
+native modules is still unfinished.
+
+The draft branch is **not fully compliant**. Compiling the code and
+passing the automated checks is necessary, not sufficient to verify
+every requirement in the standard.
