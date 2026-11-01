@@ -157,3 +157,15 @@ native modules is still unfinished.
 The draft branch is **not fully compliant**. Compiling the code and
 passing the automated checks is necessary, not sufficient to verify
 every requirement in the standard.
+
+The Finder Get Info display now uses a structured native window with
+editable layout and a read-only text area. Its layout and control
+definitions are fully indexed, with a conformance check. The existing
+file-data logic remains executable code, appropriately separated from
+the user-editable presentation.
+
+System's three original wordmark/switcher images are installed as
+owner-editable, indexed RGBA assets. The legacy ResEdit graphic importer
+now discovers indexed assets in any native application instead of
+hardcoding known Finder/System filenames. Target permissions are checked
+against the real file, preserving independent application ownership.

@@ -76,6 +76,16 @@ if $(HAIKU_BUILD_PROFILE) = nightly-osten-raw {
         [ FDirName $(HAIKU_TOP) data osten resources System ] ;
     AddFilesToHaikuImage "System Folder" Resources System
         : $(systemIndex) ;
+    # Original, owner-approved System artwork is installed as ordinary
+    # editable files; this preserves the exact compiled fallback pixels.
+    local systemArtwork =
+        <osten-resource-system>wordmark.rgba
+        <osten-resource-system>about-wordmark.rgba
+        <osten-resource-system>switcher-finder.rgba ;
+    SEARCH on $(systemArtwork) =
+        [ FDirName $(HAIKU_TOP) data osten resources System ] ;
+    AddFilesToHaikuImage "System Folder" Resources System
+        : $(systemArtwork) ;
     local finderUi = <osten-resource-finder>Interface.ostr ;
     SEARCH on $(finderUi) =
         [ FDirName $(HAIKU_TOP) data osten resources Finder ] ;

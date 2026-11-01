@@ -185,3 +185,17 @@ menu.item.clean_up=Clean Up
 menu.item.empty_trash=Empty Trash...
 menu.item.toggle_popup=Dock / Undock Pop-Up Folder
 menu.item.system_folder_access=System Folder Access...
+
+# Finder's Get Info window uses the shared native control composer
+dialog.info.frame=130,110,650,495
+dialog.info.background=239,239,236
+dialog.info.controls=details,close
+dialog.info.control.details.type=text_area
+dialog.info.control.details.frame=15,15,488,314
+dialog.info.control.details.background=255,255,255
+dialog.info.control.close.type=button
+dialog.info.control.close.frame=380,326,490,359
+dialog.info.control.close.caption_key=dialog.info.close
+dialog.info.control.close.action=info.close
+dialog.info.control.close.default=1
+dialog.info.close=Close

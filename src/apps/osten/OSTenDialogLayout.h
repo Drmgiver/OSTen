@@ -14,6 +14,7 @@
 #include <ScrollView.h>
 #include <StringView.h>
 #include <TextControl.h>
+#include <TextView.h>
 #include <View.h>
 #include <Window.h>
 
@@ -93,6 +94,20 @@ OSTenCreateDialogControls(BView* parent, const OSTenResourceCatalog& catalog,
             if (catalog.Number((base + "default").c_str(), 0, 0, 1) > 0
                 && parent->Window() != NULL)
                 parent->Window()->SetDefaultButton(button);
+        } else if (strcmp(type, "text_area") == 0) {
+            BRect textFrame(4, 4, frame.Width() - 21,
+                frame.Height() - 8);
+            BTextView* text = new BTextView(frame, id.c_str(), textFrame,
+                B_FOLLOW_ALL, B_WILL_DRAW | B_NAVIGABLE);
+            text->MakeEditable(false);
+            text->MakeSelectable(true);
+            text->SetViewColor(catalog.Color(
+                (base + "background").c_str(),
+                rgb_color{255, 255, 255, 255}));
+            view = text;
+            parent->AddChild(new BScrollView(
+                (id + "-scroll").c_str(), text,
+                B_FOLLOW_ALL, 0, false, true));
         } else if (strcmp(type, "label") == 0) {
             view = new BStringView(frame, id.c_str(), label);
             parent->AddChild(view);

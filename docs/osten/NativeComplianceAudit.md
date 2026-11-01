@@ -191,3 +191,32 @@ conversion.
 keyboard routing and focus transitions require interactive boot tests.
 Further complete resource conversion, advanced resource editors,
 self-contained native app packaging, and extensibility tests remain.
+
+## Finder Get Info conversion (October 31, 2026)
+
+Finder's Get Info interface has been converted from a fixed Haiku
+\`BAlert\` to a native, resource-composed window with a selectable
+scrolling information pane and a Close button. The dialog's window,
+controls, labels, layout and colors are editable resources. The same
+ResEdit graphical layout editor handles its \`dialog.info.controls\`
+entry. This closes a particular Finder violation but **not** the
+remaining hardcoded folder, desktop, file-operation and contextual UI,
+nor the incomplete System/ResEdit coverage.
+
+## Native artwork coverage milestone (October 31, 2026)
+
+- ResEdit's legacy graphic importer now enumerates `ICON` and
+  `IMAG` entries from any native app's standard resource index,
+  instead of relying on a hardcoded nine-asset System/Finder table.
+- Owner permission queries now use the actual artwork file path.
+  Modifying a standalone app's resources does not incorrectly require
+  the System Folder unlock.
+- The three compiled OSTen System graphics were decoded byte-for-byte
+  into indexed, installed, editable `.rgba` assets. No source art
+  was redrawn, recolored or substituted.
+- More full application resource coverage remains outstanding:
+  cursors, advanced vector graphics, additional dialogs and native
+  window chrome, sound formats, and extensible non-built-in modules.
+
+This work improves standards compliance but does **not** certify the
+three applications as fully compliant.

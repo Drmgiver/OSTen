@@ -252,3 +252,6 @@ menu.item.quit=Quit Resource Editor
 shortcut.open=O
 shortcut.refresh=R
 shortcut.quit=Q
+
+# Generic resource-index artwork importer
+editor.no_artwork=No indexed artwork

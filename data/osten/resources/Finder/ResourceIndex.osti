@@ -180,3 +180,15 @@ OSTEN-RESOURCE-INDEX/1
 0x9a986941|MENU|menu.item.empty_trash|menu.item.empty_trash|0|0
 0xb02f4a06|MENU|menu.item.toggle_popup|menu.item.toggle_popup|0|0
 0x04c56e82|MENU|menu.item.system_folder_access|menu.item.system_folder_access|0|0
+0x60e77c42|WLAY|dialog.info.frame|dialog.info.frame|0|0
+0xccc5ac91|COLR|dialog.info.background|dialog.info.background|0|0
+0xcd35a22b|DLOG|dialog.info.controls|dialog.info.controls|0|0
+0xbec021d4|DLOG|dialog.info.control.details.type|dialog.info.control.details.type|0|0
+0x58473b79|WLAY|dialog.info.control.details.frame|dialog.info.control.details.frame|0|0
+0xca6ec328|COLR|dialog.info.control.details.background|dialog.info.control.details.background|0|0
+0x59a10e4a|DLOG|dialog.info.control.close.type|dialog.info.control.close.type|0|0
+0x3816eddb|WLAY|dialog.info.control.close.frame|dialog.info.control.close.frame|0|0
+0x140e26b8|DLOG|dialog.info.control.close.caption_key|dialog.info.control.close.caption_key|0|0
+0xf43cadc8|DLOG|dialog.info.control.close.action|dialog.info.control.close.action|0|0
+0xcf7aa757|DLOG|dialog.info.control.close.default|dialog.info.control.close.default|0|0
+0x244704bf|DLOG|dialog.info.close|dialog.info.close|0|0

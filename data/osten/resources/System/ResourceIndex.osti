@@ -219,3 +219,6 @@ OSTEN-RESOURCE-INDEX/1
 0xf1a2dbf4|WLAY|notification.center.control.test.frame|notification.center.control.test.frame|0|0
 0xf513151f|DLOG|notification.center.control.test.caption_key|notification.center.control.test.caption_key|0|0
 0x23d44f15|DLOG|notification.center.control.test.action|notification.center.control.test.action|0|0
+0x402e0ff7|IMAG|wordmark|wordmark|71|20
+0xc7c522b7|IMAG|about-wordmark|about-wordmark|248|69
+0xe0979878|ICON|switcher-finder|switcher-finder|22|22

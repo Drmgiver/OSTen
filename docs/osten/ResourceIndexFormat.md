@@ -202,3 +202,42 @@ patching or command execution.
 Finder and ResEdit, not every OSTen-native or legacy application.
 Shortcut collisions across applications, menu activation focus and
 live mutation still require comprehensive booted GUI tests.
+
+## Finder Get Info: resource-driven text area
+
+The universal control builder now supports \`text_area\` using Haiku's
+read-only, selectable \`BTextView\` and a native scroll view. The
+\`dialog.info.controls\` layout in Finder contains a dynamically
+populated details pane and a Close button, both owner-editable through
+ResEdit. Information content (file name, path, size, modification date)
+comes from Finder's runtime file inspection; labels, window frame,
+text-area colors, controls and their positions come from resources.
+
+\`\`\`ini
+dialog.info.controls=details,close
+dialog.info.control.details.type=text_area
+dialog.info.control.details.frame=15,15,488,314
+dialog.info.control.close.type=button
+dialog.info.control.close.action=info.close
+\`\`\`
+
+No source-code changes are required to resize, reorder or relabel
+these controls. New control *behavior* still requires a native handler.
+
+## Indexed artwork importing for any native application
+
+ResEdit's property inspector no longer contains a fixed System/Finder
+image table. It reads each selected application's sibling
+`ResourceIndex.osti`, discovers `ICON` and `IMAG` entries,
+verifies their stated dimensions against the raw `.rgba` file, and
+offers those resources for image import and optional undo. System
+Folder Access is checked **only** when the actual target is inside
+`/boot/System Folder/`; a standalone native application's own files
+continue to use normal filesystem permissions.
+
+The OSTen image now includes the exact compiled source artwork as
+editable `System/wordmark.rgba` (71×20),
+`System/about-wordmark.rgba` (248×69) and
+`System/switcher-finder.rgba` (22×22). All three are indexed and
+installed without changing their original pixels. Compiled fallback
+art remains available if an Owner removes an asset.

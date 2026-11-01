@@ -18,6 +18,7 @@
 #include <Messenger.h>
 #include "OSTenMessages.h"
 #include "OSTenResources.h"
+#include "OSTenResourceIndex.h"
 #include "OSTenGlobalMenu.h"
 #include "ResourceBrowser.h"
 #include <ScrollView.h>
@@ -58,23 +59,11 @@ EditorResources()
 }
 
 struct AssetDefinition {
-    const char* application;
-    const char* label;
-    const char* filename;
+    std::string label;
+    std::string filename;
+    std::string path;
     int width;
     int height;
-};
-
-static const AssetDefinition kAssets[] = {
-    {"Finder", "Disk (48 x 48)", "disk", 48, 48},
-    {"Finder", "Trash empty (48 x 48)", "trash-empty", 48, 48},
-    {"Finder", "Trash full (48 x 48)", "trash-full", 48, 48},
-    {"Finder", "Folder (40 x 40)", "folder", 40, 40},
-    {"Finder", "Finder (40 x 40)", "finder", 40, 40},
-    {"Finder", "System (40 x 40)", "system", 40, 40},
-    {"System", "Menu wordmark (71 x 20)", "wordmark", 71, 20},
-    {"System", "About wordmark (248 x 69)", "about-wordmark", 248, 69},
-    {"System", "Finder switcher (22 x 22)", "switcher-finder", 22, 22}
 };
 
 struct ResourceLine {
@@ -372,11 +361,11 @@ public:
             case kAssetSelected: {
                 int32 index = -1;
                 if (message->FindInt32("index", &index) == B_OK
-                    && index >= 0 && (size_t)index
-                        < sizeof(kAssets) / sizeof(kAssets[0])
-                    && fPath == std::string("/boot/System Folder/Resources/")
-                        + kAssets[index].application + "/Interface.ostr")
+                    && index >= 0 && (size_t)index < fAssets.size()) {
                     fAssetIndex = index;
+                    for (int32 i = 0; i < fAssetMenu->CountItems(); ++i)
+                        fAssetMenu->ItemAt(i)->SetMarked(i == index);
+                }
                 return;
             }
             case kImportGraphic: _PickGraphic(); return;
@@ -447,6 +436,10 @@ private:
             } else if (entry.IsFile()) {
                 candidates.push_back(selected + ".ostr");
                 candidates.push_back(selected + ".resources/Interface.ostr");
+                size_t slash = selected.rfind('/');
+                if (slash != std::string::npos)
+                    candidates.push_back(selected.substr(0, slash)
+                        + "/Resources/Interface.ostr");
             }
             if (name == "Resource Editor" || name == "OSTenResourceEditor")
                 application = "ResourceEditor";
@@ -533,25 +526,55 @@ private:
     {
         while (fAssetMenu->CountItems() > 0)
             delete fAssetMenu->RemoveItem((int32)0);
+        fAssets.clear();
         fAssetIndex = -1;
-        // Only known System and Finder RGBA dimensions are safe to offer.
-        for (size_t i = 0; i < sizeof(kAssets) / sizeof(kAssets[0]); ++i) {
-            if (fPath != std::string("/boot/System Folder/Resources/")
-                    + kAssets[i].application + "/Interface.ostr")
-                continue;
-            BMessage* choose = new BMessage(kAssetSelected);
-            choose->AddInt32("index", (int32)i);
-            BMenuItem* item = new BMenuItem(kAssets[i].label, choose);
-            fAssetMenu->AddItem(item);
-            if (fAssetIndex < 0) {
-                fAssetIndex = (int32)i;
-                item->SetMarked(true);
+
+        // The same public index drives artwork imports for every native
+        // OSTen application. Do not special-case Finder or System assets.
+        size_t slash = fPath.rfind('/');
+        if (slash != std::string::npos) {
+            std::string directory = fPath.substr(0, slash);
+            std::map<std::string, OSTenIndexedResource> index;
+            if (OSTenReadResourceIndex(directory + "/ResourceIndex.osti",
+                    index)) {
+                for (std::map<std::string, OSTenIndexedResource>::const_iterator
+                        item = index.begin(); item != index.end(); ++item) {
+                    const OSTenIndexedResource& res = item->second;
+                    if ((res.type != "ICON" && res.type != "IMAG")
+                        || res.width <= 0 || res.height <= 0
+                        || res.width > 512 || res.height > 512)
+                        continue;
+                    AssetDefinition asset;
+                    asset.label = res.name;
+                    asset.filename = res.key;
+                    asset.path = directory + "/" + res.key + ".rgba";
+                    asset.width = res.width;
+                    asset.height = res.height;
+                    struct stat st;
+                    if (stat(asset.path.c_str(), &st) != 0
+                        || !S_ISREG(st.st_mode)
+                        || (size_t)st.st_size !=
+                            (size_t)asset.width * asset.height * 4)
+                        continue;
+                    int32 selected = (int32)fAssets.size();
+                    fAssets.push_back(asset);
+                    BMessage* choose = new BMessage(kAssetSelected);
+                    choose->AddInt32("index", selected);
+                    fAssetMenu->AddItem(new BMenuItem(
+                        asset.label.c_str(), choose));
+                    if (fAssetIndex < 0)
+                        fAssetIndex = selected;
+                }
             }
         }
         if (fAssetIndex < 0) {
-            BMenuItem* item = new BMenuItem("No known artwork", NULL);
-            item->SetEnabled(false);
-            fAssetMenu->AddItem(item);
+            BMenuItem* empty = new BMenuItem(
+                EditorResources().String("editor.no_artwork",
+                    "No indexed artwork"), NULL);
+            empty->SetEnabled(false);
+            fAssetMenu->AddItem(empty);
+        } else {
+            fAssetMenu->ItemAt(fAssetIndex)->SetMarked(true);
         }
         fAssetMenu->SetTargetForItems(this);
         fArtImport->SetEnabled(fAssetIndex >= 0);
@@ -713,12 +736,12 @@ private:
 
     void _UndoGraphic()
     {
-        if (fAssetIndex < 0 || !_OwnerAllowsChanges(true))
+        if (fAssetIndex < 0 || (size_t)fAssetIndex >= fAssets.size())
             return;
-        const AssetDefinition& asset = kAssets[fAssetIndex];
-        const std::string path = std::string("/boot/System Folder/Resources/")
-            + asset.application + "/" + asset.filename + ".rgba";
-        if (_SwapBackup(path))
+        const AssetDefinition& asset = fAssets[fAssetIndex];
+        if (!_OwnerAllowsChanges(asset.path))
+            return;
+        if (_SwapBackup(asset.path))
             _Status("Previous graphic restored. Restart the target application.");
     }
 
@@ -735,9 +758,11 @@ private:
 
     void _ImportGraphic(const entry_ref& ref)
     {
-        if (fAssetIndex < 0 || !_OwnerAllowsChanges(true))
+        if (fAssetIndex < 0 || (size_t)fAssetIndex >= fAssets.size())
             return;
-        const AssetDefinition& asset = kAssets[fAssetIndex];
+        const AssetDefinition& asset = fAssets[fAssetIndex];
+        if (!_OwnerAllowsChanges(asset.path))
+            return;
         BBitmap* bitmap = BTranslationUtils::GetBitmap(&ref);
         if (bitmap == NULL) {
             _Status("Image translator could not load that file.");
@@ -769,8 +794,7 @@ private:
         }
         delete bitmap;
 
-        std::string path = std::string("/boot/System Folder/Resources/")
-            + asset.application + "/" + asset.filename + ".rgba";
+        std::string path = asset.path;
         std::string temporary = path + ".tmp.XXXXXX";
         std::vector<char> filename(temporary.begin(), temporary.end());
         filename.push_back(0);
@@ -779,9 +803,12 @@ private:
             _Status("Cannot save graphic. Check System Folder access.");
             return;
         }
+        struct stat previousGraphic;
+        bool hasGraphic = stat(path.c_str(), &previousGraphic) == 0;
         size_t offset = 0;
-        bool success = true;
-        while (offset < rgba.size()) {
+        bool success = !hasGraphic
+            || fchmod(fd, previousGraphic.st_mode & 07777) == 0;
+        while (success && offset < rgba.size()) {
             ssize_t written = write(fd, &rgba[offset], rgba.size() - offset);
             if (written <= 0) { success = false; break; }
             offset += (size_t)written;
@@ -812,12 +839,14 @@ private:
             + ". Restart the target application.");
     }
 
-    bool _OwnerAllowsChanges(bool protectedArtwork = false)
+    bool _OwnerAllowsChanges(const std::string& target = "")
     {
-        // Respect Finder Owner access for installed system files; ordinary
-        // .ostr files elsewhere use normal filesystem permissions.
-        if (!protectedArtwork && fPath.compare(0,
-                strlen("/boot/System Folder/"), "/boot/System Folder/") != 0)
+        // Only the actual target path decides whether OSTen's System
+        // Folder access mechanism applies. Other native application
+        // folders use their normal filesystem permissions.
+        const std::string& path = target.empty() ? fPath : target;
+        if (path.compare(0, strlen("/boot/System Folder/"),
+                "/boot/System Folder/") != 0)
             return true;
         BMessenger finder("application/x-vnd.OSTen-Finder");
         BMessage query(kOSTenQuerySystemFolderAccess);
@@ -860,9 +889,12 @@ private:
             _Status("Save failed. Unlock System Folder and check permissions.");
             return;
         }
+        struct stat previousManifest;
+        bool hasManifest = stat(fPath.c_str(), &previousManifest) == 0;
         size_t offset = 0;
-        bool success = true;
-        while (offset < body.size()) {
+        bool success = !hasManifest
+            || fchmod(fd, previousManifest.st_mode & 07777) == 0;
+        while (success && offset < body.size()) {
             ssize_t written = write(fd, body.data() + offset,
                 body.size() - offset);
             if (written <= 0) { success = false; break; }
@@ -914,6 +946,7 @@ private:
     bool fDirty;
     int32 fSelection;
     int32 fAssetIndex;
+    std::vector<AssetDefinition> fAssets;
     BFilePanel* fPicker;
     BFilePanel* fTargetPicker;
     BPopUpMenu* fAssetMenu;

@@ -606,9 +606,13 @@ private:
             fStatus->SetText(BrowserUI().String("browser.pixel.tmp_failed", "Could not create temporary image file."));
             return;
         }
+        struct stat previousArtwork;
+        bool hasArtwork = stat(fEntry.path.c_str(),
+            &previousArtwork) == 0;
         size_t done = 0;
-        bool ok = true;
-        while (done < pixels.size()) {
+        bool ok = !hasArtwork
+            || fchmod(fd, previousArtwork.st_mode & 07777) == 0;
+        while (ok && done < pixels.size()) {
             ssize_t n = write(fd, pixels.data() + done, pixels.size() - done);
             if (n <= 0) { ok = false; break; }
             done += (size_t)n;

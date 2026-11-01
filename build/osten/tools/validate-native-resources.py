@@ -125,7 +125,7 @@ def validate_composed_dialog(app: str, prefix: str) -> None:
     for ident in order:
         stem = f"{prefix}.control.{ident}."
         kind = values.get(stem + "type")
-        check(kind in {"text", "label", "button", "list"},
+        check(kind in {"text", "label", "button", "list", "text_area"},
               f"{app}/{prefix}/{ident}: unsupported declared control {kind}")
         frameField = values.get(stem + "frame_key") or (stem + "frame")
         frame = values.get(frameField, "")
@@ -215,6 +215,7 @@ def main() -> int:
         validate_app(app)
     check_editor_bindings()
     validate_composed_dialog("Finder", "dialog.rename")
+    validate_composed_dialog("Finder", "dialog.info")
     validate_composed_dialog("System", "notification.center")
     validate_composed_dialog("ResourceEditor", "browser.types")
     validate_composed_dialog("ResourceEditor", "browser.entries")

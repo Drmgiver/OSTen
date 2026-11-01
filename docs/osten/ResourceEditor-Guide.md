@@ -168,3 +168,25 @@ reselect it to apply the changes.
 Finder and ResEdit menu publications use the same public
 \`OSTenGlobalMenu.h\` protocol. Detailed interactive focus and
 shortcut verification remains necessary.
+
+### Editing Finder Get Info
+
+Open Finder in Resource Editor, choose the \`DLOG\` group and
+double-click \`dialog.info.controls\`. Drag or resize its information
+pane and Close button, then Save. Restart Finder to see the new layout.
+The filename, path, file size and modification date remain dynamic
+file data, not hardcoded decorative resources.
+
+### Importing artwork into any OSTen-native app
+
+Open an application with an indexed `Resources/` directory. The
+legacy property inspector's Artwork menu now lists that application's
+real indexed `ICON` or `IMAG` assets with exact dimensions. Image
+imports update only the selected image; the Owner can choose to work
+on a copy. No mandatory backups or automatic recovery are required.
+
+The shipped System wordmark, About wordmark and Finder-switcher icon
+are now actual editable files, alongside Finder's original approved
+icon files. Editing System artwork continues to honor the System
+Folder Access mechanism; application-local artwork does not require
+that mechanism.

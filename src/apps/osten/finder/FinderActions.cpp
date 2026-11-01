@@ -14,6 +14,7 @@
 #include <Path.h>
 #include <String.h>
 #include <TextControl.h>
+#include <TextView.h>
 #include <Window.h>
 
 #include <stdio.h>
@@ -26,6 +27,7 @@ namespace {
 
 const uint32 kRenameAccept = 'osra';
 const uint32 kRenameCancel = 'osrc';
+const uint32 kInfoClose = 'osic';
 
 
 class RenameWindow : public BWindow {
@@ -105,6 +107,45 @@ private:
     BTextControl* fName;
 };
 
+class InfoWindow : public BWindow {
+public:
+    explicit InfoWindow(const char* information)
+        : BWindow(OSTenFinderResources().Rect("dialog.info.frame",
+                BRect(130, 110, 650, 495)),
+            OSTenFinderResources().String("dialog.info.title", "Get Info"),
+            B_TITLED_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL,
+            B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE)
+    {
+        const OSTenResourceCatalog& ui = OSTenFinderResources();
+        BView* background = new BView(Bounds(), "info-background",
+            B_FOLLOW_ALL, B_WILL_DRAW);
+        background->SetViewColor(ui.Color("dialog.info.background",
+            rgb_color{239, 239, 236, 255}));
+        AddChild(background);
+        const OSTenDialogAction actions[] = {
+            {"info.close", kInfoClose}
+        };
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            background, ui, "dialog.info", actions,
+            sizeof(actions) / sizeof(actions[0]));
+        OSTenDialogControls::const_iterator text = controls.find("details");
+        if (text != controls.end()) {
+            BTextView* details = static_cast<BTextView*>(text->second);
+            details->SetText(information);
+        }
+        CenterOnScreen();
+    }
+
+    void MessageReceived(BMessage* message) override
+    {
+        if (message->what == kInfoClose) {
+            Quit();
+            return;
+        }
+        BWindow::MessageReceived(message);
+    }
+};
+
 } // namespace
 
 
@@ -122,8 +163,9 @@ ShowFinderInfo(const entry_ref& ref)
     BPath path;
     struct stat information;
     if (entry.GetPath(&path) != B_OK || entry.GetStat(&information) != B_OK) {
-        (new BAlert("Get Info", OSTenFinderResources().String("dialog.info.error_message", "Unable to read information for this item."),
-            OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
+        (new InfoWindow(OSTenFinderResources().String(
+            "dialog.info.error_message",
+            "Unable to read information for this item.")))->Show();
         return;
     }
     char name[B_FILE_NAME_LENGTH];
@@ -143,7 +185,7 @@ ShowFinderInfo(const entry_ref& ref)
     if (S_ISREG(information.st_mode))
         details << OSTenFinderResources().String("dialog.info.size", "Size: ") << (int64)information.st_size << OSTenFinderResources().String("dialog.info.size_suffix", " bytes\n");
     details << OSTenFinderResources().String("dialog.info.modified", "Modified: ") << modified;
-    (new BAlert(OSTenFinderResources().String("dialog.info.title", "Get Info"), details.String(), OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
+    (new InfoWindow(details.String()))->Show();
 }
 
 
