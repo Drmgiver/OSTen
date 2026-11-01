@@ -63,7 +63,9 @@ public:
             background, ui, "dialog.rename", actions,
             sizeof(actions) / sizeof(actions[0]));
         OSTenDialogControls::const_iterator input = controls.find("name");
-        if (input != controls.end()) {
+        if (input != controls.end()
+            && strcmp(ui.String("dialog.rename.control.name.type", ""),
+                "text") == 0) {
             fName = static_cast<BTextControl*>(input->second);
             fName->SetText(name);
         }
@@ -129,7 +131,9 @@ public:
             background, ui, "dialog.info", actions,
             sizeof(actions) / sizeof(actions[0]));
         OSTenDialogControls::const_iterator text = controls.find("details");
-        if (text != controls.end()) {
+        if (text != controls.end()
+            && strcmp(ui.String("dialog.info.control.details.type", ""),
+                "text_area") == 0) {
             BTextView* details = static_cast<BTextView*>(text->second);
             details->SetText(information);
         }

@@ -175,3 +175,18 @@ are now indexed owner-editable strings. Atomic resource writes preserve
 existing file permission bits rather than replacing them with new
 temporary-file defaults. This is a targeted correctness improvement,
 not a complete standards certification.
+
+## Editor and loader expansion (November 1, 2026)
+
+The common composed-control loader now supports built-in text fields,
+text areas, lists, labels, buttons, checkboxes and sliders, plus
+application-registered custom factories. The visual dialog designer
+now authors control definitions and ordering (Add, Apply, Remove,
+Move Up, Move Down) and updates resource indexes when introducing
+new entries. Dragging and resizing remain supported. Owner edits are
+not blocked merely because they can break a native interface.
+
+The implementation still requires broad conversion of Finder, System
+and ResEdit's remaining built-in windows, richer standard resource
+types, and live booted interaction tests. It is not yet a claim of
+universal OSTen Software Standard compliance.

@@ -236,3 +236,21 @@ access settings rather than silently imposing temporary-file modes.
 **Not a complete Resource Editor compliance signoff.** The remaining
 custom canvas, inspector controls, advanced resource editors and
 unconverted windows still need the universal runtime resource system.
+
+## Composed dialog authoring milestone (November 1, 2026)
+
+The graphical layout editor can now add, remove, reorder and edit
+the type/caption/action of controls in resource-composed dialogs in
+addition to drag/resize. Additions receive typed stable IDs in the
+public resource index. The common loader accepts checkboxes, sliders,
+and registered application-specific factories. Finder Rename/Get Info
+and ResEdit's browser use declared types when casting returned
+controls, so intentionally changing the control type doesn't cause an
+unsafe C++ downcast.
+
+**Not yet complete:** Many native windows still use direct C++ view
+construction. There is no cross-file transaction for adding manifest
+and index entries, nor full GUI integration tests for all edit flows.
+Native System window decorations, Control Strip internals, additional
+Finder controls and several special resource types remain outside the
+universal composed-control path. Full-standard compliance still fails.

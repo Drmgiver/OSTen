@@ -241,3 +241,28 @@ editable `System/wordmark.rgba` (71×20),
 `System/switcher-finder.rgba` (22×22). All three are indexed and
 installed without changing their original pixels. Compiled fallback
 art remains available if an Owner removes an asset.
+
+## Runtime-composed dialog controls (November 1, 2026)
+
+A dialog's `<prefix>.controls` entry is a comma-separated ordered list
+of stable IDs. Each control is declared by the keys
+`<prefix>.control.<id>.type`, `.frame` or `.frame_key`, optional
+`.caption_key`, optional `.action` and type-specific attributes.
+
+Built-in types: `text`, `text_area`, `label`, `button`, `list`,
+`checkbox` and `slider`. For `checkbox`, `.checked` specifies the
+initial state, 0 or 1. For `slider`, `.minimum`, `.maximum`, and
+`.value` specify the initial numeric range and value. Dialog code
+passes only known `action ID → message` bindings. Resource authors
+can select registered handlers but cannot create executable commands
+by changing a resource.
+
+`OSTenDialogControlFactories` can supply application-specific native
+view constructors keyed by type without changing the common loader.
+
+The graphical dialog editor can create and reorder controls. It writes
+new stable IDs to the index, preserving the current application ID
+namespace. `Interface.ostr` and `ResourceIndex.osti` are independently
+atomic files; a failure after saving the manifest is reported rather
+than falsely claiming the whole operation succeeded. A future
+transactional resource container should eliminate this gap.

@@ -59,7 +59,9 @@ enum {
     kMenuUp = 'mnUp', kMenuDown = 'mnDn', kMenuSave = 'mnSv',
     kMenuRevert = 'mnRv', kMenuSeparator = 'mnSp', kMenuReplace = 'mnRp',
     kColorChange = 'clCh', kColorSave = 'clSv', kColorRevert = 'clRv',
-    kLayoutSave = 'lySv', kLayoutRevert = 'lyRv', kLayoutSelected = 'lySl'
+    kLayoutSave = 'lySv', kLayoutRevert = 'lyRv', kLayoutSelected = 'lySl',
+    kLayoutApply = 'lyAp', kLayoutAdd = 'lyAd',
+    kLayoutRemove = 'lyRm', kLayoutUp = 'lyUp', kLayoutDown = 'lyDn'
 };
 
 struct ResourceEntry {
@@ -654,7 +656,8 @@ private:
 // atomically renamed over the selected manifest; the Owner owns backups.
 static bool
 WriteResourceValues(const std::string& path,
-    const std::map<std::string, std::string>& replacements)
+    const std::map<std::string, std::string>& replacements,
+    bool allowNewKeys = false)
 {
     if (replacements.empty()) return false;
     FILE* input = fopen(path.c_str(), "rb");
@@ -680,8 +683,15 @@ WriteResourceValues(const std::string& path,
     }
     bool readOK = !ferror(input);
     fclose(input);
-    if (!readOK || found.size() != replacements.size())
+    if (!readOK || (!allowNewKeys && found.size() != replacements.size()))
         return false;
+    if (allowNewKeys) {
+        for (std::map<std::string, std::string>::const_iterator it
+                = replacements.begin(); it != replacements.end(); ++it) {
+            if (found.find(it->first) == found.end())
+                output += it->first + "=" + it->second + "\n";
+        }
+    }
     std::string temporary = path + ".tmp.XXXXXX";
     std::vector<char> name(temporary.begin(), temporary.end());
     name.push_back('\0');
@@ -699,6 +709,68 @@ WriteResourceValues(const std::string& path,
     if (ok && fsync(fd) != 0) ok = false;
     if (close(fd) != 0) ok = false;
     if (ok && rename(name.data(), path.c_str()) == 0)
+        return true;
+    unlink(name.data());
+    return false;
+}
+
+// Preserve typed stable IDs when the Owner adds a control at runtime.
+// Append only newly introduced keys; no existing index entries are rewritten.
+// Failure is reported, rather than pretending the index and manifest agree.
+static bool
+IndexNewResourceKeys(const ResourceEntry& parent,
+    const std::map<std::string, std::string>& additions)
+{
+    if (additions.empty()) return true;
+    const std::string indexPath = Parent(parent.path) + "/ResourceIndex.osti";
+    if (!ExistingFile(indexPath))
+        return true; // Unindexed legacy applications remain supported.
+    std::map<std::string, OSTenIndexedResource> items;
+    if (!OSTenReadResourceIndex(indexPath, items))
+        return false;
+    FILE* input = fopen(indexPath.c_str(), "rb");
+    if (input == NULL) return false;
+    struct stat metadata;
+    const bool haveMode = fstat(fileno(input), &metadata) == 0;
+    std::string body;
+    char line[8192];
+    while (fgets(line, sizeof(line), input) != NULL)
+        body += line;
+    bool ok = !ferror(input);
+    fclose(input);
+    if (!ok) return false;
+    std::set<uint32_t> identities;
+    for (std::map<std::string, OSTenIndexedResource>::const_iterator it
+            = items.begin(); it != items.end(); ++it)
+        identities.insert(it->second.id);
+    for (std::map<std::string, std::string>::const_iterator it
+            = additions.begin(); it != additions.end(); ++it) {
+        if (items.find(it->first) != items.end())
+            continue;
+        const uint32 id = OSTenStableResourceID(parent.application, it->first);
+        if (!identities.insert(id).second)
+            return false;
+        char number[20];
+        snprintf(number, sizeof(number), "0x%08lx", (unsigned long)id);
+        body += std::string(number) + "|" + parent.type + "|"
+            + it->first + "|" + it->first + "|0|0\n";
+    }
+    std::string temporary = indexPath + ".tmp.XXXXXX";
+    std::vector<char> name(temporary.begin(), temporary.end());
+    name.push_back('\0');
+    int fd = mkstemp(name.data());
+    if (fd < 0) return false;
+    ok = !haveMode || fchmod(fd, metadata.st_mode & 07777) == 0;
+    size_t written = 0;
+    while (ok && written < body.size()) {
+        ssize_t amount = write(fd, body.data() + written,
+            body.size() - written);
+        if (amount <= 0) { ok = false; break; }
+        written += (size_t)amount;
+    }
+    if (ok && fsync(fd) != 0) ok = false;
+    if (close(fd) != 0) ok = false;
+    if (ok && rename(name.data(), indexPath.c_str()) == 0)
         return true;
     unlink(name.data());
     return false;
@@ -1086,7 +1158,10 @@ private:
 struct LayoutHandle {
     std::string id;
     std::string frameKey;
+    std::string captionKey;
     std::string caption;
+    std::string type;
+    std::string action;
     BRect frame;
 };
 
@@ -1101,6 +1176,11 @@ public:
     }
 
     int32 Selected() const { return fSelected; }
+    void Select(int32 index)
+    {
+        fSelected = index;
+        Invalidate();
+    }
 
     void Draw(BRect) override
     {
@@ -1120,7 +1200,10 @@ public:
                 rgb_color{80, 90, 103, 255}));
             StrokeRect(rect);
             MovePenTo(rect.left + 6, rect.top + 18);
-            DrawString((*fHandles)[i].caption.c_str());
+            const LayoutHandle& item = (*fHandles)[i];
+            const std::string label = item.caption.empty() ? item.id
+                : item.caption;
+            DrawString(label.c_str());
             if (i == (size_t)fSelected) {
                 FillRect(BRect(rect.right - 10, rect.bottom - 10,
                     rect.right, rect.bottom));
@@ -1177,7 +1260,7 @@ class LayoutEditorWindow : public BWindow {
 public:
     explicit LayoutEditorWindow(const ResourceEntry& item)
         : BWindow(BrowserUI().Rect("browser.layout.window",
-            BRect(160, 105, 920, 690)),
+            BRect(120, 70, 1265, 690)),
             (item.label + BrowserUI().String("browser.layout.title_suffix",
                 " — Dialog Layout Editor")).c_str(), B_TITLED_WINDOW, 0),
           fEntry(item)
@@ -1195,6 +1278,51 @@ public:
                 "browser.layout.canvas_frame", BRect(14, 42, 737, 493)),
             &fHandles);
         panel->AddChild(fCanvas);
+        // The inspector uses the same editable OSTen resource catalog as
+        // the preview itself; stable control IDs are independent of labels.
+        fID = new BTextControl(BrowserUI().Rect("browser.layout.id_frame",
+            BRect(761, 54, 1100, 89)), "layout-id",
+            BrowserUI().String("browser.layout.id_label", "Control ID"),
+            "", NULL);
+        fType = new BTextControl(BrowserUI().Rect("browser.layout.type_frame",
+            BRect(761, 100, 1100, 135)), "layout-type",
+            BrowserUI().String("browser.layout.type_label", "Type"),
+            "", NULL);
+        fCaption = new BTextControl(BrowserUI().Rect("browser.layout.caption_frame",
+            BRect(761, 146, 1100, 181)), "layout-caption",
+            BrowserUI().String("browser.layout.caption_label", "Label"),
+            "", NULL);
+        fAction = new BTextControl(BrowserUI().Rect("browser.layout.action_frame",
+            BRect(761, 192, 1100, 227)), "layout-action",
+            BrowserUI().String("browser.layout.action_label", "Action ID"),
+            "", NULL);
+        BTextControl* editors[] = {fID, fType, fCaption, fAction};
+        for (size_t i = 0; i < sizeof(editors) / sizeof(editors[0]); ++i) {
+            editors[i]->SetDivider(102);
+            panel->AddChild(editors[i]);
+        }
+        struct LayoutButton {
+            const char* id;
+            const char* title;
+            uint32 message;
+            BRect frame;
+        };
+        const LayoutButton operations[] = {
+            {"apply", "Apply", kLayoutApply, BRect(765, 249, 921, 282)},
+            {"add", "Add", kLayoutAdd, BRect(936, 249, 1099, 282)},
+            {"remove", "Remove", kLayoutRemove, BRect(765, 294, 921, 327)},
+            {"up", "Move Up", kLayoutUp, BRect(936, 294, 1099, 327)},
+            {"down", "Move Down", kLayoutDown, BRect(936, 339, 1099, 372)}
+        };
+        for (size_t i = 0; i < sizeof(operations) / sizeof(operations[0]); ++i) {
+            std::string titleKey = std::string("browser.layout.") + operations[i].id;
+            std::string frameKey = titleKey + "_frame";
+            panel->AddChild(new BButton(BrowserUI().Rect(
+                    frameKey.c_str(), operations[i].frame),
+                operations[i].id,
+                BrowserUI().String(titleKey.c_str(), operations[i].title),
+                new BMessage(operations[i].message)));
+        }
         panel->AddChild(new BButton(BrowserUI().Rect(
                 "browser.layout.revert_frame", BRect(495, 502, 605, 537)),
             "revert", BrowserUI().String("browser.layout.revert", "Revert"),
@@ -1216,11 +1344,15 @@ public:
         switch (message->what) {
             case kLayoutSelected: {
                 int32 selected = fCanvas->Selected();
-                if (selected >= 0 && (size_t)selected < fHandles.size())
-                    fStatus->SetText(fHandles[selected].id.c_str());
+                _Select(selected);
                 return;
             }
             case kLayoutRevert: _Load(); return;
+            case kLayoutApply: _Apply(); return;
+            case kLayoutAdd: _Add(); return;
+            case kLayoutRemove: _Remove(); return;
+            case kLayoutUp: _Move(-1); return;
+            case kLayoutDown: _Move(1); return;
             case kLayoutSave: _Save(); return;
         }
         BWindow::MessageReceived(message);
@@ -1246,6 +1378,7 @@ private:
         }
         fclose(input);
         fHandles.clear();
+        fValues = fields;
         if (!EndsWith(fEntry.key, ".controls")) return;
         const std::string prefix = fEntry.key.substr(0,
             fEntry.key.size() - strlen(".controls"));
@@ -1275,15 +1408,137 @@ private:
             handle.frameKey = frameKey;
             handle.frame = BRect(l, t, r, b);
             const std::string captionKey = base + "caption_key";
-            const std::string key = fields[captionKey];
+            const std::string key = fields.find(captionKey) == fields.end()
+                ? base + "caption" : fields[captionKey];
+            handle.captionKey = key.empty() ? base + "caption" : key;
             std::map<std::string, std::string>::const_iterator caption
-                = fields.find(key);
+                = fields.find(handle.captionKey);
             handle.caption = caption != fields.end() ? caption->second : id;
+            handle.type = fields[base + "type"];
+            handle.action = fields[base + "action"];
             fHandles.push_back(handle);
         }
+        fCanvas->Select(-1);
+        _Select(-1);
         fCanvas->Invalidate();
         fStatus->SetText(BrowserUI().String("browser.layout.ready",
             "Control frames loaded from the application's resources"));
+    }
+
+
+    static bool _ValidID(const std::string& value)
+    {
+        return !value.empty() && value.size() <= 128
+            && value.find_first_not_of(
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+                "0123456789._-") == std::string::npos;
+    }
+
+    void _Select(int32 index)
+    {
+        if (index < 0 || (size_t)index >= fHandles.size()) {
+            fID->SetText("");
+            fType->SetText("");
+            fCaption->SetText("");
+            fAction->SetText("");
+            return;
+        }
+        const LayoutHandle& handle = fHandles[index];
+        fID->SetText(handle.id.c_str());
+        fType->SetText(handle.type.c_str());
+        fCaption->SetText(handle.caption.c_str());
+        fAction->SetText(handle.action.c_str());
+        fStatus->SetText(handle.id.c_str());
+    }
+
+    void _Apply()
+    {
+        int32 index = fCanvas->Selected();
+        if (index < 0 || (size_t)index >= fHandles.size()) return;
+        // IDs are stable resource identities: change the caption, not the ID.
+        LayoutHandle& item = fHandles[index];
+        const std::string type = fType->Text();
+        const std::string action = fAction->Text();
+        if (!_ValidID(type) || (!action.empty() && !_ValidID(action))) {
+            fStatus->SetText(BrowserUI().String("browser.layout.invalid",
+                "Type and action must be resource identifiers"));
+            return;
+        }
+        item.type = type;
+        item.action = action;
+        item.caption = fCaption->Text();
+        fCanvas->Invalidate();
+        fStatus->SetText(BrowserUI().String("browser.layout.applied",
+            "Properties applied. Save to write the manifest"));
+    }
+
+    void _Add()
+    {
+        const std::string id = fID->Text();
+        if (!_ValidID(id)) {
+            fStatus->SetText(BrowserUI().String("browser.layout.invalid",
+                "Type and action must be resource identifiers"));
+            return;
+        }
+        for (size_t i = 0; i < fHandles.size(); ++i) {
+            if (fHandles[i].id == id) {
+                fStatus->SetText(BrowserUI().String("browser.layout.duplicate",
+                    "A control with this ID already exists"));
+                return;
+            }
+        }
+        const std::string type = fType->Text();
+        const std::string action = fAction->Text();
+        if (!_ValidID(type) || (!action.empty() && !_ValidID(action))) {
+            fStatus->SetText(BrowserUI().String("browser.layout.invalid",
+                "Type and action must be resource identifiers"));
+            return;
+        }
+        const std::string prefix = fEntry.key.substr(0,
+            fEntry.key.size() - strlen(".controls"));
+        LayoutHandle item;
+        item.id = id;
+        item.frameKey = prefix + ".control." + id + ".frame";
+        item.captionKey = prefix + ".control." + id + ".caption";
+        item.type = type;
+        item.action = action;
+        item.caption = fCaption->Text();
+        const int32 current = fCanvas->Selected();
+        item.frame = BRect(25, 25, 175, 61);
+        if (current >= 0 && (size_t)current < fHandles.size())
+            item.frame.OffsetBy(20, 20);
+        const int32 next = current < 0 ? (int32)fHandles.size() : current + 1;
+        fHandles.insert(fHandles.begin() + next, item);
+        fCanvas->Select(next);
+        fCanvas->Invalidate();
+        _Select(next);
+    }
+
+    void _Remove()
+    {
+        int32 index = fCanvas->Selected();
+        if (index < 0 || (size_t)index >= fHandles.size()) return;
+        // The saved control order determines visibility. Definitions remain
+        // in the catalog for future reuse rather than silently being deleted.
+        fHandles.erase(fHandles.begin() + index);
+        int32 next = index < (int32)fHandles.size() ? index
+            : (int32)fHandles.size() - 1;
+        fCanvas->Select(next);
+        fCanvas->Invalidate();
+        _Select(next);
+    }
+
+    void _Move(int32 delta)
+    {
+        int32 index = fCanvas->Selected();
+        int32 next = index + delta;
+        if (index < 0 || next < 0
+            || (size_t)index >= fHandles.size()
+            || (size_t)next >= fHandles.size()) return;
+        std::swap(fHandles[index], fHandles[next]);
+        fCanvas->Select(next);
+        fCanvas->Invalidate();
+        _Select(next);
     }
 
     void _Save()
@@ -1297,8 +1552,40 @@ private:
                 handle.frame.left, handle.frame.top,
                 handle.frame.right, handle.frame.bottom);
             edits[handle.frameKey] = coords;
+            const std::string base = fEntry.key.substr(0,
+                fEntry.key.size() - strlen(".controls"))
+                + ".control." + handle.id + ".";
+            edits[base + "type"] = handle.type;
+            edits[base + "caption_key"] = handle.captionKey;
+            edits[handle.captionKey] = handle.caption;
+            edits[base + "action"] = handle.action;
         }
-        bool saved = WriteResourceValues(fEntry.path, edits);
+        std::string order;
+        for (size_t i = 0; i < fHandles.size(); ++i) {
+            if (i != 0) order += ",";
+            order += fHandles[i].id;
+        }
+        edits[fEntry.key] = order;
+        // Track newly authored resource fields so they receive stable IDs
+        // in the same public index used by the browser and native clients.
+        std::map<std::string, std::string> additions;
+        for (std::map<std::string, std::string>::const_iterator it
+                = edits.begin(); it != edits.end(); ++it) {
+            if (fValues.find(it->first) == fValues.end())
+                additions[it->first] = it->second;
+        }
+        bool saved = WriteResourceValues(fEntry.path, edits, true);
+        bool indexed = saved && IndexNewResourceKeys(fEntry, additions);
+        if (saved) {
+            for (std::map<std::string, std::string>::const_iterator it
+                    = edits.begin(); it != edits.end(); ++it)
+                fValues[it->first] = it->second;
+        }
+        if (saved && !indexed) {
+            fStatus->SetText(BrowserUI().String("browser.layout.index_failed",
+                "Layout saved but resource index could not be updated"));
+            return;
+        }
         fStatus->SetText(BrowserUI().String(saved
                 ? "browser.layout.saved" : "browser.layout.failed", saved
                 ? "Layout saved. Restart the application to reload"
@@ -1306,9 +1593,14 @@ private:
     }
 
     ResourceEntry fEntry;
+    std::map<std::string, std::string> fValues;
     std::vector<LayoutHandle> fHandles;
     LayoutCanvas* fCanvas;
     BStringView* fStatus;
+    BTextControl* fID;
+    BTextControl* fType;
+    BTextControl* fCaption;
+    BTextControl* fAction;
 };
 
 class ResourceListWindow : public BWindow {
@@ -1330,7 +1622,10 @@ public:
             background, BrowserUI(), "browser.entries", actions,
             sizeof(actions) / sizeof(actions[0]));
         OSTenDialogControls::const_iterator list = controls.find("resource_entries");
-        if (list != controls.end())
+        if (list != controls.end()
+            && strcmp(BrowserUI().String(
+                "browser.entries.control.resource_entries.type", ""),
+                "list") == 0)
             fList = static_cast<BListView*>(list->second);
         if (fList != NULL) {
             for (size_t i = 0; i < resources.size(); ++i)
@@ -1395,11 +1690,15 @@ public:
             bg, BrowserUI(), "browser.types", actions,
             sizeof(actions) / sizeof(actions[0]));
         OSTenDialogControls::const_iterator caption = controls.find("current");
-        fCaption = caption == controls.end() ? NULL
-            : static_cast<BStringView*>(caption->second);
+        fCaption = caption == controls.end()
+            || strcmp(BrowserUI().String(
+                "browser.types.control.current.type", ""), "label") != 0
+            ? NULL : static_cast<BStringView*>(caption->second);
         OSTenDialogControls::const_iterator types = controls.find("resource_types");
-        fTypesList = types == controls.end() ? NULL
-            : static_cast<BListView*>(types->second);
+        fTypesList = types == controls.end()
+            || strcmp(BrowserUI().String(
+                "browser.types.control.resource_types.type", ""), "list") != 0
+            ? NULL : static_cast<BListView*>(types->second);
         Show();
         _PickFile();
     }

@@ -9,6 +9,8 @@
 #include "OSTenResources.h"
 
 #include <Button.h>
+#include <CheckBox.h>
+#include <Slider.h>
 #include <ListView.h>
 #include <Message.h>
 #include <ScrollView.h>
@@ -29,6 +31,16 @@ struct OSTenDialogAction {
 
 typedef std::map<std::string, BView*> OSTenDialogControls;
 
+// Application-specific widgets can be registered without changing ResEdit
+// or extending the OS's built-in control switch. The registered factory
+// creates a native view. The Owner still controls its public resource keys.
+typedef BView* (*OSTenDialogControlFactory)(BRect frame,
+    const char* identifier, const char* caption, uint32 action,
+    const OSTenResourceCatalog& catalog, const std::string& resourcePrefix);
+
+typedef std::map<std::string, OSTenDialogControlFactory>
+    OSTenDialogControlFactories;
+
 inline uint32
 OSTenDialogActionMessage(const char* action, const OSTenDialogAction* bindings,
     size_t count)
@@ -48,7 +60,8 @@ OSTenDialogActionMessage(const char* action, const OSTenDialogAction* bindings,
 inline OSTenDialogControls
 OSTenCreateDialogControls(BView* parent, const OSTenResourceCatalog& catalog,
     const char* dialogID, const OSTenDialogAction* bindings,
-    size_t bindingCount)
+    size_t bindingCount,
+    const OSTenDialogControlFactories* extensions = NULL)
 {
     OSTenDialogControls result;
     if (parent == NULL || dialogID == NULL)
@@ -108,6 +121,28 @@ OSTenCreateDialogControls(BView* parent, const OSTenResourceCatalog& catalog,
             parent->AddChild(new BScrollView(
                 (id + "-scroll").c_str(), text,
                 B_FOLLOW_ALL, 0, false, true));
+        } else if (strcmp(type, "checkbox") == 0) {
+            BCheckBox* checkbox = new BCheckBox(frame, id.c_str(), label,
+                what ? new BMessage(what) : NULL);
+            checkbox->SetValue(catalog.Number(
+                (base + "checked").c_str(), 0, 0, 1) >= 0.5f
+                ? B_CONTROL_ON : B_CONTROL_OFF);
+            view = checkbox;
+            parent->AddChild(view);
+        } else if (strcmp(type, "slider") == 0) {
+            int32 minimum = (int32)catalog.Number(
+                (base + "minimum").c_str(), 0, -32768, 32767);
+            int32 maximum = (int32)catalog.Number(
+                (base + "maximum").c_str(), 100, -32768, 32767);
+            if (maximum <= minimum)
+                maximum = minimum + 1;
+            BSlider* slider = new BSlider(frame, id.c_str(), label,
+                what ? new BMessage(what) : NULL,
+                minimum, maximum, B_HORIZONTAL);
+            slider->SetValue((int32)catalog.Number(
+                (base + "value").c_str(), minimum, minimum, maximum));
+            view = slider;
+            parent->AddChild(view);
         } else if (strcmp(type, "label") == 0) {
             view = new BStringView(frame, id.c_str(), label);
             parent->AddChild(view);
@@ -124,6 +159,16 @@ OSTenCreateDialogControls(BView* parent, const OSTenResourceCatalog& catalog,
             parent->AddChild(new BScrollView(
                 (id + "-scroll").c_str(), list,
                 B_FOLLOW_ALL, 0, false, true));
+        }
+        if (view == NULL && extensions != NULL) {
+            OSTenDialogControlFactories::const_iterator factory
+                = extensions->find(type);
+            if (factory != extensions->end() && factory->second != NULL) {
+                view = factory->second(frame, id.c_str(), label, what,
+                    catalog, base);
+                if (view != NULL)
+                    parent->AddChild(view);
+            }
         }
         if (view != NULL)
             result[id] = view;

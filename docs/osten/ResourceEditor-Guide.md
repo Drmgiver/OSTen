@@ -199,3 +199,37 @@ status messages now live in Resource Editor's own indexed catalog under
 without recompiling it; restart the editor to load the edits. The
 application's error handling and save behavior remain separate from
 those user-facing strings.
+
+## Composed dialog authoring (November 1, 2026)
+
+The resource-driven dialog designer now contains a right-hand inspector
+for a selected control's **stable ID**, control type, displayed caption,
+and action ID. The Owner can drag and resize controls, change types,
+labels and dispatch bindings, add new controls, remove controls from the
+active order, and reorder controls before saving.
+
+- **Apply** updates the selected control's type, caption and action.
+  Its ID stays stable; renaming the caption never renames the action.
+- **Add** uses the entered unused stable control ID and makes a new
+  resource-backed control definition. Type examples include `button`,
+  `label`, `text`, `text_area`, `list`, `checkbox` and `slider`.
+- **Remove** takes a control out of the dialog's `.controls` order.
+  Existing resource entries remain recoverable by manually re-adding
+  their ID; no developer-defined safety restriction prevents removal.
+- **Move Up / Move Down** changes control order independently of ID.
+- **Save** writes changed definitions and control ordering to the
+  visible `Interface.ostr` and creates indexed IDs for new keys in
+  `ResourceIndex.osti`. Save reports an error if the index cannot
+  be updated. Per-file writes are atomic and preserve permission bits;
+  there is not yet a two-file transactional commit.
+- **Revert** reloads the current document on disk.
+
+The common dialog loader now supports `checkbox` and `slider` and
+accepts optional application-registered factories for additional
+native control types. Buttons, checkboxes and sliders can dispatch only
+the action IDs that the application explicitly registered; resource
+editing alone never invents executable handlers.
+
+This implementation provides genuine structured dialog editing for
+composed dialogs. It does **not** make all OSTen System, Finder or ResEdit
+windows composed or fully compliant. See the compliance audit.

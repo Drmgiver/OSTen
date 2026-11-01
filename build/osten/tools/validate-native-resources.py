@@ -125,7 +125,7 @@ def validate_composed_dialog(app: str, prefix: str) -> None:
     for ident in order:
         stem = f"{prefix}.control.{ident}."
         kind = values.get(stem + "type")
-        check(kind in {"text", "label", "button", "list", "text_area"},
+        check(kind in {"text", "label", "button", "list", "text_area", "checkbox", "slider"},
               f"{app}/{prefix}/{ident}: unsupported declared control {kind}")
         frameField = values.get(stem + "frame_key") or (stem + "frame")
         frame = values.get(frameField, "")
@@ -148,7 +148,7 @@ def validate_composed_dialog(app: str, prefix: str) -> None:
         if captionKey:
             check(captionKey in values,
                   f"{app}/{prefix}/{ident}: caption key absent {captionKey}")
-        if kind in {"button", "list"}:
+        if kind in {"button", "list", "checkbox", "slider"}:
             check(bool(values.get(stem + "action")),
                   f"{app}/{prefix}/{ident}: missing command/action ID")
     print(f"{app}: {prefix} — {len(order)} structured controls verified")
