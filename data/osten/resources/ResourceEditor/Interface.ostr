@@ -255,3 +255,44 @@ shortcut.quit=Q
 
 # Generic resource-index artwork importer
 editor.no_artwork=No indexed artwork
+
+# Owner-editable ResEdit warnings, alerts and status messages
+editor.alert.unsaved_title=Unsaved resources
+editor.alert.unsaved_message=Discard the unsaved resource changes?
+editor.alert.unsaved_open=Discard unsaved edits and open another resource file?
+editor.alert.cancel=Cancel
+editor.alert.discard=Discard
+editor.alert.unsupported_title=Unsupported resource file
+editor.alert.unsupported_body=No editable OSTen resource manifest was found for that selection.\nChoose an .ostr file or an OSTen application with an Interface.ostr manifest. Editing other applications' compiled binary resources is not implemented yet.
+editor.alert.ok=OK
+editor.status.resolve_failed=Could not resolve the selected file.
+editor.status.open_resource=Open an application or .ostr resource file first.
+editor.status.invalid_value=Invalid key or value. Nothing was changed.
+editor.status.duplicate_key=Duplicate resource key. Nothing was changed.
+editor.status.no_previous=No previous version is available for that resource.
+editor.status.restore_prepare=Could not prepare the restore operation.
+editor.status.restore_failed=Restore failed. Existing resource kept.
+editor.status.restore_backup_failed=Restored, but the new backup could not be retained.
+editor.status.restore_interface=Previous interface restored. Restart edited application.
+editor.status.restore_artwork=Previous graphic restored. Restart the target application.
+editor.status.image_unreadable=Image translator could not load that file.
+editor.status.image_dimensions=Graphic must match the listed pixel dimensions and be 32-bit.
+editor.status.image_temp_failed=Cannot save graphic. Check permissions on the target folder.
+editor.status.image_write_failed=Graphic import failed. Existing resource preserved.
+editor.status.image_install_failed=Cannot install graphic. Previous resource restored.
+editor.status.system_locked=Unlock the System Folder in Finder's Special menu first.
+editor.status.no_changes=No changes to save.
+editor.status.save_temp_failed=Save failed. Unlock System Folder and check permissions.
+editor.status.save_write_failed=Could not write changes. Original resources untouched.
+editor.status.save_install_failed=Could not install edited resources. Original preserved.
+editor.status.no_manifest_prefix=No supported resource manifest found for 
+editor.status.cannot_open_prefix=Cannot open 
+editor.status.error_read_prefix=Error reading 
+editor.status.editing_prefix=Editing 
+editor.status.editing_suffix= (restart the target app to reload)
+editor.status.changed_prefix=Changed 
+editor.status.changed_suffix=. Press Save to write.
+editor.status.imported_prefix=Imported 
+editor.status.imported_suffix=. Restart the target application.
+editor.status.saved_backup=Saved with backup. Restart the edited app.
+editor.status.saved=Saved. Restart the edited app.

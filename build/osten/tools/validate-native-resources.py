@@ -210,10 +210,28 @@ def validate_strip_order() -> None:
     print("System: Owner-controlled Control Strip module order checked")
 
 
+def check_editor_status_resources() -> None:
+    """ResEdit warning/error/status strings are required editable resources."""
+    values = parse_manifest(BASE / "ResourceEditor" / "Interface.ostr")
+    index = parse_index(BASE / "ResourceEditor" / "ResourceIndex.osti")
+    source = (
+        ROOT / "src/apps/osten/resedit/ResourceEditor.cpp"
+    ).read_text(encoding="utf-8")
+    refs = set(re.findall(
+        r'EditorResources\(\)\.String\("(editor\.(?:status|alert)\.[^"]+)"',
+        source))
+    missing = sorted(name for name in refs
+                     if name not in values or name not in index)
+    check(not missing,
+          f"ResourceEditor: missing owner-editable message resources {missing}")
+    print(f"ResourceEditor: {len(refs)} status/alert strings indexed")
+
+
 def main() -> int:
     for app in APPS:
         validate_app(app)
     check_editor_bindings()
+    check_editor_status_resources()
     validate_composed_dialog("Finder", "dialog.rename")
     validate_composed_dialog("Finder", "dialog.info")
     validate_composed_dialog("System", "notification.center")

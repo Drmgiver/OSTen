@@ -190,3 +190,12 @@ are now actual editable files, alongside Finder's original approved
 icon files. Editing System artwork continues to honor the System
 Folder Access mechanism; application-local artwork does not require
 that mechanism.
+
+### Editing ResEdit's messages
+
+The property editor's principal warnings, confirmation prompts and
+status messages now live in Resource Editor's own indexed catalog under
+`editor.alert.*` and `editor.status.*`. They can be changed in ResEdit
+without recompiling it; restart the editor to load the edits. The
+application's error handling and save behavior remain separate from
+those user-facing strings.

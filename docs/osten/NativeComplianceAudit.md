@@ -220,3 +220,19 @@ nor the incomplete System/ResEdit coverage.
 
 This work improves standards compliance but does **not** certify the
 three applications as fully compliant.
+
+## ResEdit strings and permission-preserving saves
+
+The legacy property editor's principal alert, status and diagnostic
+strings now have explicit indexed resource entries. CI verifies that
+literal `EditorResources().String("editor.status.*")` and
+`editor.alert.*` references correspond to bundled editable keys.
+
+Resource Editor's legacy manifest and image importer, and its graphical
+pixel editor, now preserve the original file permission bits when
+performing atomic save replacements. This preserves Owner-selected file
+access settings rather than silently imposing temporary-file modes.
+
+**Not a complete Resource Editor compliance signoff.** The remaining
+custom canvas, inspector controls, advanced resource editors and
+unconverted windows still need the universal runtime resource system.

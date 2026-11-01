@@ -169,3 +169,9 @@ owner-editable, indexed RGBA assets. The legacy ResEdit graphic importer
 now discovers indexed assets in any native application instead of
 hardcoding known Finder/System filenames. Target permissions are checked
 against the real file, preserving independent application ownership.
+
+ResEdit's previously hardcoded common warnings and status messages
+are now indexed owner-editable strings. Atomic resource writes preserve
+existing file permission bits rather than replacing them with new
+temporary-file defaults. This is a targeted correctness improvement,
+not a complete standards certification.

@@ -317,9 +317,9 @@ public:
 
     bool QuitRequested() override
     {
-        if (fDirty && (new BAlert("Unsaved resources",
-                "Discard the unsaved resource changes?",
-                "Cancel", "Discard"))->Go() != 1)
+        if (fDirty && (new BAlert(EditorResources().String("editor.alert.unsaved_title", "Unsaved resources"),
+                EditorResources().String("editor.alert.unsaved_message", "Discard the unsaved resource changes?"),
+                EditorResources().String("editor.alert.cancel", "Cancel"), EditorResources().String("editor.alert.discard", "Discard")))->Go() != 1)
             return false;
         return true;
     }
@@ -410,7 +410,7 @@ private:
         BEntry entry(&ref, true);
         BPath path;
         if (entry.GetPath(&path) != B_OK) {
-            _Status("Could not resolve the selected file.");
+            _Status(EditorResources().String("editor.status.resolve_failed", "Could not resolve the selected file."));
             return;
         }
         std::string selected(path.Path());
@@ -465,27 +465,31 @@ private:
             if (stat(candidates[i].c_str(), &details) != 0
                 || !S_ISREG(details.st_mode))
                 continue;
-            if (fDirty && (new BAlert("Unsaved resources",
-                    "Discard unsaved edits and open another resource file?",
-                    "Cancel", "Discard"))->Go() != 1)
+            if (fDirty && (new BAlert(EditorResources().String("editor.alert.unsaved_title", "Unsaved resources"),
+                    EditorResources().String("editor.alert.unsaved_open", "Discard unsaved edits and open another resource file?"),
+                    EditorResources().String("editor.alert.cancel", "Cancel"), EditorResources().String("editor.alert.discard", "Discard")))->Go() != 1)
                 return;
             if (_LoadPath(candidates[i], application))
                 return;
         }
 
-        (new BAlert("Unsupported resource file",
-            "No editable OSTen resource manifest was found for that selection.\n"
-            "Choose an .ostr file or an OSTen application with an Interface.ostr "
-            "manifest. Editing other applications' compiled binary resources "
-            "is not implemented yet.", "OK"))->Go();
-        _Status("No supported resource manifest found for " + selected);
+        (new BAlert(EditorResources().String("editor.alert.unsupported_title", "Unsupported resource file"),
+            EditorResources().String("editor.alert.unsupported_body",
+                "No editable OSTen resource manifest was found for that selection.\n"
+                "Choose an .ostr file or an OSTen application with an Interface.ostr "
+                "manifest. Editing other applications' compiled binary resources "
+                "is not implemented yet."),
+            EditorResources().String("editor.alert.ok", "OK")))->Go();
+        _Status(std::string(EditorResources().String("editor.status.no_manifest_prefix",
+            "No supported resource manifest found for ")) + selected);
     }
 
     bool _LoadPath(const std::string& path, const std::string& application)
     {
         FILE* file = fopen(path.c_str(), "rb");
         if (file == NULL) {
-            _Status("Cannot open " + path);
+            _Status(std::string(EditorResources().String("editor.status.cannot_open_prefix",
+                "Cannot open ")) + path);
             return false;
         }
         std::vector<ResourceLine> lines;
@@ -508,7 +512,8 @@ private:
         bool success = !ferror(file);
         fclose(file);
         if (!success) {
-            _Status("Error reading " + path);
+            _Status(std::string(EditorResources().String("editor.status.error_read_prefix",
+                "Error reading ")) + path);
             return false;
         }
         fLines.swap(lines);
@@ -518,7 +523,10 @@ private:
         _Populate("");
         _RefreshAssets();
         fCurrentTarget->SetText(application.c_str());
-        _Status("Editing " + fPath + " (restart the target app to reload)");
+        _Status(std::string(EditorResources().String("editor.status.editing_prefix",
+            "Editing ")) + fPath
+            + EditorResources().String("editor.status.editing_suffix",
+                " (restart the target app to reload)"));
         return true;
     }
 
@@ -635,7 +643,7 @@ private:
     void _Apply()
     {
         if (fPath.empty()) {
-            _Status("Open an application or .ostr resource file first.");
+            _Status(EditorResources().String("editor.status.open_resource", "Open an application or .ostr resource file first."));
             return;
         }
         std::string key(fKey->Text());
@@ -648,13 +656,13 @@ private:
             || value.find('\n') != std::string::npos
             || value.find('\r') != std::string::npos
             || value.size() > 7900) {
-            _Status("Invalid key or value. Nothing was changed.");
+            _Status(EditorResources().String("editor.status.invalid_value", "Invalid key or value. Nothing was changed."));
             return;
         }
         for (size_t i = 0; i < fLines.size(); ++i) {
             if (fLines[i].setting && fLines[i].key == key
                 && (int32)i != fSelection) {
-                _Status("Duplicate resource key. Nothing was changed.");
+                _Status(EditorResources().String("editor.status.duplicate_key", "Duplicate resource key. Nothing was changed."));
                 return;
             }
         }
@@ -672,7 +680,10 @@ private:
         }
         fDirty = true;
         _Populate(key);
-        _Status("Changed " + key + ". Press Save to write.");
+        _Status(std::string(EditorResources().String("editor.status.changed_prefix",
+            "Changed ")) + key
+            + EditorResources().String("editor.status.changed_suffix",
+                ". Press Save to write."));
     }
 
     void _Move(int direction)
@@ -700,7 +711,7 @@ private:
     {
         std::string backup = file + ".bak";
         if (access(backup.c_str(), R_OK) != 0) {
-            _Status("No previous version is available for that resource.");
+            _Status(EditorResources().String("editor.status.no_previous", "No previous version is available for that resource."));
             return false;
         }
         std::string temp = file + ".restore.XXXXXX";
@@ -708,7 +719,7 @@ private:
         name.push_back(0);
         int fd = mkstemp(&name[0]);
         if (fd < 0) {
-            _Status("Could not prepare the restore operation.");
+            _Status(EditorResources().String("editor.status.restore_prepare", "Could not prepare the restore operation."));
             return false;
         }
         close(fd);
@@ -716,11 +727,11 @@ private:
         if (rename(file.c_str(), &name[0]) != 0
             || rename(backup.c_str(), file.c_str()) != 0) {
             rename(&name[0], file.c_str());
-            _Status("Restore failed. Existing resource kept.");
+            _Status(EditorResources().String("editor.status.restore_failed", "Restore failed. Existing resource kept."));
             return false;
         }
         if (rename(&name[0], backup.c_str()) != 0)
-            _Status("Restored, but the new backup could not be retained.");
+            _Status(EditorResources().String("editor.status.restore_backup_failed", "Restored, but the new backup could not be retained."));
         return true;
     }
 
@@ -730,7 +741,7 @@ private:
             return;
         if (_SwapBackup(fPath)) {
             _LoadPath(fPath, fApplication);
-            _Status("Previous interface restored. Restart edited application.");
+            _Status(EditorResources().String("editor.status.restore_interface", "Previous interface restored. Restart edited application."));
         }
     }
 
@@ -742,7 +753,7 @@ private:
         if (!_OwnerAllowsChanges(asset.path))
             return;
         if (_SwapBackup(asset.path))
-            _Status("Previous graphic restored. Restart the target application.");
+            _Status(EditorResources().String("editor.status.restore_artwork", "Previous graphic restored. Restart the target application."));
     }
 
     void _PickGraphic()
@@ -765,7 +776,7 @@ private:
             return;
         BBitmap* bitmap = BTranslationUtils::GetBitmap(&ref);
         if (bitmap == NULL) {
-            _Status("Image translator could not load that file.");
+            _Status(EditorResources().String("editor.status.image_unreadable", "Image translator could not load that file."));
             return;
         }
         const int width = (int)bitmap->Bounds().Width() + 1;
@@ -774,7 +785,7 @@ private:
             || (bitmap->ColorSpace() != B_RGBA32
                 && bitmap->ColorSpace() != B_RGB32)) {
             delete bitmap;
-            _Status("Graphic must match the listed pixel dimensions and be 32-bit.");
+            _Status(EditorResources().String("editor.status.image_dimensions", "Graphic must match the listed pixel dimensions and be 32-bit."));
             return;
         }
 
@@ -800,7 +811,7 @@ private:
         filename.push_back(0);
         int fd = mkstemp(&filename[0]);
         if (fd < 0) {
-            _Status("Cannot save graphic. Check System Folder access.");
+            _Status(EditorResources().String("editor.status.image_temp_failed", "Cannot save graphic. Check System Folder access."));
             return;
         }
         struct stat previousGraphic;
@@ -819,7 +830,7 @@ private:
             success = false;
         if (!success) {
             unlink(&filename[0]);
-            _Status("Graphic import failed. Existing resource preserved.");
+            _Status(EditorResources().String("editor.status.image_write_failed", "Graphic import failed. Existing resource preserved."));
             return;
         }
         // Installing a resource does not require making a backup.
@@ -832,11 +843,13 @@ private:
             if (keptBackup)
                 rename(backup.c_str(), path.c_str());
             unlink(&filename[0]);
-            _Status("Cannot install graphic. Previous resource restored.");
+            _Status(EditorResources().String("editor.status.image_install_failed", "Cannot install graphic. Previous resource restored."));
             return;
         }
-        _Status(std::string("Imported ") + asset.label
-            + ". Restart the target application.");
+        _Status(std::string(EditorResources().String(
+            "editor.status.imported_prefix", "Imported ")) + asset.label
+            + EditorResources().String("editor.status.imported_suffix",
+                ". Restart the target application."));
     }
 
     bool _OwnerAllowsChanges(const std::string& target = "")
@@ -854,7 +867,7 @@ private:
         bool unlocked = false;
         if (finder.SendMessage(&query, &answer, 500000, 500000) != B_OK
             || answer.FindBool("unlocked", &unlocked) != B_OK || !unlocked) {
-            _Status("Unlock the System Folder in Finder's Special menu first.");
+            _Status(EditorResources().String("editor.status.system_locked", "Unlock the System Folder in Finder's Special menu first."));
             return false;
         }
         return true;
@@ -863,7 +876,7 @@ private:
     void _Save()
     {
         if (fPath.empty()) {
-            _Status("Open an application or .ostr resource file first.");
+            _Status(EditorResources().String("editor.status.open_resource", "Open an application or .ostr resource file first."));
             return;
         }
         if (!_OwnerAllowsChanges())
@@ -873,7 +886,7 @@ private:
             || fLines[fSelection].key != fKey->Text()))
             _Apply();
         if (!fDirty) {
-            _Status("No changes to save.");
+            _Status(EditorResources().String("editor.status.no_changes", "No changes to save."));
             return;
         }
         std::string body;
@@ -886,7 +899,7 @@ private:
         name.push_back(0);
         int fd = mkstemp(&name[0]);
         if (fd < 0) {
-            _Status("Save failed. Unlock System Folder and check permissions.");
+            _Status(EditorResources().String("editor.status.save_temp_failed", "Save failed. Unlock System Folder and check permissions."));
             return;
         }
         struct stat previousManifest;
@@ -906,7 +919,7 @@ private:
             success = false;
         if (!success) {
             unlink(&name[0]);
-            _Status("Could not write changes. Original resources untouched.");
+            _Status(EditorResources().String("editor.status.save_write_failed", "Could not write changes. Original resources untouched."));
             return;
         }
 
@@ -920,12 +933,15 @@ private:
             if (keptBackup)
                 rename(backup.c_str(), fPath.c_str());
             unlink(&name[0]);
-            _Status("Could not install edited resources. Original preserved.");
+            _Status(EditorResources().String("editor.status.save_install_failed", "Could not install edited resources. Original preserved."));
             return;
         }
         fDirty = false;
-        _Status(keptBackup ? "Saved with backup. Restart the edited app."
-            : "Saved. Restart the edited app.");
+        _Status(keptBackup
+            ? EditorResources().String("editor.status.saved_backup",
+                "Saved with backup. Restart the edited app.")
+            : EditorResources().String("editor.status.saved",
+                "Saved. Restart the edited app."));
     }
 
     void _Status(const std::string& text)
