@@ -2,6 +2,8 @@
 
 #include "FinderActions.h"
 #include "FileOperations.h"
+#include "OSTenResources.h"
+#include "OSTenDialogLayout.h"
 #include "OSTenMessages.h"
 
 #include <Alert.h>
@@ -12,6 +14,7 @@
 #include <Path.h>
 #include <String.h>
 #include <TextControl.h>
+#include <TextView.h>
 #include <Window.h>
 
 #include <stdio.h>
@@ -24,6 +27,7 @@ namespace {
 
 const uint32 kRenameAccept = 'osra';
 const uint32 kRenameCancel = 'osrc';
+const uint32 kInfoClose = 'osic';
 
 
 class RenameWindow : public BWindow {
@@ -32,26 +36,39 @@ public:
         :
         // Use the look/feel constructor: the window_type overload would
         // mistake our modal feel for flags and our flags for workspaces.
-        BWindow(BRect(0, 0, 390, 155), "Rename",
+        BWindow(OSTenFinderResources().Rect("dialog.rename.frame",
+                BRect(0, 0, 390, 155)),
+            OSTenFinderResources().String("dialog.rename.title", "Rename"),
             B_TITLED_WINDOW_LOOK, B_MODAL_APP_WINDOW_FEEL,
             B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE),
         fRef(ref),
-        fOwnerUnlocked(ownerUnlocked)
+        fOwnerUnlocked(ownerUnlocked), fName(NULL)
     {
+        const OSTenResourceCatalog& ui = OSTenFinderResources();
         BEntry entry(&ref, false);
         char name[B_FILE_NAME_LENGTH] = "";
         entry.GetName(name);
-        fName = new BTextControl(BRect(20, 27, 365, 57), "name",
-            "Name:", name, NULL);
-        fName->SetDivider(56);
-        AddChild(fName);
-        BButton* cancel = new BButton(BRect(185, 100, 268, 129),
-            "cancel", "Cancel", new BMessage(kRenameCancel));
-        BButton* rename = new BButton(BRect(278, 100, 370, 129),
-            "rename", "Rename", new BMessage(kRenameAccept));
-        AddChild(cancel);
-        AddChild(rename);
-        SetDefaultButton(rename);
+        // All visible controls are constructed from Finder's dialog
+        // declaration, not a compiled list of buttons and rectangles.
+        const OSTenDialogAction actions[] = {
+            {"rename.cancel", kRenameCancel},
+            {"rename.accept", kRenameAccept}
+        };
+        BView* background = new BView(Bounds(), "rename-interface",
+            B_FOLLOW_ALL, B_WILL_DRAW);
+        background->SetViewColor(ui.Color("dialog.rename.background",
+            rgb_color{239, 239, 236, 255}));
+        AddChild(background);
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            background, ui, "dialog.rename", actions,
+            sizeof(actions) / sizeof(actions[0]));
+        OSTenDialogControls::const_iterator input = controls.find("name");
+        if (input != controls.end()
+            && strcmp(ui.String("dialog.rename.control.name.type", ""),
+                "text") == 0) {
+            fName = static_cast<BTextControl*>(input->second);
+            fName->SetText(name);
+        }
         CenterOnScreen();
     }
 
@@ -62,6 +79,8 @@ public:
             return;
         }
         if (message->what == kRenameAccept) {
+            if (fName == NULL)
+                return;
             status_t error = RenameFinderEntry(fRef, fName->Text(),
                 fOwnerUnlocked);
             if (error == B_OK) {
@@ -69,16 +88,16 @@ public:
                 Quit();
                 return;
             }
-            BString details("The item could not be renamed.\n\n");
+            BString details(OSTenFinderResources().String("dialog.rename.error_intro", "The item could not be renamed.\n\n"));
             if (error == B_BAD_VALUE)
-                details << "Choose a nonempty name without slashes.";
+                details << OSTenFinderResources().String("dialog.rename.error_invalid", "Choose a nonempty name without slashes.");
             else if (error == B_PERMISSION_DENIED)
-                details << "The System Folder is locked. Unlock it first.";
+                details << OSTenFinderResources().String("dialog.rename.error_locked", "The System Folder is locked. Unlock it first.");
             else if (error == B_FILE_EXISTS)
-                details << "An item with this name already exists.";
+                details << OSTenFinderResources().String("dialog.rename.error_exists", "An item with this name already exists.");
             else
                 details << strerror(error);
-            (new BAlert("Rename", details.String(), "OK"))->Go();
+            (new BAlert(OSTenFinderResources().String("dialog.rename.title", "Rename"), details.String(), OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
             return;
         }
         BWindow::MessageReceived(message);
@@ -88,6 +107,47 @@ private:
     entry_ref fRef;
     bool fOwnerUnlocked;
     BTextControl* fName;
+};
+
+class InfoWindow : public BWindow {
+public:
+    explicit InfoWindow(const char* information)
+        : BWindow(OSTenFinderResources().Rect("dialog.info.frame",
+                BRect(130, 110, 650, 495)),
+            OSTenFinderResources().String("dialog.info.title", "Get Info"),
+            B_TITLED_WINDOW_LOOK, B_NORMAL_WINDOW_FEEL,
+            B_NOT_ZOOMABLE | B_NOT_MINIMIZABLE)
+    {
+        const OSTenResourceCatalog& ui = OSTenFinderResources();
+        BView* background = new BView(Bounds(), "info-background",
+            B_FOLLOW_ALL, B_WILL_DRAW);
+        background->SetViewColor(ui.Color("dialog.info.background",
+            rgb_color{239, 239, 236, 255}));
+        AddChild(background);
+        const OSTenDialogAction actions[] = {
+            {"info.close", kInfoClose}
+        };
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            background, ui, "dialog.info", actions,
+            sizeof(actions) / sizeof(actions[0]));
+        OSTenDialogControls::const_iterator text = controls.find("details");
+        if (text != controls.end()
+            && strcmp(ui.String("dialog.info.control.details.type", ""),
+                "text_area") == 0) {
+            BTextView* details = static_cast<BTextView*>(text->second);
+            details->SetText(information);
+        }
+        CenterOnScreen();
+    }
+
+    void MessageReceived(BMessage* message) override
+    {
+        if (message->what == kInfoClose) {
+            Quit();
+            return;
+        }
+        BWindow::MessageReceived(message);
+    }
 };
 
 } // namespace
@@ -107,26 +167,29 @@ ShowFinderInfo(const entry_ref& ref)
     BPath path;
     struct stat information;
     if (entry.GetPath(&path) != B_OK || entry.GetStat(&information) != B_OK) {
-        (new BAlert("Get Info", "Unable to read information for this item.",
-            "OK"))->Go();
+        (new InfoWindow(OSTenFinderResources().String(
+            "dialog.info.error_message",
+            "Unable to read information for this item.")))->Show();
         return;
     }
     char name[B_FILE_NAME_LENGTH];
     if (entry.GetName(name) != B_OK)
         return;
-    char modified[80] = "Unknown";
+    char modified[80];
+    snprintf(modified, sizeof(modified), "%s",
+        OSTenFinderResources().String("dialog.info.unknown", "Unknown"));
     struct tm date;
     if (localtime_r(&information.st_mtime, &date) != NULL)
         strftime(modified, sizeof(modified), "%Y-%m-%d %H:%M", &date);
     BString details;
-    details << "Name: " << name << "\n"
-        << "Kind: " << (S_ISDIR(information.st_mode) ? "Folder"
-            : S_ISLNK(information.st_mode) ? "Alias / link" : "File")
-        << "\nLocation: " << path.Path() << "\n";
+    details << OSTenFinderResources().String("dialog.info.name", "Name: ") << name << "\n"
+        << OSTenFinderResources().String("dialog.info.kind", "Kind: ") << (S_ISDIR(information.st_mode) ? OSTenFinderResources().String("dialog.info.folder", "Folder")
+            : S_ISLNK(information.st_mode) ? OSTenFinderResources().String("dialog.info.alias", "Alias / link") : OSTenFinderResources().String("dialog.info.file", "File"))
+        << OSTenFinderResources().String("dialog.info.location", "\nLocation: ") << path.Path() << "\n";
     if (S_ISREG(information.st_mode))
-        details << "Size: " << (int64)information.st_size << " bytes\n";
-    details << "Modified: " << modified;
-    (new BAlert("Get Info", details.String(), "OK"))->Go();
+        details << OSTenFinderResources().String("dialog.info.size", "Size: ") << (int64)information.st_size << OSTenFinderResources().String("dialog.info.size_suffix", " bytes\n");
+    details << OSTenFinderResources().String("dialog.info.modified", "Modified: ") << modified;
+    (new InfoWindow(details.String()))->Show();
 }
 
 
@@ -135,23 +198,22 @@ EmptyFinderTrash()
 {
     BDirectory trash("/boot/trash");
     if (trash.InitCheck() != B_OK) {
-        (new BAlert("Trash", "Trash is not available.", "OK"))->Go();
+        (new BAlert(OSTenFinderResources().String("dialog.trash.title", "Trash"), OSTenFinderResources().String("dialog.trash.unavailable", "Trash is not available."), OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
         return;
     }
     if (trash.CountEntries() == 0) {
-        (new BAlert("Trash", "Trash is already empty.", "OK"))->Go();
+        (new BAlert(OSTenFinderResources().String("dialog.trash.title", "Trash"), OSTenFinderResources().String("dialog.trash.empty", "Trash is already empty."), OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
         return;
     }
-    if ((new BAlert("Empty Trash",
-            "Permanently delete everything in Trash?\n"
-            "This action cannot be undone.", "Cancel", "Empty Trash"))->Go()
+    if ((new BAlert(OSTenFinderResources().String("dialog.trash.empty_title", "Empty Trash"),
+            OSTenFinderResources().String("dialog.trash.confirm", "Permanently delete everything in Trash?\nThis action cannot be undone."), OSTenFinderResources().String("dialog.common.cancel", "Cancel"), OSTenFinderResources().String("dialog.trash.empty_title", "Empty Trash")))->Go()
             != 1)
         return;
     status_t error = EmptyFinderDirectory(trash);
     be_app->PostMessage(kOSTenRefreshAll);
     if (error != B_OK) {
-        BString reason("Some items could not be deleted.\n\n");
+        BString reason(OSTenFinderResources().String("dialog.trash.error", "Some items could not be deleted.\n\n"));
         reason << strerror(error);
-        (new BAlert("Empty Trash", reason.String(), "OK"))->Go();
+        (new BAlert(OSTenFinderResources().String("dialog.trash.empty_title", "Empty Trash"), reason.String(), OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
     }
 }

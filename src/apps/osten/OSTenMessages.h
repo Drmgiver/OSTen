@@ -14,6 +14,7 @@ enum {
 	kOSTenViewAsList = 'osvl',
 	kOSTenFinderViewModeChanged = 'osvm',
 	kOSTenSystemFolderAccess = 'osfa',
+    kOSTenQuerySystemFolderAccess = 'osqa',
 	kOSTenRename = 'osrn',
 	kOSTenGetInfo = 'osgi',
 	kOSTenEmptyTrash = 'oset',
