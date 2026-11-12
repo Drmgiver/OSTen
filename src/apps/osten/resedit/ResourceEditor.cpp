@@ -142,8 +142,8 @@ public:
             SetHighColor(EditorResources().Color("editor.preview.hint_color",
                 rgb_color{70, 70, 70, 255}));
             DrawString(EditorResources().String("editor.preview_hint", "Select a rectangle resource to preview and drag."),
-                BPoint(EditorResources().Number("editor.preview.hint_x", 20),
-                    EditorResources().Number("editor.preview.hint_y", 37)));
+                BPoint(EditorResources().Number("editor.preview.hint_x", 20, -8192, 8192),
+                    EditorResources().Number("editor.preview.hint_y", 37, -8192, 8192)));
             return;
         }
         float maxX = std::max(fRect.right, fRect.Width());
@@ -171,11 +171,11 @@ public:
             rgb_color{15, 56, 102, 255}));
         DrawString(EditorResources().String("editor.drag_hint", "Drag to reposition"),
             BPoint(visual.left + EditorResources().Number(
-                "editor.preview.drag_x_offset", 8),
+                "editor.preview.drag_x_offset", 8, -8192, 8192),
                 std::min(visual.bottom - EditorResources().Number(
-                    "editor.preview.drag_bottom_offset", 5),
+                    "editor.preview.drag_bottom_offset", 5, -8192, 8192),
                     visual.top + EditorResources().Number(
-                        "editor.preview.drag_top_offset", 21))));
+                        "editor.preview.drag_top_offset", 21, -8192, 8192))));
     }
 
     void MouseDown(BPoint where) override
