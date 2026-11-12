@@ -18,6 +18,7 @@
 #include <Messenger.h>
 #include "OSTenMessages.h"
 #include "OSTenResources.h"
+#include "OSTenDialogLayout.h"
 #include "OSTenResourceIndex.h"
 #include "OSTenGlobalMenu.h"
 #include "ResourceBrowser.h"
@@ -138,9 +139,11 @@ public:
         SetHighColor(EditorResources().Color("editor.preview_border", rgb_color{210, 210, 210, 255}));
         StrokeRect(Bounds().InsetByCopy(1, 1));
         if (!fValid) {
-            SetHighColor(70, 70, 70);
+            SetHighColor(EditorResources().Color("editor.preview.hint_color",
+                rgb_color{70, 70, 70, 255}));
             DrawString(EditorResources().String("editor.preview_hint", "Select a rectangle resource to preview and drag."),
-                BPoint(20, 37));
+                BPoint(EditorResources().Number("editor.preview.hint_x", 20),
+                    EditorResources().Number("editor.preview.hint_y", 37)));
             return;
         }
         float maxX = std::max(fRect.right, fRect.Width());
@@ -164,9 +167,15 @@ public:
         SetPenSize(2);
         StrokeRect(visual);
         SetPenSize(1);
-        SetHighColor(15, 56, 102);
-        DrawString(EditorResources().String("editor.drag_hint", "Drag to reposition"), BPoint(visual.left + 8,
-            std::min(visual.bottom - 5, visual.top + 21)));
+        SetHighColor(EditorResources().Color("editor.preview.drag_text_color",
+            rgb_color{15, 56, 102, 255}));
+        DrawString(EditorResources().String("editor.drag_hint", "Drag to reposition"),
+            BPoint(visual.left + EditorResources().Number(
+                "editor.preview.drag_x_offset", 8),
+                std::min(visual.bottom - EditorResources().Number(
+                    "editor.preview.drag_bottom_offset", 5),
+                    visual.top + EditorResources().Number(
+                        "editor.preview.drag_top_offset", 21))));
     }
 
     void MouseDown(BPoint where) override
@@ -213,6 +222,38 @@ private:
     float fScale;
 };
 
+// The classic property inspector is itself a composed, Owner-editable
+// interface. Custom widgets are registered factories, not hardcoded
+// layout rules or special cases inside the common dialog engine.
+static BView*
+CreateResourceArtworkMenu(BRect frame, const char* id,
+    const char* label, uint32, const OSTenResourceCatalog& catalog,
+    const std::string&)
+{
+    return new BMenuField(frame, id, label,
+        new BPopUpMenu(catalog.String("editor.artwork_menu_title", "Artwork")));
+}
+
+static BView*
+CreateResourceRectanglePreview(BRect frame, const char*,
+    const char*, uint32, const OSTenResourceCatalog&, const std::string&)
+{
+    return new RectanglePreview(frame);
+}
+
+template<typename T>
+static T*
+PropertyControl(const OSTenDialogControls& controls, const char* id,
+    const char* expectedType)
+{
+    const std::string key = std::string("editor.inspector.control.") + id
+        + ".type";
+    if (strcmp(EditorResources().String(key.c_str(), ""), expectedType) != 0)
+        return NULL;
+    OSTenDialogControls::const_iterator found = controls.find(id);
+    return found == controls.end() ? NULL : static_cast<T*>(found->second);
+}
+
 class EditorWindow : public BWindow {
 public:
     EditorWindow(const std::string& resourceFile = "",
@@ -222,7 +263,9 @@ public:
                 BRect(70, 65, 1025, 700)),
             EditorResources().String("editor.title", "OSTen Resource Editor"),
             B_TITLED_WINDOW, B_NORMAL_WINDOW_FEEL, 0),
-        fDirty(false), fSelection(-1), fAssetIndex(-1), fPicker(NULL),
+        fKeys(NULL), fOrder(NULL), fKey(NULL), fValue(NULL),
+        fPreview(NULL), fStatus(NULL), fDirty(false),
+        fSelection(-1), fAssetIndex(-1), fPicker(NULL),
         fTargetPicker(NULL), fAssetMenu(NULL), fArtImport(NULL),
         fArtUndo(NULL), fCurrentTarget(NULL)
     {
@@ -232,74 +275,54 @@ public:
             rgb_color{237, 237, 233, 255}));
         AddChild(background);
 
-        background->AddChild(new BButton(EditorResources().Rect(
-                "editor.geometry.01", BRect(14, 11, 112, 40)),
-            "open", EditorResources().String("editor.open", "Open..."),
-            new BMessage(kChooseTarget)));
-        fCurrentTarget = new BStringView(EditorResources().Rect(
-                "editor.geometry.current", BRect(125, 11, 610, 40)),
-            "current_target", EditorResources().String(
-                "editor.no_file", "No resource file open"));
-        background->AddChild(fCurrentTarget);
-        background->AddChild(new BButton(EditorResources().Rect(
-                "editor.geometry.undo_save", BRect(624, 11, 727, 40)),
-            "undo_save", EditorResources().String(
-                "editor.undo_save", "Undo Save"), new BMessage(kUndoSave)));
-        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.03", BRect(734, 11, 835, 40)),
-            "discard", EditorResources().String("editor.revert", "Revert"), new BMessage(kDiscard)));
-        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.04", BRect(844, 11, 942, 40)),
-            "save", EditorResources().String("editor.save", "Save"), new BMessage(kSave)));
-
-        fKeys = new BListView(EditorResources().Rect("editor.geometry.05", BRect(14, 65, 318, 567)),
-            "Resource keys", B_SINGLE_SELECTION_LIST);
-        fKeys->SetSelectionMessage(new BMessage(kSelected));
-        background->AddChild(new BScrollView("Resource list", fKeys,
-            B_FOLLOW_LEFT | B_FOLLOW_TOP_BOTTOM, 0, false, true));
-
-        background->AddChild(new BStringView(EditorResources().Rect("editor.geometry.06", BRect(339, 52, 935, 74)),
-            "hint", EditorResources().String("editor.property_hint", "Select a resource. Apply edits, then Save.")));
-        fKey = new BTextControl(EditorResources().Rect("editor.geometry.07", BRect(339, 80, 941, 108)),
-            "key", EditorResources().String("editor.key", "Key:"), "", NULL);
-        fKey->SetDivider(75);
-        background->AddChild(fKey);
-        fValue = new BTextControl(EditorResources().Rect("editor.geometry.08", BRect(339, 116, 941, 148)),
-            "value", EditorResources().String("editor.value", "Value:"), "", NULL);
-        fValue->SetDivider(75);
-        background->AddChild(fValue);
-        fAssetMenu = new BPopUpMenu("Artwork");
-        BMenuField* assets = new BMenuField(EditorResources().Rect(
-                "editor.geometry.09", BRect(339, 155, 626, 189)),
-            "artwork", EditorResources().String("editor.artwork", "Artwork:"), fAssetMenu);
-        assets->SetDivider(75);
-        background->AddChild(assets);
-        fArtImport = new BButton(EditorResources().Rect(
-                "editor.geometry.10", BRect(639, 156, 735, 186)),
-            "import", EditorResources().String("editor.import", "Import..."),
-            new BMessage(kImportGraphic));
-        background->AddChild(fArtImport);
-        fArtUndo = new BButton(EditorResources().Rect(
-                "editor.geometry.undo_graphic", BRect(743, 156, 834, 186)),
-            "undo_graphic", EditorResources().String(
-                "editor.undo_graphic", "Undo Art"), new BMessage(kUndoGraphic));
-        background->AddChild(fArtUndo);
-        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.11", BRect(842, 156, 942, 186)),
-            "apply", EditorResources().String("editor.apply", "Apply"), new BMessage(kApply)));
-
-        fPreview = new RectanglePreview(EditorResources().Rect("editor.geometry.12", BRect(339, 202, 941, 445)));
-        background->AddChild(fPreview);
-        background->AddChild(new BStringView(EditorResources().Rect("editor.geometry.13", BRect(342, 456, 923, 480)),
-            "ordering", EditorResources().String("editor.order_hint", "Menu or module order (select an item to move it):")));
-        fOrder = new BListView(EditorResources().Rect("editor.geometry.14", BRect(339, 485, 752, 566)),
-            "Order", B_SINGLE_SELECTION_LIST);
-        background->AddChild(new BScrollView("Order list", fOrder,
-            B_FOLLOW_LEFT_TOP, 0, false, true));
-        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.15", BRect(771, 493, 853, 522)),
-            "up", EditorResources().String("editor.up", "Up"), new BMessage(kMoveUp)));
-        background->AddChild(new BButton(EditorResources().Rect("editor.geometry.16", BRect(771, 530, 853, 559)),
-            "down", EditorResources().String("editor.down", "Down"), new BMessage(kMoveDown)));
-        fStatus = new BStringView(EditorResources().Rect("editor.geometry.17", BRect(14, 587, 940, 614)),
-            "status", EditorResources().String("editor.status_no_resource", "Choose a resource set."));
-        background->AddChild(fStatus);
+        const OSTenDialogAction actions[] = {
+            {"inspector.open", kChooseTarget},
+            {"inspector.undo_save", kUndoSave},
+            {"inspector.revert", kDiscard},
+            {"inspector.save", kSave},
+            {"inspector.selected", kSelected},
+            {"inspector.import", kImportGraphic},
+            {"inspector.undo_art", kUndoGraphic},
+            {"inspector.apply", kApply},
+            {"inspector.up", kMoveUp},
+            {"inspector.down", kMoveDown}
+        };
+        OSTenDialogControlFactories factories;
+        factories["artwork_menu"] = &CreateResourceArtworkMenu;
+        factories["rectangle_preview"] = &CreateResourceRectanglePreview;
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            background, EditorResources(), "editor.inspector",
+            actions, sizeof(actions) / sizeof(actions[0]), &factories);
+        fKeys = PropertyControl<BListView>(controls, "keys", "list");
+        fOrder = PropertyControl<BListView>(controls, "order", "list");
+        fKey = PropertyControl<BTextControl>(controls, "key", "text");
+        fValue = PropertyControl<BTextControl>(controls, "value", "text");
+        fCurrentTarget = PropertyControl<BStringView>(
+            controls, "current_target", "label");
+        fPreview = PropertyControl<RectanglePreview>(
+            controls, "preview", "rectangle_preview");
+        fStatus = PropertyControl<BStringView>(controls, "status", "label");
+        fArtImport = PropertyControl<BButton>(controls, "import", "button");
+        fArtUndo = PropertyControl<BButton>(controls, "undo_art", "button");
+        BMenuField* artwork = PropertyControl<BMenuField>(
+            controls, "artwork", "artwork_menu");
+        fAssetMenu = artwork == NULL ? NULL
+            : static_cast<BPopUpMenu*>(artwork->Menu());
+        if (fKeys != NULL)
+            fKeys->SetSelectionMessage(new BMessage(kSelected));
+        if (fKey != NULL) fKey->SetDivider(75);
+        if (fValue != NULL) fValue->SetDivider(75);
+        if (artwork != NULL) artwork->SetDivider(75);
+        // The Owner can delete or change any control. No silent restore:
+        // the inspector simply omits operations whose essential widgets
+        // were intentionally removed, instead of dereferencing bad types.
+        if (!_HasRequiredControls()) {
+            // An Owner-edited partial interface still opens as authored.
+            // Missing required controls disable editing rather than
+            // resurrecting controls that the Owner intentionally removed.
+            Show();
+            return;
+        }
         _RefreshAssets();
         Show();
         if (!resourceFile.empty()) {
@@ -326,6 +349,10 @@ public:
 
     void MessageReceived(BMessage* message) override
     {
+        if (!_HasRequiredControls()) {
+            BWindow::MessageReceived(message);
+            return;
+        }
         switch (message->what) {
             case kChooseTarget: _ChooseTarget(); return;
             case kTargetChosen: {
@@ -388,6 +415,15 @@ public:
     }
 
 private:
+    bool _HasRequiredControls() const
+    {
+        return fKeys != NULL && fOrder != NULL && fKey != NULL
+            && fValue != NULL && fPreview != NULL
+            && fStatus != NULL && fCurrentTarget != NULL
+            && fAssetMenu != NULL && fArtImport != NULL
+            && fArtUndo != NULL;
+    }
+
     void _ChooseTarget()
     {
         if (fTargetPicker == NULL) {

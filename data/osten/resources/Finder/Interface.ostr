@@ -199,3 +199,7 @@ dialog.info.control.close.caption_key=dialog.info.close
 dialog.info.control.close.action=info.close
 dialog.info.control.close.default=1
 dialog.info.close=Close
+
+# Additional Owner-editable native messages and display format strings
+dialog.system_folder_access.open_failed=Cannot open the System Folder. It remains locked.
+dialog.system_folder_access.locked_again=The System Folder is locked again.

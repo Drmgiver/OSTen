@@ -378,10 +378,10 @@ public:
 			BMessenger deskbar("application/x-vnd.Be-TSKB");
 			BMessage query('osdq');
 			BMessage reply;
-			BString report("Native Deskbar System Tray\n\n");
+			BString report(OSTenSystemResources().String("diagnostics.tray.heading", "Native Deskbar System Tray\n\n"));
 			status_t error = deskbar.SendMessage(&query, &reply, 500000, 500000);
 			if (error != B_OK) {
-				report << "Deskbar did not respond: " << strerror(error);
+				report << OSTenSystemResources().String("diagnostics.tray.no_response", "Deskbar did not respond: ") << strerror(error);
 			} else {
 				bool hosted = false;
 				int32 count = -1, attempts = 0, result = B_ERROR;
@@ -389,47 +389,47 @@ public:
 				reply.FindInt32("count", &count);
 				reply.FindInt32("attempts", &attempts);
 				reply.FindInt32("result", &result);
-				report << "OSTen host active: " << (hosted ? "Yes" : "No")
-					<< "\nReplicants: " << count
-					<< "\nRegistration attempts: " << attempts
-					<< "\nLast attempt: ";
+				report << OSTenSystemResources().String("diagnostics.tray.host_active", "OSTen host active: ") << (hosted ? OSTenSystemResources().String("diagnostics.tray.yes", "Yes") : OSTenSystemResources().String("diagnostics.tray.no", "No"))
+					<< OSTenSystemResources().String("diagnostics.tray.replicants", "\nReplicants: ") << count
+					<< OSTenSystemResources().String("diagnostics.tray.registration_attempts", "\nRegistration attempts: ") << attempts
+					<< OSTenSystemResources().String("diagnostics.tray.last_attempt", "\nLast attempt: ");
 				if (attempts == 0)
-					report << "None observed";
+					report << OSTenSystemResources().String("diagnostics.tray.none", "None observed");
 				else if (result == B_OK)
-					report << "Accepted";
+					report << OSTenSystemResources().String("diagnostics.tray.accepted", "Accepted");
 				else
-					report << "Failed / incomplete (" << result << ")";
+					report << OSTenSystemResources().String("diagnostics.tray.failed", "Failed / incomplete (") << result << ")";
 			}
 			if (error == B_OK) {
 				bool value = false;
 				BRect frame;
 				BPoint point;
 				if (reply.FindBool("window_hidden", &value) == B_OK)
-					report << "\nWindow hidden: " << (value ? "Yes" : "No");
+					report << OSTenSystemResources().String("diagnostics.tray.window_hidden", "\nWindow hidden: ") << (value ? OSTenSystemResources().String("diagnostics.tray.yes", "Yes") : OSTenSystemResources().String("diagnostics.tray.no", "No"));
 				if (reply.FindRect("window_frame", &frame) == B_OK)
-					report << "\nWindow at: " << (int)frame.left << ", "
-						<< (int)frame.top << " size " << (int)frame.Width()
+					report << OSTenSystemResources().String("diagnostics.tray.window_at", "\nWindow at: ") << (int)frame.left << ", "
+						<< (int)frame.top << OSTenSystemResources().String("diagnostics.tray.size", " size ") << (int)frame.Width()
 						<< "x" << (int)frame.Height();
 				if (reply.FindBool("parent_present", &value) == B_OK)
-					report << "\nTray has parent: " << (value ? "Yes" : "No");
+					report << OSTenSystemResources().String("diagnostics.tray.parent_present", "\nTray has parent: ") << (value ? OSTenSystemResources().String("diagnostics.tray.yes", "Yes") : OSTenSystemResources().String("diagnostics.tray.no", "No"));
 				if (reply.FindBool("parent_hidden", &value) == B_OK)
-					report << "\nParent hidden: " << (value ? "Yes" : "No");
+					report << OSTenSystemResources().String("diagnostics.tray.parent_hidden", "\nParent hidden: ") << (value ? OSTenSystemResources().String("diagnostics.tray.yes", "Yes") : OSTenSystemResources().String("diagnostics.tray.no", "No"));
 				if (reply.FindBool("tray_hidden", &value) == B_OK)
-					report << "\nTray hidden: " << (value ? "Yes" : "No");
+					report << OSTenSystemResources().String("diagnostics.tray.tray_hidden", "\nTray hidden: ") << (value ? OSTenSystemResources().String("diagnostics.tray.yes", "Yes") : OSTenSystemResources().String("diagnostics.tray.no", "No"));
 				if (reply.FindRect("tray_frame", &frame) == B_OK)
-					report << "\nTray frame: " << (int)frame.left << ", "
+					report << OSTenSystemResources().String("diagnostics.tray.tray_frame", "\nTray frame: ") << (int)frame.left << ", "
 						<< (int)frame.top << " " << (int)frame.Width()
 						<< "x" << (int)frame.Height();
 				if (reply.FindBool("replicant_hidden", &value) == B_OK)
-					report << "\nReplicant hidden: " << (value ? "Yes" : "No");
+					report << OSTenSystemResources().String("diagnostics.tray.replicant_hidden", "\nReplicant hidden: ") << (value ? OSTenSystemResources().String("diagnostics.tray.yes", "Yes") : OSTenSystemResources().String("diagnostics.tray.no", "No"));
 				else
-					report << "\nReplicant child: Not found";
+					report << OSTenSystemResources().String("diagnostics.tray.replicant_not_found", "\nReplicant child: Not found");
 				if (reply.FindRect("replicant_frame", &frame) == B_OK)
-					report << "\nReplicant frame: " << (int)frame.left << ", "
+					report << OSTenSystemResources().String("diagnostics.tray.replicant_frame", "\nReplicant frame: ") << (int)frame.left << ", "
 						<< (int)frame.top << " " << (int)frame.Width()
 						<< "x" << (int)frame.Height();
 				if (reply.FindPoint("replicant_screen", &point) == B_OK)
-					report << "\nReplicant screen: " << (int)point.x
+					report << OSTenSystemResources().String("diagnostics.tray.replicant_screen", "\nReplicant screen: ") << (int)point.x
 						<< ", " << (int)point.y;
 			}
 			(new BAlert(OSTenSystemResources().String("dialog.tray_diagnostics.title",

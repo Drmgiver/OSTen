@@ -286,3 +286,34 @@ on application restart. Large windows may extend beyond the current
 preview canvas; scrolling and whole-window live preview are still
 future improvements. Full conformance requires conversion of all
 remaining native C++-defined windows.
+
+## Legacy Resource Editor inspector composition and cross-component text (November 12, 2026)
+
+The older Resource Editor property inspector is now instantiated through
+`OSTenCreateDialogControls` rather than a fixed constructor full of
+BButton/BStringView/BTextControl view layouts. Its 19 visible controls are
+declared in `editor.inspector.controls` with stable resource identifiers,
+types, frames, captions and action bindings. The existing artwork menu
+and rectangle-preview canvas are registered custom widget factories,
+available to the same loader that powers native Finder dialogs.
+
+The Owner can now open `editor.inspector.controls` in ResEdit's layout
+designer and remove, reorder, resize or replace its controls without
+recompiling the inspector. Expected types are verified before casts.
+If a required widget is intentionally absent, the modified window still
+appears but editing operations are disabled rather than dereferencing
+the missing widget. This is an implementation reliability constraint,
+not a developer-enforced prohibition on changes.
+
+Additional Finder System Folder access/error messages and inline rename
+diagnostics now load from Finder resources. System's notification detail
+strings, list formatting and 22 native tray diagnostics fields now
+load from System resources. The catalog indexes cover these additions.
+ResEdit preview instruction colors and positions are also Owner-editable.
+
+**Remaining blockers:** universal conversion of Finder windows, System
+About/Control Strip rendering and menus, ResEdit's pixel/menu/color
+editors and painter internals; format-specific vector/audio/cursor
+editing; cross-file atomicity between manifest/index when adding keys;
+and actual interaction testing after boot. Compilation alone never
+certifies the standard.

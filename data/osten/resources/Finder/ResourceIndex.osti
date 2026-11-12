@@ -192,3 +192,5 @@ OSTEN-RESOURCE-INDEX/1
 0xf43cadc8|DLOG|dialog.info.control.close.action|dialog.info.control.close.action|0|0
 0xcf7aa757|DLOG|dialog.info.control.close.default|dialog.info.control.close.default|0|0
 0x244704bf|DLOG|dialog.info.close|dialog.info.close|0|0
+0xbcccffde|TEXT|dialog.system_folder_access.open_failed|dialog.system_folder_access.open_failed|0|0
+0x5cba4247|TEXT|dialog.system_folder_access.locked_again|dialog.system_folder_access.locked_again|0|0

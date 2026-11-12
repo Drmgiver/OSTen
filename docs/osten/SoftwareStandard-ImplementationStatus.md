@@ -222,3 +222,22 @@ on application restart. Large windows may extend beyond the current
 preview canvas; scrolling and whole-window live preview are still
 future improvements. Full conformance requires conversion of all
 remaining native C++-defined windows.
+
+## Core inspector migration (November 12, 2026)
+
+The legacy ResEdit property inspector is now a composed native window
+whose 19 controls—including custom artwork and rectangle widgets—are
+read through `editor.inspector.controls`, not hardcoded into the
+constructor. Its own captions, action IDs, geometry and selection model
+are represented in `Interface.ostr` and the public index. The
+composed-dialog validator includes this inspector and discovers its
+registered custom control factories.
+
+Finder's remaining identified System Folder access messages and inline
+rename errors, plus System's notification text/formatting and tray
+diagnostic report labels, have been migrated to resource entries.
+The index and manifest must remain consistent after these conversions.
+
+The release remains a **partial compliance implementation**, not
+a successful full-standard certification. The audited gaps remain
+tracked in [NativeComplianceAudit.md](NativeComplianceAudit.md).

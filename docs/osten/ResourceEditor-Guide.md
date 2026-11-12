@@ -244,3 +244,22 @@ press Apply for numeric editing. Save writes the associated native
 window frame resource alongside the control definitions. System
 notification windows use an explicit frame-key alias because their
 screen-relative resource is named separately.
+
+## Editable classic property-inspector interface (November 12, 2026)
+
+The classic property inspector now uses `editor.inspector.controls` in
+ResEdit's own visible catalog. Select that `DLOG` resource in the
+new browser to edit all 19 currently declared controls, including
+their labels, types, order and frames. The artwork dropdown and
+rectangle preview are registered native widget factories, not
+hardcoded resource exceptions. A native application may register
+its own widget factories with the public composed-control API.
+
+Deleting an essential control doesn't make ResEdit secretly
+reintroduce it on restart. The edited window appears as defined,
+and actions that require absent controls are disabled rather than
+crashing. An Owner may restore the control or edit the catalog
+through another copy of ResEdit.
+
+The preview hint and drag-label colors and offsets are also resources.
+No compulsory backup or repair mechanism is introduced.

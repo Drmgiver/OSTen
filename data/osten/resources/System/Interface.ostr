@@ -246,3 +246,34 @@ notification.center.control.test.action=notices.test
 strip.module.settings_id=6
 strip.module.summary_fallback=Module has no description.
 notification.center.window_frame_key=notification.window_frame
+
+# Additional Owner-editable native messages and display format strings
+notification.details_empty=No additional details.
+notification.time_format=%I:%M %p
+notification.time_title_separator=  
+notification.title_content_separator= - 
+notification.empty=No notifications yet.
+
+# Owner-editable System tray diagnostics report fields
+diagnostics.tray.heading=Native Deskbar System Tray\n\n
+diagnostics.tray.no_response=Deskbar did not respond: 
+diagnostics.tray.host_active=OSTen host active: 
+diagnostics.tray.yes=Yes
+diagnostics.tray.no=No
+diagnostics.tray.replicants=\nReplicants: 
+diagnostics.tray.registration_attempts=\nRegistration attempts: 
+diagnostics.tray.last_attempt=\nLast attempt: 
+diagnostics.tray.none=None observed
+diagnostics.tray.accepted=Accepted
+diagnostics.tray.failed=Failed / incomplete (
+diagnostics.tray.window_hidden=\nWindow hidden: 
+diagnostics.tray.window_at=\nWindow at: 
+diagnostics.tray.size= size 
+diagnostics.tray.parent_present=\nTray has parent: 
+diagnostics.tray.parent_hidden=\nParent hidden: 
+diagnostics.tray.tray_hidden=\nTray hidden: 
+diagnostics.tray.tray_frame=\nTray frame: 
+diagnostics.tray.replicant_hidden=\nReplicant hidden: 
+diagnostics.tray.replicant_not_found=\nReplicant child: Not found
+diagnostics.tray.replicant_frame=\nReplicant frame: 
+diagnostics.tray.replicant_screen=\nReplicant screen: 

@@ -455,8 +455,11 @@ public:
             if (index >= 0 && (size_t)index < fDisplayed.size()) {
                 const OSTenNotice& n = fDisplayed[index];
                 (new BAlert(n.title.String(),
-                    n.content.IsEmpty() ? "No additional details."
-                    : n.content.String(), "OK"))->Go(NULL);
+                    n.content.IsEmpty()
+                        ? OSTenSystemResources().String("notification.details_empty",
+                            "No additional details.")
+                        : n.content.String(),
+                    OSTenSystemResources().String("dialog.ok", "OK")))->Go(NULL);
             }
             return;
         }
@@ -475,15 +478,21 @@ public:
             struct tm local;
             localtime_r(&n.when, &local);
             char when[32];
-            strftime(when, sizeof(when), "%I:%M %p", &local);
+            strftime(when, sizeof(when),
+                OSTenSystemResources().String("notification.time_format",
+                    "%I:%M %p"), &local);
             BString text(when);
-            text << "  " << n.title;
+            text << OSTenSystemResources().String(
+                "notification.time_title_separator", "  ") << n.title;
             if (!n.content.IsEmpty())
-                text << " - " << n.content;
+                text << OSTenSystemResources().String(
+                    "notification.title_content_separator", " - ")
+                    << n.content;
             fList->AddItem(new BStringItem(text.String()));
         }
         if (fDisplayed.empty()) {
-            BStringItem* empty = new BStringItem("No notifications yet.");
+            BStringItem* empty = new BStringItem(OSTenSystemResources().String(
+                "notification.empty", "No notifications yet."));
             empty->SetEnabled(false);
             fList->AddItem(empty);
         }

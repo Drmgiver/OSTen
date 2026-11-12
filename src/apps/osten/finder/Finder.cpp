@@ -320,7 +320,7 @@ TransferEntries(const BMessage* message, const entry_ref& targetRef,
 			explanation << OSTenFinderResources().String("dialog.transfer.recovery", "\n\nFiles were kept for recovery in:\n")
 				<< recoveryPath;
 		}
-		(new BAlert(OSTenFinderResources().String("dialog.finder.title", "Finder"), explanation.String(), "OK"))->Go();
+		(new BAlert(OSTenFinderResources().String("dialog.finder.title", "Finder"), explanation.String(), OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
 	}
 	be_app->PostMessage(kFinderRefreshAll);
 }
@@ -900,14 +900,14 @@ private:
         if (error != B_OK) {
             BString details("The item could not be renamed.\n\n");
             if (error == B_BAD_VALUE)
-                details << "Choose a nonempty name without slashes.";
+                details << OSTenFinderResources().String("dialog.rename.error_invalid", "Choose a nonempty name without slashes.");
             else if (error == B_PERMISSION_DENIED)
-                details << "The System Folder is locked. Unlock it first.";
+                details << OSTenFinderResources().String("dialog.rename.error_locked", "The System Folder is locked. Unlock it first.");
             else if (error == B_FILE_EXISTS)
-                details << "An item with this name already exists.";
+                details << OSTenFinderResources().String("dialog.rename.error_exists", "An item with this name already exists.");
             else
                 details << strerror(error);
-            (new BAlert(OSTenFinderResources().String("dialog.rename.title", "Rename"), details.String(), "OK"))->Go();
+            (new BAlert(OSTenFinderResources().String("dialog.rename.title", "Rename"), details.String(), OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
             Refresh(previous.String());
             return;
         }
@@ -1940,7 +1940,7 @@ private:
 			&& current.GetPath(&currentPath) == B_OK
 			&& IsOSTenSystemFolderPath(currentPath)) {
 			(new BAlert(OSTenFinderResources().String("dialog.folder.locked_title", "System Folder"),
-				OSTenFinderResources().String("dialog.folder.locked", "The System Folder is locked. Use Special > System Folder Access... to unlock it."), "OK"))->Go();
+				OSTenFinderResources().String("dialog.folder.locked", "The System Folder is locked. Use Special > System Folder Access... to unlock it."), OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
 			return;
 		}
 		BDirectory directory(&fDirectory);
@@ -1954,7 +1954,7 @@ private:
 			fView->Refresh(name.String());
 		else {
 			(new BAlert(OSTenFinderResources().String("dialog.folder.new_title", "New Folder"), OSTenFinderResources().String("dialog.folder.create_failed", "The folder could not be created."),
-				"OK"))->Go();
+				OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
 		}
 	}
 
@@ -2084,7 +2084,7 @@ OpenFinderEntry(const entry_ref& ref, int32 depth)
         if (error != B_OK) {
             BString reason(OSTenFinderResources().String("dialog.open.failed", "The file could not be opened.\n\n"));
             reason << strerror(error);
-            (new BAlert(OSTenFinderResources().String("dialog.finder.title", "Finder"), reason.String(), "OK"))->Go();
+            (new BAlert(OSTenFinderResources().String("dialog.finder.title", "Finder"), reason.String(), OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
         }
     }
 }
@@ -2498,7 +2498,7 @@ private:
             fFolderView->Refresh(name.String());
         else
             (new BAlert(OSTenFinderResources().String("dialog.folder.new_title", "New Folder"), OSTenFinderResources().String("dialog.folder.create_failed", "The folder could not be created."),
-                "OK"))->Go();
+                OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
     }
 
 	DesktopView* fView;
@@ -2587,9 +2587,12 @@ public:
 					entry_ref ref;
 					if (folder.InitCheck() != B_OK || !folder.IsDirectory()
 						|| folder.GetRef(&ref) != B_OK) {
-						(new BAlert("System Folder Access",
-							"Cannot open the System Folder. It remains locked.",
-							"OK"))->Go();
+						(new BAlert(OSTenFinderResources().String(
+                                "dialog.system_folder_access.title", "System Folder Access"),
+                            OSTenFinderResources().String(
+                                "dialog.system_folder_access.open_failed",
+                                "Cannot open the System Folder. It remains locked."),
+                            OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
 						return;
 					}
 					sSystemFolderUnlocked.store(true);
@@ -2608,8 +2611,12 @@ public:
                     ui.String("dialog.system_folder_access.lock_button", "Lock"));
 				if (dialog->Go() == 1) {
 					sSystemFolderUnlocked.store(false);
-					(new BAlert("System Folder Access",
-						"The System Folder is locked again.", "OK"))->Go();
+					(new BAlert(OSTenFinderResources().String(
+                            "dialog.system_folder_access.title", "System Folder Access"),
+                        OSTenFinderResources().String(
+                            "dialog.system_folder_access.locked_again",
+                            "The System Folder is locked again."),
+                        OSTenFinderResources().String("dialog.common.ok", "OK")))->Go();
 				}
 			}
 			return;

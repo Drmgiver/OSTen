@@ -752,7 +752,20 @@ IndexNewResourceKeys(const ResourceEntry& parent,
             return false;
         char number[20];
         snprintf(number, sizeof(number), "0x%08lx", (unsigned long)id);
-        body += std::string(number) + "|" + parent.type + "|"
+        // Index each new field by its actual role, not by the type of
+        // its parent dialog. Newly authored control frames are layouts;
+        // captions and action bindings are normal editable text.
+        std::string type = "TEXT";
+        if (EndsWith(it->first, ".frame") || EndsWith(it->first, ".frame_key")
+            || EndsWith(it->first, ".window_frame_key"))
+            type = "WLAY";
+        else if (EndsWith(it->first, ".controls"))
+            type = "DLOG";
+        else if (EndsWith(it->first, ".background"))
+            type = "COLR";
+        else if (EndsWith(it->first, ".order"))
+            type = "MENU";
+        body += std::string(number) + "|" + type + "|"
             + it->first + "|" + it->first + "|0|0\n";
     }
     std::string temporary = indexPath + ".tmp.XXXXXX";
