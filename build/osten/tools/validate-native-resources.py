@@ -243,6 +243,7 @@ def main() -> int:
     validate_composed_dialog("Finder", "dialog.rename")
     validate_composed_dialog("Finder", "dialog.info")
     validate_composed_dialog("System", "notification.center")
+    validate_composed_dialog("System", "about")
     validate_composed_dialog("ResourceEditor", "browser.types")
     validate_composed_dialog("ResourceEditor", "browser.entries")
     validate_composed_dialog("ResourceEditor", "editor.inspector")

@@ -25,6 +25,7 @@
 
 #include "AboutComputer.h"
 #include "OSTenResources.h"
+#include "OSTenDialogLayout.h"
 #include "OSTenAboutWordmark.h"
 
 
@@ -449,14 +450,15 @@ public:
         fOverview = new AboutOverviewView(frame);
         AddChild(fOverview);
 
-        fList = new BListView(OSTenSystemResources().Rect(
-                "about.app_list_frame", BRect(19, 296, 542, 497)),
-            "Running applications", B_SINGLE_SELECTION_LIST,
-            B_FOLLOW_LEFT_TOP);
-        fList->SetViewColor(kWhite);
-        BScrollView* listScroller = new BScrollView("Application memory",
-            fList, B_FOLLOW_LEFT_TOP, 0, false, true);
-        fOverview->AddChild(listScroller);
+        // Running-applications list is a resource-defined native control,
+        // not a compiled-in rectangle or mandatory widget.
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            fOverview, OSTenSystemResources(), "about", NULL, 0);
+        OSTenDialogControls::const_iterator list = controls.find("apps");
+        if (list != controls.end()
+            && strcmp(OSTenSystemResources().String(
+                "about.control.apps.type", ""), "list") == 0)
+            fList = static_cast<BListView*>(list->second);
 
         _Refresh();
         BMessage refresh(kRefreshAbout);
@@ -467,9 +469,11 @@ public:
     ~AboutComputerWindow() override
     {
         delete fRefreshRunner;
-        for (int32 i = 0; i < fList->CountItems(); ++i)
-            delete fList->ItemAt(i);
-        fList->MakeEmpty();
+        if (fList != NULL) {
+            for (int32 i = 0; i < fList->CountItems(); ++i)
+                delete fList->ItemAt(i);
+            fList->MakeEmpty();
+        }
     }
 
     void MessageReceived(BMessage* message) override
@@ -492,6 +496,8 @@ private:
         system_info info;
         fOverview->SetSystemInfo(get_system_info(&info) == B_OK
             ? &info : NULL);
+        if (fList == NULL)
+            return; // Owner removed/retyped the list: the rest still works.
 
         std::vector<ApplicationUsage> apps = RunningApplications();
         uint64 largest = 0;

@@ -252,3 +252,7 @@ OSTEN-RESOURCE-INDEX/1
 0xfe64d465|TEXT|diagnostics.tray.replicant_not_found|diagnostics.tray.replicant_not_found|0|0
 0x2699930a|TEXT|diagnostics.tray.replicant_frame|diagnostics.tray.replicant_frame|0|0
 0xb1cdf49d|TEXT|diagnostics.tray.replicant_screen|diagnostics.tray.replicant_screen|0|0
+0xd6e04b19|DLOG|about.controls|about.controls|0|0
+0x2d88e888|TEXT|about.control.apps.type|about.control.apps.type|0|0
+0x8e5ce76d|WLAY|about.control.apps.frame_key|about.control.apps.frame_key|0|0
+0x3cf70504|COLR|about.control.apps.background|about.control.apps.background|0|0

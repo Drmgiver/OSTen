@@ -317,3 +317,19 @@ editors and painter internals; format-specific vector/audio/cursor
 editing; cross-file atomicity between manifest/index when adding keys;
 and actual interaction testing after boot. Compilation alone never
 certifies the standard.
+
+## About This Computer native control composition (November 12, 2026)
+
+System's running-application list in About This Computer is now declared
+through `about.controls` with a typed `list`, a frame-key alias to
+`about.app_list_frame`, and a resource-defined background. The
+`AboutComputerWindow` requests the view from the universal native
+control loader instead of constructing a list and its scroll view
+directly in C++. It checks the declared type before casting; removing
+or retyping the list leaves the rest of the About view usable rather
+than crashing.
+
+The native-resource preflight now validates the About control schema.
+The overview's custom-drawn statistics, memory visualization and
+wordmark still require complete independent resource composition and
+graphics editing to meet every aspect of the standard.

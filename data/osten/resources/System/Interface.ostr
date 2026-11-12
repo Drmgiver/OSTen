@@ -276,4 +276,10 @@ diagnostics.tray.tray_frame=\nTray frame:
 diagnostics.tray.replicant_hidden=\nReplicant hidden: 
 diagnostics.tray.replicant_not_found=\nReplicant child: Not found
 diagnostics.tray.replicant_frame=\nReplicant frame: 
-diagnostics.tray.replicant_screen=\nReplicant screen: 
+diagnostics.tray.replicant_screen=\nReplicant screen:
+
+# Native About window application list is an editable composed control
+about.controls=apps
+about.control.apps.type=list
+about.control.apps.frame_key=about.app_list_frame
+about.control.apps.background=255,255,255

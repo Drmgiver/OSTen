@@ -241,3 +241,12 @@ The index and manifest must remain consistent after these conversions.
 The release remains a **partial compliance implementation**, not
 a successful full-standard certification. The audited gaps remain
 tracked in [NativeComplianceAudit.md](NativeComplianceAudit.md).
+
+## About window resource-defined list (November 12, 2026)
+
+System About This Computer now constructs its running-applications list
+from indexed `about.controls` resource definitions using
+`OSTenCreateDialogControls`. The list's frame, type and background
+are editable in the shared resource catalog; the editor can modify or
+remove the control without a C++ change. The remaining custom About
+visualization and other OS components still require conversion.
