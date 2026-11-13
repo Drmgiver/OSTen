@@ -364,3 +364,25 @@ target, installed image target and app_server default lookup are now named
 Window chrome, colors and drawing behavior are unchanged. The preflight
 checks that all core identity bindings agree. This rename does not confer
 full standards compliance or settle any separate intellectual property issue.
+
+## Pixel Editor native control composition (November 12, 2026)
+
+Resource Editor's pixel-artwork window now instantiates the artwork
+canvas, status line, and Save/Revert/Undo buttons from the public
+`browser.pixel.controls` resource sequence. Its five controls have
+indexed stable identifiers, editable types, frames and action bindings.
+The `pixel_canvas` custom factory receives its current artwork data
+through explicit per-composition context instead of a process-global
+singleton. The same context API is available to future specialized
+native resource widgets.
+
+Owners may edit or remove any declared control. Missing/retyped canvas
+or status controls disable the affected editing operations without
+silently reinstating them. The graphical dialog editor also exposes
+this window's outer frame through `browser.pixel.window_frame_key`.
+The resource preflight validates the newly composed Pixel Editor.
+
+**Remaining:** pixel canvas internal palette/checker geometry and line
+colors, remaining custom-drawn resource types, System/Finder coverage,
+application module protocols, and real booted GUI interaction testing.
+This is not complete OSTen Software Standard compliance.

@@ -36,7 +36,8 @@ typedef std::map<std::string, BView*> OSTenDialogControls;
 // creates a native view. The Owner still controls its public resource keys.
 typedef BView* (*OSTenDialogControlFactory)(BRect frame,
     const char* identifier, const char* caption, uint32 action,
-    const OSTenResourceCatalog& catalog, const std::string& resourcePrefix);
+    const OSTenResourceCatalog& catalog, const std::string& resourcePrefix,
+    void* context);
 
 typedef std::map<std::string, OSTenDialogControlFactory>
     OSTenDialogControlFactories;
@@ -61,7 +62,8 @@ inline OSTenDialogControls
 OSTenCreateDialogControls(BView* parent, const OSTenResourceCatalog& catalog,
     const char* dialogID, const OSTenDialogAction* bindings,
     size_t bindingCount,
-    const OSTenDialogControlFactories* extensions = NULL)
+    const OSTenDialogControlFactories* extensions = NULL,
+    void* factoryContext = NULL)
 {
     OSTenDialogControls result;
     if (parent == NULL || dialogID == NULL)
@@ -171,7 +173,7 @@ OSTenCreateDialogControls(BView* parent, const OSTenResourceCatalog& catalog,
                 = extensions->find(type);
             if (factory != extensions->end() && factory->second != NULL) {
                 view = factory->second(frame, id.c_str(), label, what,
-                    catalog, base);
+                    catalog, base, factoryContext);
                 if (view != NULL)
                     parent->AddChild(view);
             }

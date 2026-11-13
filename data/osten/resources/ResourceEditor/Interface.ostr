@@ -487,3 +487,23 @@ browser.color.control.save.caption_key=browser.color.save
 browser.color.control.save.action=color.save
 browser.color.control.status.type=label
 browser.color.control.status.frame_key=browser.color.status_frame
+
+# Owner-composed Pixel Editor: artwork canvas and commands
+browser.pixel.window_frame_key=browser.pixel.window
+browser.pixel.controls=canvas,status,undo,revert,save
+browser.pixel.control.canvas.type=pixel_canvas
+browser.pixel.control.canvas.frame_key=browser.pixel.canvas
+browser.pixel.control.status.type=label
+browser.pixel.control.status.frame_key=browser.pixel.status_frame
+browser.pixel.control.undo.type=button
+browser.pixel.control.undo.frame_key=browser.pixel.undo_frame
+browser.pixel.control.undo.caption_key=browser.pixel.undo
+browser.pixel.control.undo.action=pixel.undo
+browser.pixel.control.revert.type=button
+browser.pixel.control.revert.frame_key=browser.pixel.revert_frame
+browser.pixel.control.revert.caption_key=browser.pixel.revert
+browser.pixel.control.revert.action=pixel.revert
+browser.pixel.control.save.type=button
+browser.pixel.control.save.frame_key=browser.pixel.save_frame
+browser.pixel.control.save.caption_key=browser.pixel.save
+browser.pixel.control.save.action=pixel.save

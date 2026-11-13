@@ -278,6 +278,7 @@ def main() -> int:
     validate_composed_dialog("ResourceEditor", "browser.entries")
     validate_composed_dialog("ResourceEditor", "browser.menu")
     validate_composed_dialog("ResourceEditor", "browser.color")
+    validate_composed_dialog("ResourceEditor", "browser.pixel")
     validate_composed_dialog("ResourceEditor", "editor.inspector")
     validate_global_menu("Finder", {
         "new_folder", "open", "rename", "get_info", "close",

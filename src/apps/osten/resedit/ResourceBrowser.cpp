@@ -358,8 +358,8 @@ PaletteColor(int slot)
 class PixelCanvas : public BView {
 public:
     PixelCanvas(BRect frame, const ResourceEntry& entry,
-        const std::vector<uint8>& source)
-        : BView(frame, "pixel-canvas", B_FOLLOW_ALL, B_WILL_DRAW),
+        const std::vector<uint8>& source, const char* identifier)
+        : BView(frame, identifier, B_FOLLOW_ALL, B_WILL_DRAW),
           fEntry(entry), fPixels(source), fScale(1),
           fColor(1), fPainting(false), fDirty(false)
     {
@@ -507,6 +507,23 @@ private:
     bool fDirty;
 };
 
+
+struct PixelCanvasFactoryContext {
+    const ResourceEntry* entry;
+    const std::vector<uint8>* pixels;
+};
+
+static BView*
+CreateBrowserPixelCanvas(BRect frame, const char* identifier, const char*,
+    uint32, const OSTenResourceCatalog&, const std::string&, void* context)
+{
+    PixelCanvasFactoryContext* data
+        = static_cast<PixelCanvasFactoryContext*>(context);
+    if (data == NULL || data->entry == NULL || data->pixels == NULL)
+        return NULL;
+    return new PixelCanvas(frame, *data->entry, *data->pixels, identifier);
+}
+
 class PixelEditorWindow : public BWindow {
 public:
     explicit PixelEditorWindow(const ResourceEntry& entry)
@@ -526,21 +543,28 @@ public:
             B_FOLLOW_ALL, B_WILL_DRAW);
         background->SetViewColor(BrowserUI().Color("browser.pixel.background", rgb_color{239, 239, 236, 255}));
         AddChild(background);
-        fCanvas = new PixelCanvas(BrowserUI().Rect("browser.pixel.canvas", BRect(10, 10, 758, 548)), entry, rgba);
-        background->AddChild(fCanvas);
-        char heading[256];
-        snprintf(heading, sizeof(heading),
-            "%s  |  %d x %d RGBA  |  paint with mouse",
-            entry.label.c_str(), entry.width, entry.height);
-        fStatus = new BStringView(BrowserUI().Rect("browser.pixel.status_frame", BRect(20, 557, 745, 584)),
-            "pixel-status", heading);
-        background->AddChild(fStatus);
-        background->AddChild(new BButton(BrowserUI().Rect("browser.pixel.undo_frame", BRect(390, 590, 505, 624)),
-            "undo-pixel", BrowserUI().String("browser.pixel.undo", "Undo Save"), new BMessage(kUndoPixels)));
-        background->AddChild(new BButton(BrowserUI().Rect("browser.pixel.revert_frame", BRect(511, 590, 614, 624)),
-            "revert-pixel", BrowserUI().String("browser.pixel.revert", "Revert"), new BMessage(kRevertPixels)));
-        background->AddChild(new BButton(BrowserUI().Rect("browser.pixel.save_frame", BRect(626, 590, 744, 624)),
-            "save-pixel", BrowserUI().String("browser.pixel.save", "Save"), new BMessage(kSavePixels)));
+        const OSTenDialogAction actions[] = {
+            {"pixel.undo", kUndoPixels},
+            {"pixel.revert", kRevertPixels},
+            {"pixel.save", kSavePixels}
+        };
+        PixelCanvasFactoryContext state = {&entry, &rgba};
+        OSTenDialogControlFactories factories;
+        factories["pixel_canvas"] = &CreateBrowserPixelCanvas;
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            background, BrowserUI(), "browser.pixel", actions,
+            sizeof(actions) / sizeof(actions[0]), &factories, &state);
+        fCanvas = BrowserComposedControl<PixelCanvas>(
+            controls, "browser.pixel", "canvas", "pixel_canvas");
+        fStatus = BrowserComposedControl<BStringView>(
+            controls, "browser.pixel", "status", "label");
+        if (fStatus != NULL) {
+            char heading[256];
+            snprintf(heading, sizeof(heading),
+                "%s  |  %d x %d RGBA  |  paint with mouse",
+                entry.label.c_str(), entry.width, entry.height);
+            fStatus->SetText(heading);
+        }
         Show();
     }
 
@@ -554,6 +578,10 @@ public:
 
     void MessageReceived(BMessage* message) override
     {
+        if (!_Ready()) {
+            BWindow::MessageReceived(message);
+            return;
+        }
         switch (message->what) {
             case kPixelsChanged:
                 fStatus->SetText(BrowserUI().String("browser.pixel.changed", "Pixel artwork changed — Save to write."));
@@ -566,6 +594,8 @@ public:
     }
 
 private:
+    bool _Ready() const { return fCanvas != NULL && fStatus != NULL; }
+
     void _Revert()
     {
         std::vector<uint8> bytes;
@@ -1051,7 +1081,7 @@ private:
 
 static BView*
 CreateBrowserColorSample(BRect frame, const char* identifier, const char*,
-    uint32, const OSTenResourceCatalog&, const std::string&)
+    uint32, const OSTenResourceCatalog&, const std::string&, void*)
 {
     return new ColorSample(frame, identifier);
 }

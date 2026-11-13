@@ -228,7 +228,7 @@ private:
 static BView*
 CreateResourceArtworkMenu(BRect frame, const char* id,
     const char* label, uint32, const OSTenResourceCatalog& catalog,
-    const std::string&)
+    const std::string&, void*)
 {
     return new BMenuField(frame, id, label,
         new BPopUpMenu(catalog.String("editor.artwork_menu_title", "Artwork")));
@@ -236,7 +236,8 @@ CreateResourceArtworkMenu(BRect frame, const char* id,
 
 static BView*
 CreateResourceRectanglePreview(BRect frame, const char*,
-    const char*, uint32, const OSTenResourceCatalog&, const std::string&)
+    const char*, uint32, const OSTenResourceCatalog&, const std::string&,
+    void*)
 {
     return new RectanglePreview(frame);
 }
