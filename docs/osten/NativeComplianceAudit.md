@@ -333,3 +333,25 @@ The native-resource preflight now validates the About control schema.
 The overview's custom-drawn statistics, memory visualization and
 wordmark still require complete independent resource composition and
 graphics editing to meet every aspect of the standard.
+
+## Menu and RGB editing window composition (November 12, 2026)
+
+Resource Editor's native Menu Editor and RGB Color Editor now request
+their visible controls from the universal `OSTenCreateDialogControls`
+loader. Their ordered control IDs, types, frames, captions and commands are
+editable and indexed in Resource Editor's own public resource catalog.
+The color preview uses a registered native `color_sample` factory;
+RGB sliders expose their range and hash-mark styling as resource fields.
+Changes to these `.controls` sequences can be made in the graphical
+dialog layout designer without editing C++.
+
+If the Owner intentionally removes or retypes a required data-entry
+control, the editor's operations are disabled instead of making an unsafe
+downcast. The Owner's edit itself is not prohibited or reversed.
+Catalog/index preflight validates both new default dialog schemas.
+
+**Still not full compliance:** Pixel Editor's canvas/palette drawing,
+resource-type specific editors (audio, cursors, vectors, metadata), remaining
+System/Finder custom UI, native executable Control Strip modules,
+cross-file manifest/index transactions and live post-boot GUI tests remain.
+No merge or certification before Owner approval and verification.

@@ -121,10 +121,14 @@ def validate_composed_dialog(app: str, prefix: str) -> None:
     available_types = {"text", "label", "button", "list", "text_area",
                        "checkbox", "slider"}
     if app == "ResourceEditor":
-        source = (
-            ROOT / "src/apps/osten/resedit/ResourceEditor.cpp"
-        ).read_text(encoding="utf-8")
-        available_types.update(re.findall(r'factories\["([A-Za-z0-9._-]+)"\]', source))
+        sources = (
+            ROOT / "src/apps/osten/resedit/ResourceEditor.cpp",
+            ROOT / "src/apps/osten/resedit/ResourceBrowser.cpp",
+        )
+        for path in sources:
+            source = path.read_text(encoding="utf-8")
+            available_types.update(re.findall(
+                r'factories\["([A-Za-z0-9._-]+)"\]', source))
     check(bool(order) and all(order),
           f"{app}/{prefix}: missing or empty declared controls")
     check(len(order) == len(set(order)),
@@ -246,6 +250,8 @@ def main() -> int:
     validate_composed_dialog("System", "about")
     validate_composed_dialog("ResourceEditor", "browser.types")
     validate_composed_dialog("ResourceEditor", "browser.entries")
+    validate_composed_dialog("ResourceEditor", "browser.menu")
+    validate_composed_dialog("ResourceEditor", "browser.color")
     validate_composed_dialog("ResourceEditor", "editor.inspector")
     validate_global_menu("Finder", {
         "new_folder", "open", "rename", "get_info", "close",

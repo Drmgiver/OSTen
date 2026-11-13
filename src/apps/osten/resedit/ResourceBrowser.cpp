@@ -50,6 +50,21 @@ static const OSTenResourceCatalog& BrowserUI()
     return ui;
 }
 
+// The catalog is the authoritative control type, not the C++ pointer cast.
+// If the Owner removes or retypes a required control, its editor stays open
+// without dereferencing a view of the wrong type.
+template<typename T>
+static T*
+BrowserComposedControl(const OSTenDialogControls& controls, const char* prefix,
+    const char* id, const char* expectedType)
+{
+    const std::string key = std::string(prefix) + ".control." + id + ".type";
+    if (strcmp(BrowserUI().String(key.c_str(), ""), expectedType) != 0)
+        return NULL;
+    OSTenDialogControls::const_iterator found = controls.find(id);
+    return found == controls.end() ? NULL : static_cast<T*>(found->second);
+}
+
 enum {
     kOpenFile = 'rbOp', kFileChosen = 'rbFc', kOpenType = 'rbTy',
     kOpenEntry = 'rbEn', kRefresh = 'rbRf',
@@ -804,64 +819,46 @@ public:
             BRect(180, 110, 780, 620)),
             (entry.label + BrowserUI().String("browser.menu.title_suffix",
                 " — Menu Editor")).c_str(), B_TITLED_WINDOW, 0),
-          fEntry(entry), fDirty(false)
+          fEntry(entry), fItems(NULL), fAction(NULL), fStatus(NULL), fDirty(false)
     {
         BView* pane = new BView(Bounds(), "menu-editor",
             B_FOLLOW_ALL, B_WILL_DRAW);
         pane->SetViewColor(BrowserUI().Color("browser.menu.background",
             rgb_color{239, 239, 236, 255}));
         AddChild(pane);
-        pane->AddChild(new BStringView(BrowserUI().Rect("browser.menu.hint_frame",
-            BRect(14, 8, 580, 35)), "menu-hint",
-            BrowserUI().String("browser.menu.hint",
-                "Menu command order (drag alternative: Up / Down)")));
-        fItems = new BListView(BrowserUI().Rect("browser.menu.list",
-            BRect(12, 40, 359, 429)),
-            "menu-item-list", B_SINGLE_SELECTION_LIST);
-        fItems->SetSelectionMessage(new BMessage(kMenuSelected));
-        pane->AddChild(new BScrollView("menu-items", fItems,
-            B_FOLLOW_ALL, 0, false, true));
-        fAction = new BTextControl(BrowserUI().Rect("browser.menu.action",
-            BRect(375, 46, 579, 83)), "command-id",
-            BrowserUI().String("browser.menu.action_label", "Command ID"),
-            "", NULL);
-        fAction->SetDivider(85);
-        pane->AddChild(fAction);
-        struct Control { const char* key; const char* text; uint32 action;
-            BRect fallback; const char* name; };
-        const Control buttons[] = {
-            {"add", "Add", kMenuAdd, BRect(373, 92, 471, 124), "add"},
-            {"separator", "Separator", kMenuSeparator,
-                BRect(482, 92, 584, 124), "separator"},
-            {"replace", "Replace", kMenuReplace,
-                BRect(373, 137, 471, 169), "replace"},
-            {"remove", "Remove", kMenuRemove,
-                BRect(482, 137, 584, 169), "remove"},
-            {"up", "Up", kMenuUp, BRect(373, 183, 471, 215), "up"},
-            {"down", "Down", kMenuDown,
-                BRect(482, 183, 584, 215), "down"},
-            {"revert", "Revert", kMenuRevert,
-                BRect(373, 441, 471, 480), "revert"},
-            {"save", "Save", kMenuSave, BRect(482, 441, 584, 480), "save"}
+        const OSTenDialogAction actions[] = {
+            {"menu.selected", kMenuSelected},
+            {"menu.add", kMenuAdd},
+            {"menu.separator", kMenuSeparator},
+            {"menu.replace", kMenuReplace},
+            {"menu.remove", kMenuRemove},
+            {"menu.up", kMenuUp},
+            {"menu.down", kMenuDown},
+            {"menu.revert", kMenuRevert},
+            {"menu.save", kMenuSave}
         };
-        for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); ++i) {
-            std::string key = std::string("browser.menu.") + buttons[i].key;
-            std::string geometry = key + "_frame";
-            pane->AddChild(new BButton(
-                BrowserUI().Rect(geometry.c_str(), buttons[i].fallback),
-                buttons[i].name, BrowserUI().String(key.c_str(), buttons[i].text),
-                new BMessage(buttons[i].action)));
-        }
-        fStatus = new BStringView(BrowserUI().Rect("browser.menu.status",
-            BRect(16, 485, 575, 506)), "menu-status",
-            BrowserUI().String("browser.menu.ready", "Command IDs retain their actions"));
-        pane->AddChild(fStatus);
-        _Load();
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            pane, BrowserUI(), "browser.menu", actions,
+            sizeof(actions) / sizeof(actions[0]));
+        fItems = BrowserComposedControl<BListView>(
+            controls, "browser.menu", "items", "list");
+        fAction = BrowserComposedControl<BTextControl>(
+            controls, "browser.menu", "action", "text");
+        fStatus = BrowserComposedControl<BStringView>(
+            controls, "browser.menu", "status", "label");
+        if (fItems != NULL)
+            fItems->SetSelectionMessage(new BMessage(kMenuSelected));
+        if (_Ready())
+            _Load();
         Show();
     }
 
     void MessageReceived(BMessage* message) override
     {
+        if (!_Ready()) {
+            BWindow::MessageReceived(message);
+            return;
+        }
         const int32 selection = fItems->CurrentSelection();
         const bool valid = selection >= 0 && (size_t)selection < fCommands.size();
         switch (message->what) {
@@ -914,6 +911,11 @@ public:
     }
 
 private:
+    bool _Ready() const
+    {
+        return fItems != NULL && fAction != NULL && fStatus != NULL;
+    }
+
     static bool _ValidateID(const std::string& value)
     {
         return !value.empty() && value.size() <= 128
@@ -1029,7 +1031,7 @@ IsMenuSequence(const ResourceEntry& entry)
 // are catalog resources just like the color value being edited.
 class ColorSample : public BView {
 public:
-    ColorSample(BRect rect) : BView(rect, "rgb-preview",
+    ColorSample(BRect rect, const char* identifier) : BView(rect, identifier,
         B_FOLLOW_LEFT | B_FOLLOW_TOP, B_WILL_DRAW)
     {
         fColor = rgb_color{255, 255, 255, 255};
@@ -1047,6 +1049,13 @@ private:
     rgb_color fColor;
 };
 
+static BView*
+CreateBrowserColorSample(BRect frame, const char* identifier, const char*,
+    uint32, const OSTenResourceCatalog&, const std::string&)
+{
+    return new ColorSample(frame, identifier);
+}
+
 class ColorEditorWindow : public BWindow {
 public:
     explicit ColorEditorWindow(const ResourceEntry& item)
@@ -1054,53 +1063,47 @@ public:
             BRect(190, 145, 700, 510)),
             (item.label + BrowserUI().String("browser.color.title_suffix",
                 " — Color Editor")).c_str(), B_TITLED_WINDOW, 0),
-          fEntry(item)
+          fEntry(item), fSample(NULL), fStatus(NULL)
     {
+        for (int i = 0; i < 3; ++i)
+            fSlider[i] = NULL;
         BView* panel = new BView(Bounds(), "color-editor",
             B_FOLLOW_ALL, B_WILL_DRAW);
         panel->SetViewColor(BrowserUI().Color("browser.color.background",
             rgb_color{239, 239, 236, 255}));
         AddChild(panel);
-        panel->AddChild(new BStringView(BrowserUI().Rect(
-                "browser.color.hint_frame", BRect(18, 9, 475, 38)),
-            "color-hint", BrowserUI().String("browser.color.hint",
-                "Move the sliders to change the selected RGB resource")));
-        static const char* names[] = {"red", "green", "blue"};
-        static const char* defaults[] = {"Red", "Green", "Blue"};
+        const OSTenDialogAction actions[] = {
+            {"color.changed", kColorChange},
+            {"color.revert", kColorRevert},
+            {"color.save", kColorSave}
+        };
+        OSTenDialogControlFactories factories;
+        factories["color_sample"] = &CreateBrowserColorSample;
+        OSTenDialogControls controls = OSTenCreateDialogControls(
+            panel, BrowserUI(), "browser.color", actions,
+            sizeof(actions) / sizeof(actions[0]), &factories);
+        const char* names[] = {"red", "green", "blue"};
         for (int i = 0; i < 3; ++i) {
-            char key[80];
-            snprintf(key, sizeof(key), "browser.color.%s_frame", names[i]);
-            BRect fallback(18, 48 + i * 64, 349, 96 + i * 64);
-            fSlider[i] = new BSlider(
-                BrowserUI().Rect(key, fallback), names[i],
-                BrowserUI().String((std::string("browser.color.") + names[i]).c_str(),
-                    defaults[i]), new BMessage(kColorChange), 0, 255);
-            fSlider[i]->SetHashMarks(B_HASH_MARKS_BOTTOM);
-            fSlider[i]->SetHashMarkCount(9);
-            panel->AddChild(fSlider[i]);
-            fSlider[i]->SetTarget(this);
+            fSlider[i] = BrowserComposedControl<BSlider>(
+                controls, "browser.color", names[i], "slider");
+            if (fSlider[i] != NULL)
+                fSlider[i]->SetTarget(this);
         }
-        fSample = new ColorSample(BrowserUI().Rect(
-            "browser.color.preview_frame", BRect(371, 55, 480, 226)));
-        panel->AddChild(fSample);
-        panel->AddChild(new BButton(BrowserUI().Rect(
-                "browser.color.revert_frame", BRect(260, 263, 358, 298)),
-            "revert", BrowserUI().String("browser.color.revert", "Revert"),
-            new BMessage(kColorRevert)));
-        panel->AddChild(new BButton(BrowserUI().Rect(
-                "browser.color.save_frame", BRect(378, 263, 482, 298)),
-            "save", BrowserUI().String("browser.color.save", "Save"),
-            new BMessage(kColorSave)));
-        fStatus = new BStringView(BrowserUI().Rect(
-            "browser.color.status_frame", BRect(18, 307, 476, 342)),
-            "color-status", "");
-        panel->AddChild(fStatus);
-        _Load();
+        fSample = BrowserComposedControl<ColorSample>(
+            controls, "browser.color", "preview", "color_sample");
+        fStatus = BrowserComposedControl<BStringView>(
+            controls, "browser.color", "status", "label");
+        if (_Ready())
+            _Load();
         Show();
     }
 
     void MessageReceived(BMessage* message) override
     {
+        if (!_Ready()) {
+            BWindow::MessageReceived(message);
+            return;
+        }
         switch (message->what) {
             case kColorChange: _Preview(); return;
             case kColorRevert: _Load(); return;
@@ -1110,6 +1113,12 @@ public:
     }
 
 private:
+    bool _Ready() const
+    {
+        return fSlider[0] != NULL && fSlider[1] != NULL
+            && fSlider[2] != NULL && fSample != NULL && fStatus != NULL;
+    }
+
     void _Preview()
     {
         fSample->SetColor(rgb_color{(uint8)fSlider[0]->Value(),

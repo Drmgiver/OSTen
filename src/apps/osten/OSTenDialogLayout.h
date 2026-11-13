@@ -141,6 +141,12 @@ OSTenCreateDialogControls(BView* parent, const OSTenResourceCatalog& catalog,
                 minimum, maximum, B_HORIZONTAL);
             slider->SetValue((int32)catalog.Number(
                 (base + "value").c_str(), minimum, minimum, maximum));
+            if (catalog.Number((base + "hash_marks").c_str(),
+                    0, 0, 1) >= 0.5f) {
+                slider->SetHashMarks(B_HASH_MARKS_BOTTOM);
+                slider->SetHashMarkCount((int32)catalog.Number(
+                    (base + "hash_count").c_str(), 9, 1, 256));
+            }
             view = slider;
             parent->AddChild(view);
         } else if (strcmp(type, "label") == 0) {
