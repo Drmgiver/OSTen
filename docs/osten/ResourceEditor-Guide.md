@@ -2,7 +2,7 @@
 **Development preview, Software Standard migration**
 
 The native Resource Editor works directly with the same editable interface
-resources used by System, Finder, MacDecorator, and Resource Editor itself.
+resources used by System, Finder, OSTenClassicDecorator, and Resource Editor itself.
 It does not patch executable code.
 
 ## Where to find it
