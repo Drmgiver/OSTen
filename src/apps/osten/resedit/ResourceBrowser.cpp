@@ -363,9 +363,19 @@ public:
           fEntry(entry), fPixels(source), fScale(1),
           fColor(1), fPainting(false), fDirty(false)
     {
-        fScale = std::max(1, std::min(8, std::min(
-            485 / entry.width, 480 / entry.height)));
-        SetViewColor(BrowserUI().Color("browser.pixel.canvas_background", rgb_color{245, 245, 245, 255}));
+        // The Owner chooses the drawing area and scaling limits; the
+        // editor uses the same saved values for rendering and hit-testing.
+        const float maximumWidth = BrowserUI().Number(
+            "browser.pixel.paint_max_width", 485, 1, 4096);
+        const float maximumHeight = BrowserUI().Number(
+            "browser.pixel.paint_max_height", 480, 1, 4096);
+        const int maximumScale = (int)BrowserUI().Number(
+            "browser.pixel.paint_max_scale", 8, 1, 32);
+        fScale = std::max(1, std::min(maximumScale, std::min(
+            (int)(maximumWidth / entry.width),
+            (int)(maximumHeight / entry.height))));
+        SetViewColor(BrowserUI().Color("browser.pixel.canvas_background",
+            rgb_color{245, 245, 245, 255}));
     }
 
     bool Dirty() const { return fDirty; }
@@ -382,85 +392,134 @@ public:
 
     void Draw(BRect) override
     {
-        // The canvas, a usable 1:1 preview, and a selectable color palette.
-        SetHighColor(BrowserUI().Color("browser.pixel.board_background", rgb_color{225, 225, 225, 255}));
+        const OSTenResourceCatalog& ui = BrowserUI();
+        const BPoint origin = ui.Point("browser.pixel.paint_origin",
+            BPoint(16, 16));
+        const rgb_color checkerLight = ui.Color(
+            "browser.pixel.checker_light", rgb_color{241, 241, 241, 255});
+        const rgb_color checkerDark = ui.Color(
+            "browser.pixel.checker_dark", rgb_color{212, 212, 212, 255});
+        const int checkerSize = (int)ui.Number(
+            "browser.pixel.checker_size", 4, 1, 128);
+        const int gridMinScale = (int)ui.Number(
+            "browser.pixel.grid_min_scale", 6, 1, 32);
+
+        SetHighColor(ui.Color("browser.pixel.board_background",
+            rgb_color{225, 225, 225, 255}));
         FillRect(Bounds());
         for (int y = 0; y < fEntry.height; ++y) {
             for (int x = 0; x < fEntry.width; ++x) {
-                size_t i = ((size_t)y * fEntry.width + x) * 4;
-                bool light = ((x / 4 + y / 4) % 2) == 0;
-                uint8 bg = light ? 241 : 212;
-                uint8 alpha = fPixels[i + 3];
-                rgb_color c = {
-                    (uint8)((fPixels[i] * alpha + bg * (255 - alpha)) / 255),
-                    (uint8)((fPixels[i + 1] * alpha + bg * (255 - alpha)) / 255),
-                    (uint8)((fPixels[i + 2] * alpha + bg * (255 - alpha)) / 255),
+                const size_t i = ((size_t)y * fEntry.width + x) * 4;
+                const rgb_color back =
+                    ((x / checkerSize + y / checkerSize) % 2) == 0
+                    ? checkerLight : checkerDark;
+                const uint8 alpha = fPixels[i + 3];
+                const rgb_color composed = {
+                    (uint8)((fPixels[i] * alpha + back.red * (255 - alpha)) / 255),
+                    (uint8)((fPixels[i + 1] * alpha
+                        + back.green * (255 - alpha)) / 255),
+                    (uint8)((fPixels[i + 2] * alpha
+                        + back.blue * (255 - alpha)) / 255),
                     255
                 };
-                BRect cell(16 + x * fScale, 16 + y * fScale,
-                    15 + (x + 1) * fScale, 15 + (y + 1) * fScale);
-                SetHighColor(c);
+                BRect cell(origin.x + x * fScale,
+                    origin.y + y * fScale,
+                    origin.x - 1 + (x + 1) * fScale,
+                    origin.y - 1 + (y + 1) * fScale);
+                SetHighColor(composed);
                 FillRect(cell);
-                if (fScale >= 6) {
-                    SetHighColor(125, 125, 125);
+                if (fScale >= gridMinScale) {
+                    SetHighColor(ui.Color("browser.pixel.grid_color",
+                        rgb_color{125, 125, 125, 255}));
                     StrokeRect(cell);
                 }
             }
         }
-        SetHighColor(85, 85, 85);
-        StrokeRect(BRect(15, 15, 16 + fEntry.width * fScale,
-            16 + fEntry.height * fScale));
-        SetHighColor(40, 40, 40);
-        DrawString(BrowserUI().String("browser.pixel.palette_hint", "Palette (click a color)"), BPoint(545, 25));
+        SetHighColor(ui.Color("browser.pixel.paint_border",
+            rgb_color{85, 85, 85, 255}));
+        StrokeRect(BRect(origin.x - 1, origin.y - 1,
+            origin.x + fEntry.width * fScale,
+            origin.y + fEntry.height * fScale));
+
+        SetHighColor(ui.Color("browser.pixel.label_color",
+            rgb_color{40, 40, 40, 255}));
+        DrawString(ui.String("browser.pixel.palette_hint",
+            "Palette (click a color)"),
+            ui.Point("browser.pixel.palette_hint_point", BPoint(545, 25)));
         for (int i = 0; i < 16; ++i) {
-            int x = 546 + (i % 4) * 34;
-            int y = 39 + (i / 4) * 34;
-            BRect swatch(x, y, x + 27, y + 27);
+            const BRect swatch = _SwatchRect(i);
             SetHighColor(i == 0
-                ? BrowserUI().Color("browser.pixel.transparent_swatch", rgb_color{248, 248, 248, 255}) : PaletteColor(i));
+                ? ui.Color("browser.pixel.transparent_swatch",
+                    rgb_color{248, 248, 248, 255})
+                : PaletteColor(i));
             FillRect(swatch);
             SetHighColor(i == fColor
-                ? rgb_color{0, 95, 200, 255}
-                : rgb_color{95, 95, 95, 255});
-            SetPenSize(i == fColor ? 3 : 1);
+                ? ui.Color("browser.pixel.selected_border",
+                    rgb_color{0, 95, 200, 255})
+                : ui.Color("browser.pixel.swatch_border",
+                    rgb_color{95, 95, 95, 255}));
+            SetPenSize(i == fColor
+                ? ui.Number("browser.pixel.selected_border_width", 3, 1, 12)
+                : ui.Number("browser.pixel.swatch_border_width", 1, 1, 12));
             StrokeRect(swatch);
             SetPenSize(1);
             if (i == 0) {
-                SetHighColor(200, 40, 40);
-                StrokeLine(BPoint(x + 2, y + 25),
-                    BPoint(x + 25, y + 2));
+                const float inset = ui.Number(
+                    "browser.pixel.eraser_inset", 2, 0, 32);
+                SetHighColor(ui.Color("browser.pixel.eraser_stroke",
+                    rgb_color{200, 40, 40, 255}));
+                StrokeLine(BPoint(swatch.left + inset,
+                        swatch.bottom - inset),
+                    BPoint(swatch.right - inset,
+                        swatch.top + inset));
             }
         }
 
-        SetHighColor(40, 40, 40);
-        DrawString(BrowserUI().String("browser.pixel.actual_hint", "Actual pixels"), BPoint(545, 224));
-        int scale = std::max(1, std::min(2,
-            std::min(198 / fEntry.width, 180 / fEntry.height)));
+        SetHighColor(ui.Color("browser.pixel.label_color",
+            rgb_color{40, 40, 40, 255}));
+        DrawString(ui.String("browser.pixel.actual_hint",
+            "Actual pixels"),
+            ui.Point("browser.pixel.actual_hint_point", BPoint(545, 224)));
+        const BPoint previewOrigin = ui.Point(
+            "browser.pixel.preview_origin", BPoint(545, 237));
+        const int previewScale = std::max(1, std::min(
+            (int)ui.Number("browser.pixel.preview_max_scale", 2, 1, 32),
+            std::min(
+                (int)(ui.Number("browser.pixel.preview_max_width",
+                    198, 1, 4096) / fEntry.width),
+                (int)(ui.Number("browser.pixel.preview_max_height",
+                    180, 1, 4096) / fEntry.height))));
         for (int y = 0; y < fEntry.height; ++y) {
             for (int x = 0; x < fEntry.width; ++x) {
-                size_t i = ((size_t)y * fEntry.width + x) * 4;
+                const size_t i = ((size_t)y * fEntry.width + x) * 4;
                 if (fPixels[i + 3] == 0)
                     continue;
                 SetHighColor(rgb_color{
                     fPixels[i], fPixels[i + 1], fPixels[i + 2], 255});
-                FillRect(BRect(545 + x * scale, 237 + y * scale,
-                    544 + (x + 1) * scale, 236 + (y + 1) * scale));
+                FillRect(BRect(previewOrigin.x + x * previewScale,
+                    previewOrigin.y + y * previewScale,
+                    previewOrigin.x - 1 + (x + 1) * previewScale,
+                    previewOrigin.y - 1 + (y + 1) * previewScale));
             }
         }
-        SetHighColor(80, 80, 80);
-        DrawString(BrowserUI().String("browser.pixel.transparent_hint", "Transparent swatch = eraser"),
-            BPoint(545, 460));
+        SetHighColor(ui.Color("browser.pixel.footer_color",
+            rgb_color{80, 80, 80, 255}));
+        DrawString(ui.String("browser.pixel.transparent_hint",
+            "Transparent swatch = eraser"),
+            ui.Point("browser.pixel.transparent_hint_point",
+                BPoint(545, 460)));
     }
 
     void MouseDown(BPoint where) override
     {
-        if (where.x >= 546 && where.x < 546 + 4 * 34
-            && where.y >= 39 && where.y < 39 + 4 * 34) {
-            int col = (int)(where.x - 546) / 34;
-            int row = (int)(where.y - 39) / 34;
-            fColor = row * 4 + col;
-            Invalidate();
-            return;
+        // A swatch is clickable exactly where it is drawn. Moving or
+        // resizing its resource geometry cannot strand the hit targets.
+        for (int i = 0; i < 16; ++i) {
+            if (_SwatchRect(i).Contains(where)) {
+                fColor = i;
+                Invalidate();
+                return;
+            }
         }
         if (_Paint(where)) {
             fPainting = true;
@@ -477,14 +536,33 @@ public:
     void MouseUp(BPoint) override { fPainting = false; }
 
 private:
+    BRect _SwatchRect(int slot) const
+    {
+        const OSTenResourceCatalog& ui = BrowserUI();
+        const BPoint origin = ui.Point(
+            "browser.pixel.palette_origin", BPoint(546, 39));
+        const int columns = (int)ui.Number(
+            "browser.pixel.palette_columns", 4, 1, 16);
+        const float spacing = ui.Number(
+            "browser.pixel.palette_spacing", 34, 1, 512);
+        const float size = ui.Number(
+            "browser.pixel.palette_swatch_size", 27, 1, 256);
+        const float x = origin.x + (slot % columns) * spacing;
+        const float y = origin.y + (slot / columns) * spacing;
+        return BRect(x, y, x + size, y + size);
+    }
+
     bool _Paint(BPoint where)
     {
-        int x = (int)(where.x - 16) / fScale;
-        int y = (int)(where.y - 16) / fScale;
-        if (where.x < 16 || where.y < 16
-            || x < 0 || x >= fEntry.width || y < 0 || y >= fEntry.height)
+        const BPoint origin = BrowserUI().Point(
+            "browser.pixel.paint_origin", BPoint(16, 16));
+        if (where.x < origin.x || where.y < origin.y)
             return false;
-        size_t i = ((size_t)y * fEntry.width + x) * 4;
+        const int x = (int)((where.x - origin.x) / fScale);
+        const int y = (int)((where.y - origin.y) / fScale);
+        if (x < 0 || x >= fEntry.width || y < 0 || y >= fEntry.height)
+            return false;
+        const size_t i = ((size_t)y * fEntry.width + x) * 4;
         const rgb_color paint = PaletteColor(fColor);
         if (fPixels[i] == paint.red && fPixels[i + 1] == paint.green
             && fPixels[i + 2] == paint.blue && fPixels[i + 3] == paint.alpha)
@@ -506,7 +584,6 @@ private:
     bool fPainting;
     bool fDirty;
 };
-
 
 struct PixelCanvasFactoryContext {
     const ResourceEntry* entry;

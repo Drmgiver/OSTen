@@ -264,11 +264,76 @@ def validate_osten_classic_decorator() -> None:
     print("System: OSTen Classic decorator identity checked")
 
 
+
+def validate_pixel_canvas_defaults() -> None:
+    """Check shipped Pixel Canvas values, not Owner-selected runtime edits."""
+    path = BASE / "ResourceEditor" / "Interface.ostr"
+    values = parse_manifest(path)
+    index = parse_index(BASE / "ResourceEditor" / "ResourceIndex.osti")
+    source = (
+        ROOT / "src/apps/osten/resedit/ResourceBrowser.cpp"
+    ).read_text(encoding="utf-8")
+    prefix = "browser.pixel."
+    color_fields = (
+        "paint_border", "checker_light", "checker_dark",
+        "grid_color", "label_color", "selected_border", "swatch_border",
+        "eraser_stroke", "footer_color",
+    )
+    point_fields = (
+        "paint_origin", "palette_origin", "palette_hint_point",
+        "preview_origin", "actual_hint_point", "transparent_hint_point",
+    )
+    number_fields = (
+        "paint_max_width", "paint_max_height", "paint_max_scale",
+        "checker_size", "grid_min_scale", "palette_columns",
+        "palette_spacing", "palette_swatch_size",
+        "selected_border_width", "swatch_border_width", "eraser_inset",
+        "preview_max_width", "preview_max_height", "preview_max_scale",
+    )
+    for name in color_fields:
+        key = prefix + name
+        check(key in index and index[key][1] == "COLR",
+              f"Pixel Canvas: missing indexed RGB resource {key}")
+        values_list = values.get(key, "").split(",")
+        try:
+            channels = [int(value) for value in values_list]
+            valid = len(channels) == 3 and all(0 <= x <= 255 for x in channels)
+        except ValueError:
+            valid = False
+        check(valid, f"Pixel Canvas: invalid default RGB {key}")
+    for name in point_fields:
+        key = prefix + name
+        check(key in index and index[key][1] == "WLAY",
+              f"Pixel Canvas: missing indexed point resource {key}")
+        try:
+            coords = [float(value) for value in values.get(key, "").split(",")]
+            valid = len(coords) == 2 and all(abs(x) <= 8192 for x in coords)
+        except ValueError:
+            valid = False
+        check(valid, f"Pixel Canvas: invalid default point {key}")
+    for name in number_fields:
+        key = prefix + name
+        check(key in index and index[key][1] == "NUMB",
+              f"Pixel Canvas: missing indexed number resource {key}")
+        try:
+            valid = float(values.get(key, "")) >= 0
+        except ValueError:
+            valid = False
+        check(valid, f"Pixel Canvas: invalid default number {key}")
+    check("_SwatchRect(i).Contains(where)" in source
+          and "const BRect swatch = _SwatchRect(i)" in source,
+          "Pixel Canvas: painting and palette hit-testing must share geometry")
+    check('BrowserUI().Point(\n            "browser.pixel.paint_origin"' in source,
+          "Pixel Canvas: painting must honor the editable paint origin")
+    print("ResourceEditor: 29 indexed Pixel Canvas appearance/layout defaults checked")
+
+
 def main() -> int:
     validate_osten_classic_decorator()
     for app in APPS:
         validate_app(app)
     check_editor_bindings()
+    validate_pixel_canvas_defaults()
     check_editor_status_resources()
     validate_composed_dialog("Finder", "dialog.rename")
     validate_composed_dialog("Finder", "dialog.info")

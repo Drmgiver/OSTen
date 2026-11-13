@@ -386,3 +386,20 @@ The resource preflight validates the newly composed Pixel Editor.
 colors, remaining custom-drawn resource types, System/Finder coverage,
 application module protocols, and real booted GUI interaction testing.
 This is not complete OSTen Software Standard compliance.
+
+## Pixel Canvas palette, checker and positioning coverage (November 12, 2026)
+
+Resource Editor's pixel-artwork painter now reads its paint origin, paint
+scale limits, checkerboard colors/size, grid threshold/color, canvas border,
+label positions/colors, sixteen-swatch palette origin/columns/spacing/size,
+selected/normal outlines, eraser diagonal, and 1:1 preview position/scale
+limits from 29 indexed owner-editable resources. The shipped defaults retain
+the approved appearance. Painting, swatch highlighting and mouse selection
+share resource-derived rectangles rather than having different hardcoded hit
+areas, including after an Owner moves the palette. The native preflight
+validates the default types, RGB triples, points, and numeric values.
+
+These data changes do not alter image file formats or force backup/recovery.
+Remaining gaps include complete import/export for other asset formats,
+font/audio/cursor/vector editors, cross-file resource transactions,
+additional Finder/System native UI, and booted interaction tests.

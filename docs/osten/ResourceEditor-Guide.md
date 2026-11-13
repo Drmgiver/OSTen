@@ -263,3 +263,12 @@ through another copy of ResEdit.
 
 The preview hint and drag-label colors and offsets are also resources.
 No compulsory backup or repair mechanism is introduced.
+
+## Pixel Canvas custom appearance (November 12, 2026)
+
+The Pixel Editor uses the same indexed Resource Editor catalogue for its
+checkerboard, palette geometry, paint origin, pixel scale, color outlines,
+label positions and actual-size preview. Open the Resource Editor resources
+and edit the corresponding `browser.pixel.*` entries. The drawing code and
+mouse hit detection read the same geometry, so a moved swatch remains clickable
+after the application restarts. The default artwork and interface are unchanged.
