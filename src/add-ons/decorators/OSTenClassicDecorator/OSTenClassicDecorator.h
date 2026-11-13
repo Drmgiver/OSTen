@@ -7,8 +7,8 @@
  *		Adrien Destugues, pulkomandy@gmail.com
  *		John Scipione, jscipione@gmail.com
  */
-#ifndef MAC_DECORATOR_H
-#define MAC_DECORATOR_H
+#ifndef OSTEN_CLASSIC_DECORATOR_H
+#define OSTEN_CLASSIC_DECORATOR_H
 
 
 #include "DecorManager.h"
@@ -16,9 +16,9 @@
 #include "SATDecorator.h"
 
 
-class MacDecorAddOn : public DecorAddOn {
+class OSTenClassicDecorAddOn : public DecorAddOn {
 public:
-								MacDecorAddOn(image_id id, const char* name);
+								OSTenClassicDecorAddOn(image_id id, const char* name);
 
 protected:
 	virtual Decorator*			_AllocateDecorator(DesktopSettings& settings,
@@ -26,11 +26,11 @@ protected:
 };
 
 
-class MacDecorator: public SATDecorator {
+class OSTenClassicDecorator: public SATDecorator {
 public:
-								MacDecorator(DesktopSettings& settings,
+								OSTenClassicDecorator(DesktopSettings& settings,
 									BRect frame, Desktop* desktop);
-	virtual						~MacDecorator();
+	virtual						~OSTenClassicDecorator();
 
 			void				Draw(BRect updateRect);
 			void				Draw();
@@ -106,4 +106,4 @@ private:
 };
 
 
-#endif	// MAC_DECORATOR_H
+#endif	// OSTEN_CLASSIC_DECORATOR_H

@@ -239,7 +239,33 @@ def check_editor_status_resources() -> None:
     print(f"ResourceEditor: {len(refs)} status/alert strings indexed")
 
 
+
+def validate_osten_classic_decorator() -> None:
+    """The image, runtime default and built add-on must agree on one name."""
+    name = "OSTenClassicDecorator"
+    directory = ROOT / "src" / "add-ons" / "decorators" / name
+    for filename in ("Jamfile", name + ".cpp", name + ".h", "resources.rdef"):
+        check((directory / filename).is_file(),
+              f"Decorator: missing OSTen Classic source {filename}")
+    references = (
+        ("src/add-ons/decorators/Jamfile",
+         "SubInclude HAIKU_TOP src add-ons decorators " + name + " ;"),
+        ("build/jam/images/definitions/common-tail", ": " + name + " ;"),
+        ("src/servers/app/decorator/DecorManager.cpp",
+         'path.Append("' + name + '")'),
+    )
+    for relative, expected in references:
+        body = (ROOT / relative).read_text(encoding="utf-8")
+        check(expected in body,
+              f"Decorator: build/runtime identity missing from {relative}")
+    if (directory / "resources.rdef").is_file():
+        metadata = (directory / "resources.rdef").read_text(encoding="utf-8")
+        check('"OSTen Classic"' in metadata, "Decorator: wrong public name")
+    print("System: OSTen Classic decorator identity checked")
+
+
 def main() -> int:
+    validate_osten_classic_decorator()
     for app in APPS:
         validate_app(app)
     check_editor_bindings()

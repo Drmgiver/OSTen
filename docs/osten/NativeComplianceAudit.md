@@ -88,7 +88,7 @@ These changes are **necessary but insufficient** for compliance.
 - The global menu bar is Finder-command-oriented. Native applications
   cannot yet publish a complete active-app menu model through the Standard.
 - SystemExtras, AboutComputer, ControlStrip, notifications, and the
-  MacDecorator retain non-resource-defined drawing and behavior.
+  OSTenClassicDecorator retain non-resource-defined drawing and behavior.
 - The resource catalog and API do not yet define fully editable menu,
   widget, sound and notification *structures* with stable IDs.
 
@@ -355,3 +355,12 @@ resource-type specific editors (audio, cursors, vectors, metadata), remaining
 System/Finder custom UI, native executable Control Strip modules,
 cross-file manifest/index transactions and live post-boot GUI tests remain.
 No merge or certification before Owner approval and verification.
+
+## OSTen Classic decorator naming (November 12, 2026)
+
+The OSTen-native window decorator, its C++ classes, add-on path, build
+target, installed image target and app_server default lookup are now named
+`OSTenClassicDecorator`. The publicly displayed style is **OSTen Classic**.
+Window chrome, colors and drawing behavior are unchanged. The preflight
+checks that all core identity bindings agree. This rename does not confer
+full standards compliance or settle any separate intellectual property issue.

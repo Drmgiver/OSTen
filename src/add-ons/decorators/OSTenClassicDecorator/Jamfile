@@ -1,4 +1,4 @@
-SubDir HAIKU_TOP src add-ons decorators MacDecorator ;
+SubDir HAIKU_TOP src add-ons decorators OSTenClassicDecorator ;
 
 UseBuildFeatureHeaders freetype ;
 SubDirHdrs $(HAIKU_TOP) src apps osten ;
@@ -11,12 +11,12 @@ UseHeaders [ FDirName $(HAIKU_TOP) src servers app font ] ;
 UsePrivateHeaders app shared interface graphics ;
 UseLibraryHeaders agg ;
 
-AddResources MacDecorator : resources.rdef ;
+AddResources OSTenClassicDecorator : resources.rdef ;
 
-Includes [ FGristFiles MacDecorator.cpp ]
+Includes [ FGristFiles OSTenClassicDecorator.cpp ]
 	: [ BuildFeatureAttribute freetype : headers ] ;
 
-Addon MacDecorator :
-	MacDecorator.cpp
+Addon OSTenClassicDecorator :
+	OSTenClassicDecorator.cpp
 	: be <nogrist>app_server [ TargetLibstdc++ ] [ TargetLibsupc++ ]
 ;
