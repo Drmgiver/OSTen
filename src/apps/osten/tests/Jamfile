@@ -3,5 +3,5 @@ SubDir HAIKU_TOP src apps osten tests ;
 UsePrivateHeaders storage ;
 SubDirHdrs $(HAIKU_TOP) src apps osten finder ;
 SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src apps osten finder ] ;
-Application OSTenTransferTests : TransferTests.cpp FileOperations.cpp
+Application OSTenTransferTests : TransferTests.cpp FileOperationsTestImpl.cpp
  : be [ TargetLibstdc++ ] : TransferTests.rdef ;
