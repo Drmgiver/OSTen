@@ -445,3 +445,16 @@ files are responsible for decoding them, and this milestone does not
 implement in-app sound playback or font/vector drawing. Full-standard
 signoff still requires all native application resources, complete
 versioned schemas, application packaging and interactive verification.
+
+## Self-editable native resource browser list items (November 18, 2026)
+
+The native type and entry browser rows now render their frame geometry,
+row heights, text positions, selection highlights, glyph backgrounds
+and foreground colors from 27 indexed owner-editable resources.
+Default values preserve their original appearance. Type counts and
+resource ID descriptions are assembled with static numeric formats and
+editable text fragments, preventing owner-supplied captions from
+being treated as printf directives. This extends self-customization
+beyond the Resource Editor windows to the browser content itself.
+The complete standard still requires other native UI, resource
+transactions, application module protocols and GUI interaction tests.

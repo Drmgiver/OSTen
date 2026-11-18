@@ -265,32 +265,52 @@ public:
     void Update(BView* view, const BFont* font) override
     {
         BListItem::Update(view, font);
-        SetHeight(60);
+        SetHeight(BrowserUI().Number("browser.types.row_height",
+            60, 1, 1024));
     }
 
     void DrawItem(BView* view, BRect rect, bool) override
     {
+        const OSTenResourceCatalog& ui = BrowserUI();
         view->SetHighColor(IsSelected()
-            ? BrowserUI().Color("browser.types.selected", rgb_color{192, 217, 243, 255})
-            : BrowserUI().Color("browser.types.item_background", rgb_color{250, 250, 249, 255}));
+            ? ui.Color("browser.types.selected",
+                rgb_color{192, 217, 243, 255})
+            : ui.Color("browser.types.item_background",
+                rgb_color{250, 250, 249, 255}));
         view->FillRect(rect);
-        BRect emblem(rect.left + 9, rect.top + 7,
-            rect.left + 53, rect.top + 51);
-        view->SetHighColor(225, 230, 236);
-        view->FillRoundRect(emblem, 5, 5);
-        view->SetHighColor(90, 100, 115);
-        view->StrokeRoundRect(emblem, 5, 5);
-        view->SetHighColor(25, 55, 85);
+        BRect emblem = ui.Rect("browser.types.emblem_frame",
+            BRect(9, 7, 53, 51));
+        emblem.OffsetBy(rect.left, rect.top);
+        const float radius = ui.Number(
+            "browser.types.emblem_radius", 5, 0, 64);
+        view->SetHighColor(ui.Color("browser.types.emblem_fill",
+            rgb_color{225, 230, 236, 255}));
+        view->FillRoundRect(emblem, radius, radius);
+        view->SetHighColor(ui.Color("browser.types.emblem_outline",
+            rgb_color{90, 100, 115, 255}));
+        view->StrokeRoundRect(emblem, radius, radius);
+        view->SetHighColor(ui.Color("browser.types.emblem_text",
+            rgb_color{25, 55, 85, 255}));
+        const BPoint small = ui.Point(
+            "browser.types.emblem_text_at", BPoint(13, 33));
         view->DrawString(fType.c_str(),
-            BPoint(rect.left + 13, rect.top + 33));
-        view->SetHighColor(20, 20, 20);
+            BPoint(rect.left + small.x, rect.top + small.y));
+        view->SetHighColor(ui.Color("browser.types.title_color",
+            rgb_color{20, 20, 20, 255}));
+        const BPoint title = ui.Point(
+            "browser.types.title_at", BPoint(69, 26));
         view->DrawString(fType.c_str(),
-            BPoint(rect.left + 69, rect.top + 26));
-        char details[72];
-        snprintf(details, sizeof(details), "%d resources", fCount);
-        view->SetHighColor(95, 95, 95);
-        view->DrawString(details,
-            BPoint(rect.left + 69, rect.top + 46));
+            BPoint(rect.left + title.x, rect.top + title.y));
+        char count[32];
+        snprintf(count, sizeof(count), "%d", fCount);
+        const std::string description = std::string(count) + ui.String(
+            "browser.types.count_suffix", " resources");
+        view->SetHighColor(ui.Color("browser.types.detail_color",
+            rgb_color{95, 95, 95, 255}));
+        const BPoint detail = ui.Point(
+            "browser.types.detail_at", BPoint(69, 46));
+        view->DrawString(description.c_str(),
+            BPoint(rect.left + detail.x, rect.top + detail.y));
     }
 
 private:
@@ -308,46 +328,74 @@ public:
     void Update(BView* view, const BFont* font) override
     {
         BListItem::Update(view, font);
-        SetHeight(64);
+        SetHeight(BrowserUI().Number("browser.entries.row_height",
+            64, 1, 1024));
     }
 
     void DrawItem(BView* view, BRect rect, bool) override
     {
+        const OSTenResourceCatalog& ui = BrowserUI();
         view->SetHighColor(IsSelected()
-            ? BrowserUI().Color("browser.entries.selected", rgb_color{192, 217, 243, 255})
-            : BrowserUI().Color("browser.entries.item_background", rgb_color{252, 252, 252, 255}));
+            ? ui.Color("browser.entries.selected",
+                rgb_color{192, 217, 243, 255})
+            : ui.Color("browser.entries.item_background",
+                rgb_color{252, 252, 252, 255}));
         view->FillRect(rect);
         if (fBitmap != NULL) {
-            BRect picture(rect.left + 9, rect.top + 7,
-                rect.left + 57, rect.top + 55);
-            view->SetHighColor(233, 233, 233);
+            BRect picture = ui.Rect("browser.entries.preview_frame",
+                BRect(9, 7, 57, 55));
+            picture.OffsetBy(rect.left, rect.top);
+            view->SetHighColor(ui.Color("browser.entries.preview_background",
+                rgb_color{233, 233, 233, 255}));
             view->FillRect(picture);
             view->SetDrawingMode(B_OP_ALPHA);
             view->DrawBitmap(fBitmap, fBitmap->Bounds(), picture);
             view->SetDrawingMode(B_OP_COPY);
         } else {
-            BRect icon(rect.left + 14, rect.top + 10,
-                rect.left + 49, rect.top + 49);
-            view->SetHighColor(231, 234, 239);
+            BRect icon = ui.Rect("browser.entries.icon_frame",
+                BRect(14, 10, 49, 49));
+            icon.OffsetBy(rect.left, rect.top);
+            view->SetHighColor(ui.Color("browser.entries.icon_fill",
+                rgb_color{231, 234, 239, 255}));
             view->FillRect(icon);
-            view->SetHighColor(100, 110, 120);
+            view->SetHighColor(ui.Color("browser.entries.icon_outline",
+                rgb_color{100, 110, 120, 255}));
             view->StrokeRect(icon);
-            view->DrawString(BrowserUI().String("browser.entries.generic_icon", "TXT"), BPoint(rect.left + 19, rect.top + 34));
+            const BPoint text = ui.Point("browser.entries.icon_text_at",
+                BPoint(19, 34));
+            view->DrawString(ui.String(
+                "browser.entries.generic_icon", "TXT"),
+                BPoint(rect.left + text.x, rect.top + text.y));
         }
-        view->SetHighColor(25, 25, 25);
+        view->SetHighColor(ui.Color("browser.entries.title_color",
+            rgb_color{25, 25, 25, 255}));
+        const BPoint title = ui.Point(
+            "browser.entries.title_at", BPoint(75, 29));
         view->DrawString(fEntry.label.c_str(),
-            BPoint(rect.left + 75, rect.top + 29));
-        char detail[100];
-        if (fEntry.artwork)
-            snprintf(detail, sizeof(detail), "%d x %d RGBA artwork",
+            BPoint(rect.left + title.x, rect.top + title.y));
+        char dimensions[80];
+        if (fEntry.artwork) {
+            snprintf(dimensions, sizeof(dimensions), "%d x %d",
                 fEntry.width, fEntry.height);
-        else
-            snprintf(detail, sizeof(detail), "%s resource", fEntry.type.c_str());
-        view->SetHighColor(95, 95, 95);
-        char numbered[144];
-        snprintf(numbered, sizeof(numbered), "%s  [ID %08lx]",
-            detail, (unsigned long)fEntry.id);
-        view->DrawString(numbered, BPoint(rect.left + 75, rect.top + 49));
+        } else
+            snprintf(dimensions, sizeof(dimensions), "%s",
+                fEntry.type.c_str());
+        const std::string description = std::string(dimensions)
+            + ui.String(fEntry.artwork ? "browser.entries.rgba_suffix"
+                : "browser.entries.resource_suffix",
+                fEntry.artwork ? " RGBA artwork" : " resource");
+        char identifier[24];
+        snprintf(identifier, sizeof(identifier), "%08lx",
+            (unsigned long)fEntry.id);
+        const std::string detail = description
+            + ui.String("browser.entries.id_prefix", "  [ID ")
+            + identifier + ui.String("browser.entries.id_suffix", "]");
+        view->SetHighColor(ui.Color("browser.entries.detail_color",
+            rgb_color{95, 95, 95, 255}));
+        const BPoint detailAt = ui.Point(
+            "browser.entries.detail_at", BPoint(75, 49));
+        view->DrawString(detail.c_str(),
+            BPoint(rect.left + detailAt.x, rect.top + detailAt.y));
     }
 
 private:
