@@ -70,6 +70,9 @@ def parse_index(path: pathlib.Path) -> dict[str, tuple[int, str, str, int, int]]
         check(bool(label) and "|" not in label, f"{path}:{number}: bad label")
         check(0 <= width <= 2048 and 0 <= height <= 2048,
               f"{path}:{number}: bad image dimensions")
+        check((width == height == 0) or
+              (kind in ("ICON", "IMAG") and width > 0 and height > 0),
+              f"{path}:{number}: dimensions are only valid for RGBA art")
         output[key] = (id_value, kind, label, width, height)
     return output
 

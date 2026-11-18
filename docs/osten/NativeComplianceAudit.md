@@ -458,3 +458,13 @@ being treated as printf directives. This extends self-customization
 beyond the Resource Editor windows to the browser content itself.
 The complete standard still requires other native UI, resource
 transactions, application module protocols and GUI interaction tests.
+
+## Strict typed-resource index parsing (November 18, 2026)
+
+The public header-only typed index reader no longer silently skips bad
+records. It rejects truncated or oversized lines, duplicate resource IDs
+or keys, invalid type/key syntax, bad dimensions and missing labels.
+A failed parse does not replace a previously loaded complete catalog.
+Portable host regression tests now exercise these failure cases before
+the cross-compiler build. This improves reader correctness but does not
+resolve multi-file manifest/index atomicity or full native GUI compliance.

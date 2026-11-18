@@ -298,3 +298,18 @@ separate runtime responsibilities. Filename case, suffix and indexed
 type must match the public registry. Unknown types remain open to
 future extensions and can use the generic inspector when represented
 by manifest keys. This is not arbitrary compiled Haiku-resource editing.
+
+## Strict index-reader error semantics (November 18, 2026)
+
+The portable index loader now parses an entire index as one document.
+Malformed lines, unsupported field syntax, duplicate keys or IDs, invalid
+image dimensions, oversized lines and truncated records cause a **failed
+load**, rather than silently discarding individual resources and presenting
+an incomplete catalog. On failure the caller's previous index remains
+untouched. Valid indexes continue to use exactly six pipe-separated
+fields per row with a terminal LF and the v1 header.
+
+The host-side C++ test covers valid typed records and representative
+malformed documents. The Python preflight checks matching image-dimension
+semantics. This protects typed resource discovery; it does not yet provide
+cross-file transactional saving of the manifest and index.
