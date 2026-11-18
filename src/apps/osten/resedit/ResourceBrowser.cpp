@@ -1552,40 +1552,48 @@ public:
 
     void Draw(BRect) override
     {
-        SetHighColor(BrowserUI().Color("browser.layout.frame_color",
+        const OSTenResourceCatalog& ui = BrowserUI();
+        SetHighColor(ui.Color("browser.layout.frame_color",
             rgb_color{80, 90, 103, 255}));
         StrokeRect(Bounds());
         if (fWindowFrame != NULL && fWindowFrame->IsValid()) {
-            BRect window(20, 20, 20 + fWindowFrame->Width(),
-                20 + fWindowFrame->Height());
-            SetHighColor(BrowserUI().Color("browser.layout.window_outline",
+            const BRect window = _WindowRect();
+            SetHighColor(ui.Color("browser.layout.window_outline",
                 rgb_color{42, 68, 99, 255}));
             StrokeRect(window);
-            StrokeLine(BPoint(window.left, window.top + 20),
-                BPoint(window.right, window.top + 20));
-            FillRect(BRect(window.right - 11, window.bottom - 11,
-                window.right, window.bottom));
+            const float titleHeight = ui.Number(
+                "browser.layout.window_title_height", 20, 0, 256);
+            StrokeLine(BPoint(window.left, window.top + titleHeight),
+                BPoint(window.right, window.top + titleHeight));
+            SetHighColor(ui.Color("browser.layout.window_handle_fill",
+                rgb_color{42, 68, 99, 255}));
+            FillRect(_WindowResizeHandle(window));
         }
         for (size_t i = 0; i < fHandles->size(); ++i) {
-            BRect rect = (*fHandles)[i].frame;
-            rect.OffsetBy(20, 20);
+            const BRect rect = _ControlRect(i);
             SetHighColor(i == (size_t)fSelected
-                ? BrowserUI().Color("browser.layout.selected",
+                ? ui.Color("browser.layout.selected",
                     rgb_color{191, 220, 250, 255})
-                : BrowserUI().Color("browser.layout.control",
+                : ui.Color("browser.layout.control",
                     rgb_color{234, 234, 232, 255}));
             FillRect(rect);
-            SetHighColor(BrowserUI().Color("browser.layout.frame_color",
+            SetHighColor(ui.Color("browser.layout.frame_color",
                 rgb_color{80, 90, 103, 255}));
             StrokeRect(rect);
-            MovePenTo(rect.left + 6, rect.top + 18);
+            const BPoint textOffset = ui.Point(
+                "browser.layout.control_label_offset", BPoint(6, 18));
+            MovePenTo(rect.left + textOffset.x,
+                rect.top + textOffset.y);
+            SetHighColor(ui.Color("browser.layout.control_label_color",
+                rgb_color{80, 90, 103, 255}));
             const LayoutHandle& item = (*fHandles)[i];
             const std::string label = item.caption.empty() ? item.id
                 : item.caption;
             DrawString(label.c_str());
             if (i == (size_t)fSelected) {
-                FillRect(BRect(rect.right - 10, rect.bottom - 10,
-                    rect.right, rect.bottom));
+                SetHighColor(ui.Color("browser.layout.control_handle_fill",
+                    rgb_color{80, 90, 103, 255}));
+                FillRect(_ControlResizeHandle(rect));
             }
         }
     }
@@ -1593,32 +1601,49 @@ public:
     void MouseDown(BPoint where) override
     {
         fSelected = -1;
+        fTracking = false;
         fWindowTracking = false;
+        const OSTenResourceCatalog& ui = BrowserUI();
         for (int32 i = (int32)fHandles->size() - 1; i >= 0; --i) {
-            BRect rect = (*fHandles)[i].frame;
-            rect.OffsetBy(20, 20);
+            const BRect rect = _ControlRect((size_t)i);
             if (rect.Contains(where)) {
                 fSelected = i;
                 fOrigin = where;
                 fInitial = (*fHandles)[i].frame;
-                fResize = where.x >= rect.right - 12
-                    && where.y >= rect.bottom - 12;
+                BRect hit = _ControlResizeHandle(rect);
+                const float padding = ui.Number(
+                    "browser.layout.control_handle_hit_padding",
+                    2, 0, 128);
+                hit.left -= padding;
+                hit.top -= padding;
+                fResize = hit.Contains(where);
                 fTracking = true;
                 SetMouseEventMask(B_POINTER_EVENTS, B_NO_POINTER_HISTORY);
                 break;
             }
         }
         if (!fTracking && fWindowFrame != NULL && fWindowFrame->IsValid()) {
-            BRect window(20, 20, 20 + fWindowFrame->Width(),
-                20 + fWindowFrame->Height());
-            if (BRect(window.right - 13, window.bottom - 13,
-                    window.right + 5, window.bottom + 5).Contains(where)) {
+            const BRect window = _WindowRect();
+            BRect hit = _WindowResizeHandle(window);
+            const float inner = ui.Number(
+                "browser.layout.window_handle_hit_inner", 2, 0, 128);
+            const float outer = ui.Number(
+                "browser.layout.window_handle_hit_outer", 5, 0, 128);
+            hit.left -= inner;
+            hit.top -= inner;
+            hit.right += outer;
+            hit.bottom += outer;
+            if (hit.Contains(where)) {
                 fWindowTracking = true;
                 fWindowResize = true;
-            } else if (BRect(window.left, window.top,
-                    window.right, window.top + 20).Contains(where)) {
-                fWindowTracking = true;
-                fWindowResize = false;
+            } else {
+                const float titleHeight = ui.Number(
+                    "browser.layout.window_title_height", 20, 0, 256);
+                if (BRect(window.left, window.top, window.right,
+                        window.top + titleHeight).Contains(where)) {
+                    fWindowTracking = true;
+                    fWindowResize = false;
+                }
             }
             if (fWindowTracking) {
                 fOrigin = where;
@@ -1637,8 +1662,12 @@ public:
             float dx = where.x - fOrigin.x;
             float dy = where.y - fOrigin.y;
             if (fWindowResize) {
-                frame.right = std::max(frame.left + 40, frame.right + dx);
-                frame.bottom = std::max(frame.top + 35, frame.bottom + dy);
+                frame.right = std::max(frame.left + BrowserUI().Number(
+                    "browser.layout.min_window_width", 40, 1, 8192),
+                    frame.right + dx);
+                frame.bottom = std::max(frame.top + BrowserUI().Number(
+                    "browser.layout.min_window_height", 35, 1, 8192),
+                    frame.bottom + dy);
             } else frame.OffsetBy(dx, dy);
             *fWindowFrame = frame;
             Invalidate();
@@ -1650,8 +1679,12 @@ public:
         const float dx = where.x - fOrigin.x;
         const float dy = where.y - fOrigin.y;
         if (fResize) {
-            frame.right = std::max(frame.left + 20, frame.right + dx);
-            frame.bottom = std::max(frame.top + 15, frame.bottom + dy);
+            frame.right = std::max(frame.left + BrowserUI().Number(
+                "browser.layout.min_control_width", 20, 1, 8192),
+                frame.right + dx);
+            frame.bottom = std::max(frame.top + BrowserUI().Number(
+                "browser.layout.min_control_height", 15, 1, 8192),
+                frame.bottom + dy);
         } else frame.OffsetBy(dx, dy);
         (*fHandles)[fSelected].frame = frame;
         Invalidate();
@@ -1663,6 +1696,44 @@ public:
         fWindowTracking = false;
     }
 private:
+    BPoint _PreviewOrigin() const
+    {
+        return BrowserUI().Point("browser.layout.preview_origin",
+            BPoint(20, 20));
+    }
+
+    BRect _WindowRect() const
+    {
+        const BPoint origin = _PreviewOrigin();
+        return BRect(origin.x, origin.y,
+            origin.x + fWindowFrame->Width(),
+            origin.y + fWindowFrame->Height());
+    }
+
+    BRect _ControlRect(size_t index) const
+    {
+        BRect frame = (*fHandles)[index].frame;
+        const BPoint origin = _PreviewOrigin();
+        frame.OffsetBy(origin.x, origin.y);
+        return frame;
+    }
+
+    BRect _WindowResizeHandle(const BRect& frame) const
+    {
+        const float size = BrowserUI().Number(
+            "browser.layout.window_handle_size", 11, 1, 256);
+        return BRect(frame.right - size, frame.bottom - size,
+            frame.right, frame.bottom);
+    }
+
+    BRect _ControlResizeHandle(const BRect& frame) const
+    {
+        const float size = BrowserUI().Number(
+            "browser.layout.control_handle_size", 10, 1, 256);
+        return BRect(frame.right - size, frame.bottom - size,
+            frame.right, frame.bottom);
+    }
+
     std::vector<LayoutHandle>* fHandles;
     BRect* fWindowFrame;
     int32 fSelected;

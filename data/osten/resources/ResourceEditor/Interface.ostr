@@ -654,3 +654,20 @@ browser.entries.id_prefix=  [ID
 browser.entries.id_suffix=]
 browser.entries.detail_color=95,95,95
 browser.entries.detail_at=75,49
+
+# Resource-driven graphical layout preview handles, offsets and mouse targets
+browser.layout.preview_origin=20,20
+browser.layout.window_title_height=20
+browser.layout.window_handle_size=11
+browser.layout.window_handle_fill=42,68,99
+browser.layout.window_handle_hit_inner=2
+browser.layout.window_handle_hit_outer=5
+browser.layout.control_label_offset=6,18
+browser.layout.control_label_color=80,90,103
+browser.layout.control_handle_size=10
+browser.layout.control_handle_fill=80,90,103
+browser.layout.control_handle_hit_padding=2
+browser.layout.min_window_width=40
+browser.layout.min_window_height=35
+browser.layout.min_control_width=20
+browser.layout.min_control_height=15

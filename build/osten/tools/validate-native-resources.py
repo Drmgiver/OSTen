@@ -331,12 +331,69 @@ def validate_pixel_canvas_defaults() -> None:
     print("ResourceEditor: 29 indexed Pixel Canvas appearance/layout defaults checked")
 
 
+
+def validate_layout_canvas_defaults() -> None:
+    """Verify indexed drawing and interaction settings for the layout canvas."""
+    values = parse_manifest(BASE / "ResourceEditor" / "Interface.ostr")
+    index = parse_index(BASE / "ResourceEditor" / "ResourceIndex.osti")
+    source = (ROOT / "src/apps/osten/resedit/ResourceBrowser.cpp"
+              ).read_text(encoding="utf-8")
+    point_fields = ("preview_origin", "control_label_offset")
+    color_fields = ("window_handle_fill", "control_label_color",
+                    "control_handle_fill")
+    number_fields = ("window_title_height", "window_handle_size",
+                     "window_handle_hit_inner", "window_handle_hit_outer",
+                     "control_handle_size", "control_handle_hit_padding",
+                     "min_window_width", "min_window_height",
+                     "min_control_width", "min_control_height")
+    for name in point_fields:
+        key = "browser.layout." + name
+        check(key in index and index[key][1] == "WLAY",
+              f"Layout Canvas: missing indexed point {key}")
+        try:
+            coords = [float(part) for part in values.get(key, "").split(",")]
+            valid = len(coords) == 2 and all(-8192 <= x <= 8192 for x in coords)
+        except ValueError:
+            valid = False
+        check(valid, f"Layout Canvas: invalid point {key}")
+    for name in color_fields:
+        key = "browser.layout." + name
+        check(key in index and index[key][1] == "COLR",
+              f"Layout Canvas: missing indexed color {key}")
+        try:
+            channels = [int(part) for part in values.get(key, "").split(",")]
+            valid = len(channels) == 3 and all(0 <= x <= 255 for x in channels)
+        except ValueError:
+            valid = False
+        check(valid, f"Layout Canvas: invalid RGB {key}")
+    for name in number_fields:
+        key = "browser.layout." + name
+        check(key in index and index[key][1] == "NUMB",
+              f"Layout Canvas: missing indexed number {key}")
+        try:
+            value = float(values.get(key, ""))
+            valid = 0 <= value <= 8192
+        except ValueError:
+            valid = False
+        check(valid, f"Layout Canvas: invalid number {key}")
+    check(source.count("const BRect window = _WindowRect();") >= 2,
+          "Layout Canvas: window rendering and selection must share geometry")
+    check(source.count("const BRect rect = _ControlRect(") >= 2,
+          "Layout Canvas: control rendering and selection must share geometry")
+    check(source.count("_WindowResizeHandle(window)") >= 2,
+          "Layout Canvas: window resize handle/hit area must share geometry")
+    check(source.count("_ControlResizeHandle(rect)") >= 2,
+          "Layout Canvas: control resize handle/hit area must share geometry")
+    print("ResourceEditor: 15 indexed Layout Canvas defaults checked")
+
+
 def main() -> int:
     validate_osten_classic_decorator()
     for app in APPS:
         validate_app(app)
     check_editor_bindings()
     validate_pixel_canvas_defaults()
+    validate_layout_canvas_defaults()
     check_editor_status_resources()
     validate_composed_dialog("Finder", "dialog.rename")
     validate_composed_dialog("Finder", "dialog.info")

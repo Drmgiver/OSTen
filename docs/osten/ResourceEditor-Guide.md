@@ -294,3 +294,13 @@ existing file permissions preserved; no backup is required.
 Restart the target application to reload the resource. The app itself
 must understand the chosen file's encoding. This editor does not
 provide sound playback, font editing or vector drawing yet.
+
+
+## Customize the layout canvas's handles and hit targets
+
+The Resource Editor's `browser.layout.*` resources now include
+`preview_origin`, `window_title_height`,
+`window_handle_size`, `control_handle_size`, their hit padding,
+`control_label_offset`, minimum resize dimensions and appearance
+colors. The mouse hit areas use the same geometry helpers as the
+visible handles; edits apply after restarting Resource Editor.

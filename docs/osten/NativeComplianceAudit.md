@@ -468,3 +468,19 @@ A failed parse does not replace a previously loaded complete catalog.
 Portable host regression tests now exercise these failure cases before
 the cross-compiler build. This improves reader correctness but does not
 resolve multi-file manifest/index atomicity or full native GUI compliance.
+
+## Resource-defined graphical layout-preview geometry (November 18, 2026)
+
+The layout designer's custom canvas now derives the preview origin,
+window title divider, resize-handle sizes, hit padding, control labels,
+minimum resize dimensions and handle/label colors from 15 indexed
+owner-editable resources. Rendering and mouse selection share
+`_WindowRect`, `_ControlRect`, `_WindowResizeHandle` and
+`_ControlResizeHandle` helpers, so changing the appearance or position
+does not silently strand its corresponding input target.
+
+Shipped defaults reproduce the previous geometry and appearance, and
+the resource preflight validates typed default values and that
+drawing/selection reference the same helper paths. These changes
+address the Resource Editor's own designer canvas, not the remaining
+System, Finder or cross-file transaction compliance gaps.
