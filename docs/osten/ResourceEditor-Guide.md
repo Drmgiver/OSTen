@@ -272,3 +272,12 @@ label positions and actual-size preview. Open the Resource Editor resources
 and edit the corresponding `browser.pixel.*` entries. The drawing code and
 mouse hit detection read the same geometry, so a moved swatch remains clickable
 after the application restarts. The default artwork and interface are unchanged.
+
+## Edit the Dialog Layout Editor itself
+
+Resource Editor's own graphical layout designer is declared under
+`browser.layout.controls` with stable, typed control IDs. Open that
+`DLOG` resource to edit its own preview canvas, inspector fields,
+buttons, positions, captions and action bindings. Changes apply after
+restarting Resource Editor. A custom `layout_canvas` factory draws the
+live handles while keeping editable geometry in the resource manifest.

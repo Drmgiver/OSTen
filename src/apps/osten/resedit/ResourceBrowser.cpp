@@ -1300,8 +1300,8 @@ struct LayoutHandle {
 class LayoutCanvas : public BView {
 public:
     LayoutCanvas(BRect bounds, std::vector<LayoutHandle>* handles,
-        BRect* windowFrame)
-        : BView(bounds, "layout-canvas", B_FOLLOW_ALL, B_WILL_DRAW),
+        BRect* windowFrame, const char* identifier)
+        : BView(bounds, identifier, B_FOLLOW_ALL, B_WILL_DRAW),
           fHandles(handles), fWindowFrame(windowFrame),
           fSelected(-1), fTracking(false), fResize(false),
           fWindowTracking(false), fWindowResize(false)
@@ -1441,6 +1441,23 @@ private:
     BRect fInitial;
 };
 
+
+struct LayoutCanvasFactoryContext {
+    std::vector<LayoutHandle>* handles;
+    BRect* frame;
+};
+
+static BView*
+CreateBrowserLayoutCanvas(BRect frame, const char* identifier, const char*,
+    uint32, const OSTenResourceCatalog&, const std::string&, void* context)
+{
+    LayoutCanvasFactoryContext* data
+        = static_cast<LayoutCanvasFactoryContext*>(context);
+    if (data == NULL || data->handles == NULL || data->frame == NULL)
+        return NULL;
+    return new LayoutCanvas(frame, data->handles, data->frame, identifier);
+}
+
 class LayoutEditorWindow : public BWindow {
 public:
     explicit LayoutEditorWindow(const ResourceEntry& item)
@@ -1448,7 +1465,8 @@ public:
             BRect(120, 70, 1265, 690)),
             (item.label + BrowserUI().String("browser.layout.title_suffix",
                 " — Dialog Layout Editor")).c_str(), B_TITLED_WINDOW, 0),
-          fEntry(item)
+          fEntry(item), fCanvas(NULL), fStatus(NULL), fID(NULL),
+          fType(NULL), fCaption(NULL), fAction(NULL), fWindowGeometry(NULL)
     {
         fWindowFrame = BRect(0, 0, -1, -1);
         BView* panel = new BView(Bounds(), "layout-editor",
@@ -1456,83 +1474,48 @@ public:
         panel->SetViewColor(BrowserUI().Color("browser.layout.background",
             rgb_color{239, 239, 236, 255}));
         AddChild(panel);
-        panel->AddChild(new BStringView(BrowserUI().Rect(
-                "browser.layout.hint_frame", BRect(16, 10, 733, 38)),
-            "layout-hint", BrowserUI().String("browser.layout.hint",
-                "Drag a control to move it; drag its lower-right handle to resize")));
-        fCanvas = new LayoutCanvas(BrowserUI().Rect(
-                "browser.layout.canvas_frame", BRect(14, 42, 737, 493)),
-            &fHandles, &fWindowFrame);
-        panel->AddChild(fCanvas);
-        // The inspector uses the same editable OSTen resource catalog as
-        // the preview itself; stable control IDs are independent of labels.
-        fID = new BTextControl(BrowserUI().Rect("browser.layout.id_frame",
-            BRect(761, 54, 1100, 89)), "layout-id",
-            BrowserUI().String("browser.layout.id_label", "Control ID"),
-            "", NULL);
-        fType = new BTextControl(BrowserUI().Rect("browser.layout.type_frame",
-            BRect(761, 100, 1100, 135)), "layout-type",
-            BrowserUI().String("browser.layout.type_label", "Type"),
-            "", NULL);
-        fCaption = new BTextControl(BrowserUI().Rect("browser.layout.caption_frame",
-            BRect(761, 146, 1100, 181)), "layout-caption",
-            BrowserUI().String("browser.layout.caption_label", "Label"),
-            "", NULL);
-        fAction = new BTextControl(BrowserUI().Rect("browser.layout.action_frame",
-            BRect(761, 192, 1100, 227)), "layout-action",
-            BrowserUI().String("browser.layout.action_label", "Action ID"),
-            "", NULL);
-        fWindowGeometry = new BTextControl(BrowserUI().Rect(
-            "browser.layout.window_geometry_frame", BRect(761, 402, 1100, 437)),
-            "layout-window-geometry",
-            BrowserUI().String("browser.layout.window_geometry_label",
-                "Window frame"), "", NULL);
-        BTextControl* editors[] = {
-            fID, fType, fCaption, fAction, fWindowGeometry};
-        for (size_t i = 0; i < sizeof(editors) / sizeof(editors[0]); ++i) {
-            editors[i]->SetDivider(102);
-            panel->AddChild(editors[i]);
-        }
-        struct LayoutButton {
-            const char* id;
-            const char* title;
-            uint32 message;
-            BRect frame;
+
+        const OSTenDialogAction actions[] = {
+            {"layout.apply", kLayoutApply},
+            {"layout.add", kLayoutAdd},
+            {"layout.remove", kLayoutRemove},
+            {"layout.up", kLayoutUp},
+            {"layout.down", kLayoutDown},
+            {"layout.revert", kLayoutRevert},
+            {"layout.save", kLayoutSave}
         };
-        const LayoutButton operations[] = {
-            {"apply", "Apply", kLayoutApply, BRect(765, 249, 921, 282)},
-            {"add", "Add", kLayoutAdd, BRect(936, 249, 1099, 282)},
-            {"remove", "Remove", kLayoutRemove, BRect(765, 294, 921, 327)},
-            {"up", "Move Up", kLayoutUp, BRect(936, 294, 1099, 327)},
-            {"down", "Move Down", kLayoutDown, BRect(936, 339, 1099, 372)}
-        };
-        for (size_t i = 0; i < sizeof(operations) / sizeof(operations[0]); ++i) {
-            std::string titleKey = std::string("browser.layout.") + operations[i].id;
-            std::string frameKey = titleKey + "_frame";
-            panel->AddChild(new BButton(BrowserUI().Rect(
-                    frameKey.c_str(), operations[i].frame),
-                operations[i].id,
-                BrowserUI().String(titleKey.c_str(), operations[i].title),
-                new BMessage(operations[i].message)));
-        }
-        panel->AddChild(new BButton(BrowserUI().Rect(
-                "browser.layout.revert_frame", BRect(495, 502, 605, 537)),
-            "revert", BrowserUI().String("browser.layout.revert", "Revert"),
-            new BMessage(kLayoutRevert)));
-        panel->AddChild(new BButton(BrowserUI().Rect(
-                "browser.layout.save_frame", BRect(619, 502, 728, 537)),
-            "save", BrowserUI().String("browser.layout.save", "Save"),
-            new BMessage(kLayoutSave)));
-        fStatus = new BStringView(BrowserUI().Rect(
-                "browser.layout.status_frame", BRect(16, 500, 478, 544)),
-            "layout-status", "");
-        panel->AddChild(fStatus);
-        _Load();
+        LayoutCanvasFactoryContext context = {&fHandles, &fWindowFrame};
+        OSTenDialogControlFactories factories;
+        factories["layout_canvas"] = &CreateBrowserLayoutCanvas;
+        const OSTenDialogControls controls = OSTenCreateDialogControls(
+            panel, BrowserUI(), "browser.layout",
+            actions, sizeof(actions) / sizeof(actions[0]),
+            &factories, &context);
+        fCanvas = BrowserComposedControl<LayoutCanvas>(
+            controls, "browser.layout", "canvas", "layout_canvas");
+        fID = BrowserComposedControl<BTextControl>(
+            controls, "browser.layout", "id", "text");
+        fType = BrowserComposedControl<BTextControl>(
+            controls, "browser.layout", "type", "text");
+        fCaption = BrowserComposedControl<BTextControl>(
+            controls, "browser.layout", "caption", "text");
+        fAction = BrowserComposedControl<BTextControl>(
+            controls, "browser.layout", "action", "text");
+        fWindowGeometry = BrowserComposedControl<BTextControl>(
+            controls, "browser.layout", "window_geometry", "text");
+        fStatus = BrowserComposedControl<BStringView>(
+            controls, "browser.layout", "status", "label");
+        if (_Ready())
+            _Load();
         Show();
     }
 
     void MessageReceived(BMessage* message) override
     {
+        if (!_Ready()) {
+            BWindow::MessageReceived(message);
+            return;
+        }
         switch (message->what) {
             case kLayoutSelected: {
                 int32 selected = fCanvas->Selected();
@@ -1551,6 +1534,13 @@ public:
     }
 
 private:
+    bool _Ready() const
+    {
+        return fCanvas != NULL && fStatus != NULL
+            && fID != NULL && fType != NULL && fCaption != NULL
+            && fAction != NULL && fWindowGeometry != NULL;
+    }
+
     void _Load()
     {
         FILE* input = fopen(fEntry.path.c_str(), "rb");

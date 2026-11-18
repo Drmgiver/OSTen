@@ -403,3 +403,23 @@ These data changes do not alter image file formats or force backup/recovery.
 Remaining gaps include complete import/export for other asset formats,
 font/audio/cursor/vector editors, cross-file resource transactions,
 additional Finder/System native UI, and booted interaction tests.
+
+## Graphical dialog designer self-composition (November 18, 2026)
+
+The Resource Editor's graphical layout designer now builds all 15
+controls through the common `OSTenCreateDialogControls` API.
+Its preview canvas is a registered `layout_canvas` factory receiving
+the editor's live handle collection and outer frame as context.
+The seven operation buttons, text inspector fields, hint and status
+are declared in indexed, owner-editable `browser.layout.controls`
+records. The five text-field dividers are editable numeric resources.
+The outer window frame uses `browser.layout.window_frame_key`.
+
+A missing or retyped essential field prevents the editor operations
+from dereferencing an invalid pointer; it is not forcibly restored.
+The native catalog validator checks the default composed control set.
+
+This removes an important Resource Editor self-editing blocker,
+but full-standard compliance still requires additional resource formats,
+System and Finder coverage, multi-file resource consistency and
+interactive testing after boot.
