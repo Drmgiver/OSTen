@@ -423,3 +423,25 @@ This removes an important Resource Editor self-editing blocker,
 but full-standard compliance still requires additional resource formats,
 System and Finder coverage, multi-file resource consistency and
 interactive testing after boot.
+
+## Native indexed binary-asset editing (November 18, 2026)
+
+Resource Editor now discovers file-backed native `SOUN`, `CURS`,
+`VECT`, and `FONT` resource types from public resource-index IDs.
+Supported file suffixes include WAV/AIFF/OGG/FLAC, CUR/CURSOR,
+HVIF/SVG, and TTF/OTF respectively. The binary file is stored beside
+the app's `ResourceIndex.osti`, with the filename stem matching its
+indexed key and its indexed image dimensions set to zero.
+The editor displays the asset type/name/size and allows direct
+replacement using a native file picker, a streaming bounded copy,
+atomic destination rename and original permission-bit preservation.
+System Folder edits still require the Owner's Finder unlock.
+No compulsory backup is created and executable files are never patched.
+
+The replacement window is resource-composed, with editable fields,
+captions, positions and action ID. Unknown extensions/types remain
+opaque and use the generic property inspector. Native consumers of these
+files are responsible for decoding them, and this milestone does not
+implement in-app sound playback or font/vector drawing. Full-standard
+signoff still requires all native application resources, complete
+versioned schemas, application packaging and interactive verification.

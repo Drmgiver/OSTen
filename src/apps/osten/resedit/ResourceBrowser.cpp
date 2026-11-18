@@ -76,7 +76,8 @@ enum {
     kColorChange = 'clCh', kColorSave = 'clSv', kColorRevert = 'clRv',
     kLayoutSave = 'lySv', kLayoutRevert = 'lyRv', kLayoutSelected = 'lySl',
     kLayoutApply = 'lyAp', kLayoutAdd = 'lyAd',
-    kLayoutRemove = 'lyRm', kLayoutUp = 'lyUp', kLayoutDown = 'lyDn'
+    kLayoutRemove = 'lyRm', kLayoutUp = 'lyUp', kLayoutDown = 'lyDn',
+    kAssetImport = 'asIm', kAssetChosen = 'asCh'
 };
 
 struct ResourceEntry {
@@ -89,6 +90,7 @@ struct ResourceEntry {
     int width;
     int height;
     bool artwork;
+    bool binaryAsset;
 };
 
 static bool
@@ -117,6 +119,25 @@ ExistingFile(const std::string& path)
 {
     struct stat st;
     return stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+}
+
+
+// Native non-RGBA assets are file-backed resources with indexed stable IDs.
+// Their bytes stay in the selected application's folder, not its executable.
+// This list is an open format registry; unknown indexed types still use the
+// ordinary generic property inspector rather than being misidentified.
+static bool
+IsNativeBinaryAsset(const std::string& suffix, const std::string& type)
+{
+    return (type == "SOUN"
+            && (suffix == ".wav" || suffix == ".aiff"
+                || suffix == ".ogg" || suffix == ".flac"))
+        || (type == "CURS"
+            && (suffix == ".cur" || suffix == ".cursor"))
+        || (type == "VECT"
+            && (suffix == ".hvif" || suffix == ".svg"))
+        || (type == "FONT"
+            && (suffix == ".ttf" || suffix == ".otf"));
 }
 
 static bool
@@ -770,6 +791,170 @@ private:
     ResourceEntry fEntry;
     PixelCanvas* fCanvas;
     BStringView* fStatus;
+};
+
+
+class BinaryAssetEditorWindow : public BWindow {
+public:
+    explicit BinaryAssetEditorWindow(const ResourceEntry& entry)
+        : BWindow(BrowserUI().Rect("browser.asset.window",
+            BRect(180, 120, 850, 400)),
+            (entry.label + BrowserUI().String("browser.asset.title_suffix",
+                " — Asset Editor")).c_str(), B_TITLED_WINDOW, 0),
+          fEntry(entry), fDetails(NULL), fStatus(NULL), fPicker(NULL)
+    {
+        BView* panel = new BView(Bounds(), "asset-editor",
+            B_FOLLOW_ALL, B_WILL_DRAW);
+        panel->SetViewColor(BrowserUI().Color("browser.asset.background",
+            rgb_color{239, 239, 236, 255}));
+        AddChild(panel);
+        const OSTenDialogAction actions[] = {
+            {"asset.import", kAssetImport}
+        };
+        const OSTenDialogControls controls = OSTenCreateDialogControls(
+            panel, BrowserUI(), "browser.asset",
+            actions, sizeof(actions) / sizeof(actions[0]));
+        fDetails = BrowserComposedControl<BStringView>(
+            controls, "browser.asset", "details", "label");
+        fStatus = BrowserComposedControl<BStringView>(
+            controls, "browser.asset", "status", "label");
+        if (fDetails != NULL) {
+            struct stat st;
+            const bool exists = stat(fEntry.path.c_str(), &st) == 0;
+            char bytes[64];
+            snprintf(bytes, sizeof(bytes), "%lld",
+                exists ? (long long)st.st_size : 0LL);
+            const std::string label = fEntry.type + "  |  "
+                + Leaf(fEntry.path) + "  |  " + bytes + " bytes";
+            fDetails->SetText(label.c_str());
+        }
+        Show();
+    }
+
+    ~BinaryAssetEditorWindow() override { delete fPicker; }
+
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+            case kAssetImport:
+                _Pick();
+                return;
+            case kAssetChosen: {
+                entry_ref ref;
+                if (message->FindRef("refs", &ref) == B_OK)
+                    _Replace(ref);
+                Activate(true);
+                return;
+            }
+            case B_CANCEL:
+                Activate(true);
+                return;
+        }
+        BWindow::MessageReceived(message);
+    }
+
+private:
+    void _Report(const char* key, const char* fallback)
+    {
+        if (fStatus != NULL)
+            fStatus->SetText(BrowserUI().String(key, fallback));
+    }
+
+    void _Pick()
+    {
+        if (fPicker == NULL) {
+            BMessenger receiver(this);
+            BMessage selected(kAssetChosen);
+            fPicker = new BFilePanel(B_OPEN_PANEL, &receiver,
+                NULL, B_FILE_NODE, false, &selected);
+        }
+        fPicker->Show();
+    }
+
+    void _Replace(const entry_ref& ref)
+    {
+        BEntry selected(&ref, true);
+        BPath path;
+        if (selected.GetPath(&path) != B_OK)
+            return;
+        const std::string sourcePath(path.Path());
+        if (sourcePath == fEntry.path) {
+            _Report("browser.asset.unchanged",
+                "Selected file is already the current asset.");
+            return;
+        }
+        if (!OwnerMayWrite(fEntry.path))
+            return;
+        FILE* input = fopen(sourcePath.c_str(), "rb");
+        if (input == NULL) {
+            _Report("browser.asset.failed", "Unable to replace this asset.");
+            return;
+        }
+        struct stat sourceMetadata;
+        const bool sourceValid = fstat(fileno(input), &sourceMetadata) == 0
+            && S_ISREG(sourceMetadata.st_mode)
+            && sourceMetadata.st_size >= 0
+            && sourceMetadata.st_size <= (off_t)BrowserUI().Number(
+                "browser.asset.max_bytes", 134217728, 1, 1073741824);
+        if (!sourceValid) {
+            fclose(input);
+            _Report("browser.asset.invalid",
+                "Selected asset is unreadable or exceeds the size limit.");
+            return;
+        }
+        std::string temporary = fEntry.path + ".tmp.XXXXXX";
+        std::vector<char> name(temporary.begin(), temporary.end());
+        name.push_back('\0');
+        int fd = mkstemp(name.data());
+        if (fd < 0) {
+            fclose(input);
+            _Report("browser.asset.failed", "Unable to replace this asset.");
+            return;
+        }
+        struct stat current;
+        const bool exists = stat(fEntry.path.c_str(), &current) == 0;
+        bool ok = !exists || fchmod(fd, current.st_mode & 07777) == 0;
+        uint8 buffer[32768];
+        while (ok) {
+            const size_t amount = fread(buffer, 1, sizeof(buffer), input);
+            if (amount == 0) {
+                if (ferror(input)) ok = false;
+                break;
+            }
+            size_t sent = 0;
+            while (ok && sent < amount) {
+                ssize_t count = write(fd, buffer + sent, amount - sent);
+                if (count <= 0) {
+                    ok = false;
+                    break;
+                }
+                sent += (size_t)count;
+            }
+        }
+        if (fclose(input) != 0) ok = false;
+        if (ok && fsync(fd) != 0) ok = false;
+        if (close(fd) != 0) ok = false;
+        if (ok && rename(name.data(), fEntry.path.c_str()) == 0) {
+            _Report("browser.asset.saved",
+                "Asset replaced. Restart the edited application to reload.");
+            if (fDetails != NULL) {
+                char bytes[64];
+                snprintf(bytes, sizeof(bytes), "%lld",
+                    (long long)sourceMetadata.st_size);
+                const std::string label = fEntry.type + "  |  "
+                    + Leaf(fEntry.path) + "  |  " + bytes + " bytes";
+                fDetails->SetText(label.c_str());
+            }
+            return;
+        }
+        unlink(name.data());
+        _Report("browser.asset.failed", "Unable to replace this asset.");
+    }
+
+    ResourceEntry fEntry;
+    BStringView* fDetails;
+    BStringView* fStatus;
+    BFilePanel* fPicker;
 };
 
 // A real hierarchical menu-order editor. This edits the stable command-ID
@@ -1878,6 +2063,8 @@ public:
             const ResourceEntry& item = fResources[index];
             if (item.artwork)
                 new PixelEditorWindow(item);
+            else if (item.binaryAsset)
+                new BinaryAssetEditorWindow(item);
             else if (IsMenuSequence(item))
                 new MenuEditorWindow(item);
             else if (EndsWith(item.key, ".controls")
@@ -2075,6 +2262,7 @@ private:
             resource.width = 0;
             resource.height = 0;
             resource.artwork = false;
+            resource.binaryAsset = false;
             entries.push_back(resource);
         }
         bool readOK = !ferror(file);
@@ -2135,6 +2323,56 @@ private:
             resource.width = width;
             resource.height = height;
             resource.artwork = true;
+            resource.binaryAsset = false;
+            entries.push_back(resource);
+        }
+
+
+        // Binary assets are native indexed files and never arbitrary binary
+        // executables. Only recognized type/extension pairs are exposed.
+        // Adding an asset is a matter of adding its typed index entry and
+        // sibling file, not modifying or recompiling Resource Editor.
+        directory.Rewind();
+        while (directory.GetNextEntry(&image, true) == B_OK) {
+            if (!image.IsFile())
+                continue;
+            BPath assetPath;
+            if (image.GetPath(&assetPath) != B_OK)
+                continue;
+            const std::string nativePath(assetPath.Path());
+            const std::string basename = Leaf(nativePath);
+            const size_t dot = basename.rfind('.');
+            if (dot == std::string::npos || dot == 0)
+                continue;
+            const std::string key = basename.substr(0, dot);
+            const std::string suffix = basename.substr(dot);
+            std::map<std::string, OSTenIndexedResource>::const_iterator
+                resourceIndex = index.find(key);
+            if (resourceIndex == index.end()
+                || !IsNativeBinaryAsset(suffix, resourceIndex->second.type)
+                || resourceIndex->second.width != 0
+                || resourceIndex->second.height != 0)
+                continue;
+            bool duplicate = false;
+            for (size_t i = 0; i < entries.size(); ++i) {
+                if (entries[i].key == key) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate)
+                continue;
+            ResourceEntry resource;
+            resource.id = resourceIndex->second.id;
+            resource.type = resourceIndex->second.type;
+            resource.key = key;
+            resource.label = resourceIndex->second.name;
+            resource.path = nativePath;
+            resource.application = fApplication;
+            resource.width = 0;
+            resource.height = 0;
+            resource.artwork = false;
+            resource.binaryAsset = true;
             entries.push_back(resource);
         }
 

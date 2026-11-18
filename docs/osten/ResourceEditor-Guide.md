@@ -281,3 +281,16 @@ Resource Editor's own graphical layout designer is declared under
 buttons, positions, captions and action bindings. Changes apply after
 restarting Resource Editor. A custom `layout_canvas` factory draws the
 live handles while keeping editable geometry in the resource manifest.
+
+## Native binary resource replacement
+
+The type browser discovers indexed `SOUN`, `CURS`, `VECT` and
+`FONT` files stored alongside the manifest and resource index.
+Double-clicking one opens a resource-composed Asset Editor, showing
+the current type, filename and byte count. **Import File** selects
+replacement bytes without modifying the target executable. The
+replacement is atomically installed at the same resource path with
+existing file permissions preserved; no backup is required.
+Restart the target application to reload the resource. The app itself
+must understand the chosen file's encoding. This editor does not
+provide sound playback, font editing or vector drawing yet.

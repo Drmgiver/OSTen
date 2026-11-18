@@ -266,3 +266,35 @@ namespace. `Interface.ostr` and `ResourceIndex.osti` are independently
 atomic files; a failure after saving the manifest is reported rather
 than falsely claiming the whole operation succeeded. A future
 transactional resource container should eliminate this gap.
+
+## File-backed binary assets (November 18, 2026)
+
+Index records can represent non-RGBA, non-executable binary resources.
+A native application puts these assets beside `Interface.ostr`
+and `ResourceIndex.osti`. The **filename stem must equal KEY**,
+and the index supplies the stable ID, type, and display name.
+These types have WIDTH=0 and HEIGHT=0:
+
+| Type | Supported file suffixes |
+| --- | --- |
+| `SOUN` | `.wav`, `.aiff`, `.ogg`, `.flac` |
+| `CURS` | `.cur`, `.cursor` |
+| `VECT` | `.hvif`, `.svg` |
+| `FONT` | `.ttf`, `.otf` |
+
+For example a third-party application can ship `notify.wav` and
+`0x0137ba29|SOUN|notify|Notification sound|0|0` in its public index.
+Resource Editor discovers the asset by type and key without knowing
+the application or modifying its code. The native asset editor shows
+the type and size, then replaces bytes directly using a file picker
+and an atomic same-directory rename. It preserves existing filesystem
+permission bits and applies the same System Folder access check as
+other editor operations. No automatic backup is required.
+
+The editor copies the Owner-selected file as-is; it does not promise
+that a file is a valid sound, cursor, vector or font. Decoding,
+playback, cursor rendering and use by the target application are
+separate runtime responsibilities. Filename case, suffix and indexed
+type must match the public registry. Unknown types remain open to
+future extensions and can use the generic inspector when represented
+by manifest keys. This is not arbitrary compiled Haiku-resource editing.
