@@ -9,10 +9,10 @@
  */
 
 
-/*! Decorator resembling Mac OS 8 and 9 */
+/*! OSTen Classic native window decorator. */
 
 
-#include "MacDecorator.h"
+#include "OSTenClassicDecorator.h"
 
 #include <algorithm>
 #include <new>
@@ -26,6 +26,7 @@
 #include "DrawingEngine.h"
 #include "PatternHandler.h"
 #include "RGBColor.h"
+#include "OSTenResources.h"
 
 
 //#define DEBUG_DECORATOR
@@ -36,7 +37,7 @@
 #endif
 
 
-MacDecorAddOn::MacDecorAddOn(image_id id, const char* name)
+OSTenClassicDecorAddOn::OSTenClassicDecorAddOn(image_id id, const char* name)
 	:
 	DecorAddOn(id, name)
 {
@@ -44,35 +45,35 @@ MacDecorAddOn::MacDecorAddOn(image_id id, const char* name)
 
 
 Decorator*
-MacDecorAddOn::_AllocateDecorator(DesktopSettings& settings, BRect rect,
+OSTenClassicDecorAddOn::_AllocateDecorator(DesktopSettings& settings, BRect rect,
 	Desktop* desktop)
 {
-	return new (std::nothrow)MacDecorator(settings, rect, desktop);
+	return new (std::nothrow)OSTenClassicDecorator(settings, rect, desktop);
 }
 
 
-MacDecorator::MacDecorator(DesktopSettings& settings, BRect frame,
+OSTenClassicDecorator::OSTenClassicDecorator(DesktopSettings& settings, BRect frame,
 	Desktop* desktop)
 	:
 	SATDecorator(settings, frame, desktop),
-	fButtonHighColor((rgb_color) { 232, 232, 232, 255 }),
-	fButtonLowColor((rgb_color) { 128, 128, 128, 255 }),
-	fFrameHighColor((rgb_color) { 255, 255, 255, 255 }),
-	fFrameMidColor((rgb_color) { 216, 216, 216, 255 }),
-	fFrameLowColor((rgb_color) { 156, 156, 156, 255 }),
-	fFrameLowerColor((rgb_color) { 0, 0, 0, 255 }),
-	fFocusTextColor(settings.UIColor(B_WINDOW_TEXT_COLOR)),
-	fNonFocusTextColor(settings.UIColor(B_WINDOW_INACTIVE_TEXT_COLOR))
+	fButtonHighColor(OSTenSystemResources().Color("decorator.button_high", rgb_color{ 232, 232, 232, 255 })),
+	fButtonLowColor(OSTenSystemResources().Color("decorator.button_low", rgb_color{ 128, 128, 128, 255 })),
+	fFrameHighColor(OSTenSystemResources().Color("decorator.frame_high", rgb_color{ 255, 255, 255, 255 })),
+	fFrameMidColor(OSTenSystemResources().Color("decorator.frame_mid", rgb_color{ 216, 216, 216, 255 })),
+	fFrameLowColor(OSTenSystemResources().Color("decorator.frame_low", rgb_color{ 156, 156, 156, 255 })),
+	fFrameLowerColor(OSTenSystemResources().Color("decorator.frame_lower", rgb_color{ 0, 0, 0, 255 })),
+	fFocusTextColor(OSTenSystemResources().Color("decorator.focus_text", settings.UIColor(B_WINDOW_TEXT_COLOR))),
+	fNonFocusTextColor(OSTenSystemResources().Color("decorator.inactive_text", settings.UIColor(B_WINDOW_INACTIVE_TEXT_COLOR)))
 {
-	STRACE(("MacDecorator()\n"));
+	STRACE(("OSTenClassicDecorator()\n"));
 	STRACE(("\tFrame (%.1f,%.1f,%.1f,%.1f)\n",
 		frame.left, frame.top, frame.right, frame.bottom));
 }
 
 
-MacDecorator::~MacDecorator()
+OSTenClassicDecorator::~OSTenClassicDecorator()
 {
-	STRACE(("~MacDecorator()\n"));
+	STRACE(("~OSTenClassicDecorator()\n"));
 }
 
 
@@ -80,9 +81,9 @@ MacDecorator::~MacDecorator()
 
 
 void
-MacDecorator::Draw(BRect updateRect)
+OSTenClassicDecorator::Draw(BRect updateRect)
 {
-	STRACE(("MacDecorator: Draw(BRect updateRect): "));
+	STRACE(("OSTenClassicDecorator: Draw(BRect updateRect): "));
 	updateRect.PrintToStream();
 
 	// We need to draw a few things: the tab, the borders,
@@ -96,9 +97,9 @@ MacDecorator::Draw(BRect updateRect)
 
 
 void
-MacDecorator::Draw()
+OSTenClassicDecorator::Draw()
 {
-	STRACE("MacDecorator::Draw()\n");
+	STRACE("OSTenClassicDecorator::Draw()\n");
 	fDrawingEngine->SetDrawState(&fDrawState);
 
 	_DrawFrame(fBorderRect);
@@ -111,7 +112,7 @@ MacDecorator::Draw()
 
 
 Decorator::Region
-MacDecorator::RegionAt(BPoint where, int32& tab) const
+OSTenClassicDecorator::RegionAt(BPoint where, int32& tab) const
 {
 	// The base decorator tests Close and Zoom but not Minimize. Its
 	// REGION_TAB hit would swallow our right-hand WindowShade button.
@@ -127,7 +128,7 @@ MacDecorator::RegionAt(BPoint where, int32& tab) const
 	if (_IsTabOnly())
 		return REGION_NONE;
 
-	// The visible classic Mac size box must also be the clickable resize area.
+	// The visible classic resize box must also be the clickable resize area.
 	// It is available for normal titled Finder windows as well as document
 	// windows; the OS must never offer it on a fixed-size window.
 	if (fResizeRect.IsValid() && fResizeRect.Contains(where))
@@ -148,7 +149,7 @@ MacDecorator::RegionAt(BPoint where, int32& tab) const
 
 
 bool
-MacDecorator::SetRegionHighlight(Region region, uint8 highlight,
+OSTenClassicDecorator::SetRegionHighlight(Region region, uint8 highlight,
 	BRegion* dirty, int32 tabIndex)
 {
 	Decorator::Tab* tab
@@ -185,7 +186,7 @@ MacDecorator::SetRegionHighlight(Region region, uint8 highlight,
 
 
 void
-MacDecorator::GetSizeLimits(int32* minWidth, int32* minHeight,
+OSTenClassicDecorator::GetSizeLimits(int32* minWidth, int32* minHeight,
 	int32* maxWidth, int32* maxHeight) const
 {
 	// The standard decorator enforces enough client height for the
@@ -201,7 +202,7 @@ MacDecorator::GetSizeLimits(int32* minWidth, int32* minHeight,
 
 
 bool
-MacDecorator::_IsTabOnly() const
+OSTenClassicDecorator::_IsTabOnly() const
 {
 	// Finder collapses the client area to zero height for WindowShade.
 	// Keep the real Platinum tab and its buttons, but omit the frame and
@@ -212,14 +213,15 @@ MacDecorator::_IsTabOnly() const
 
 
 void
-MacDecorator::_DoLayout()
+OSTenClassicDecorator::_DoLayout()
 {
-	STRACE(("MacDecorator: Do Layout\n"));
+	STRACE(("OSTenClassicDecorator: Do Layout\n"));
 
 	// Here we determine the size of every rectangle that we use
 	// internally when we are given the size of the client rectangle.
 
-	const int32 kDefaultBorderWidth = 6;
+	const int32 kDefaultBorderWidth = (int32)OSTenSystemResources().Number(
+        "decorator.border_width", 6, 1, 12);
 
 	bool hasTab = false;
 
@@ -237,7 +239,8 @@ MacDecorator::_DoLayout()
 
 			case B_FLOATING_WINDOW_LOOK:
 				hasTab = true;
-				fBorderWidth = 3;
+				fBorderWidth = (int32)OSTenSystemResources().Number(
+                    "decorator.floating_border_width", 3, 1, 12);
 				break;
 
 			case B_BORDERED_WINDOW_LOOK:
@@ -252,7 +255,7 @@ MacDecorator::_DoLayout()
 
 	fBorderRect = fFrame.InsetByCopy(-fBorderWidth, -fBorderWidth);
 
-	// Keep the classic Macintosh size box flush with the outer right
+	// Keep the classic resize box flush with the outer right
 	// and bottom edges, but extend only its LEFT edge to align with the
 	// vertical scrollbar. The old 16-pixel box started seven pixels too
 	// far right, leaving a step at the scrollbar/resize-box junction.
@@ -261,7 +264,10 @@ MacDecorator::_DoLayout()
 	if (!_IsTabOnly() && fTopTab != NULL && hasTab
 		&& (fTopTab->flags & (B_NOT_RESIZABLE | B_NOT_H_RESIZABLE
 			| B_NOT_V_RESIZABLE)) == 0) {
-		fResizeRect.Set(fBorderRect.right - 22, fBorderRect.bottom - 15,
+		fResizeRect.Set(fBorderRect.right - OSTenSystemResources().Number(
+                    "decorator.resize_width", 22, 16, 44),
+                fBorderRect.bottom - OSTenSystemResources().Number(
+                    "decorator.resize_height", 15, 12, 38),
 			fBorderRect.right, fBorderRect.bottom);
 	}
 
@@ -276,7 +282,9 @@ MacDecorator::_DoLayout()
 		// rather than painting one full-width title bar for every window.
 		// Keep the title-bar region as the maximum available tab strip.
 		fTitleBarRect.Set(fFrame.left - fBorderWidth,
-			fFrame.top - 22, fFrame.right + fBorderWidth,
+			fFrame.top - OSTenSystemResources().Number(
+                "decorator.tab_height", 22, 18, 36),
+            fFrame.right + fBorderWidth,
 			fFrame.top - 3);
 
 		const int32 count = fTabList.CountItems();
@@ -294,8 +302,12 @@ MacDecorator::_DoLayout()
 			}
 			// Reserve room for the three original Platinum controls.
 			// Grouped windows share the available width instead of overlapping.
-			float tabWidth = std::min(240.0f,
-				std::max(105.0f, titleWidth + 80.0f));
+			float tabWidth = std::min(OSTenSystemResources().Number(
+                    "decorator.max_tab_width", 240, 150, 500),
+                std::max(OSTenSystemResources().Number(
+                    "decorator.min_tab_width", 105, 90, 300),
+                    titleWidth + OSTenSystemResources().Number(
+                    "decorator.tab_padding", 80, 60, 150)));
 			if (count > 1)
 				tabWidth = std::min(tabWidth, slotWidth);
 			else
@@ -312,13 +324,17 @@ MacDecorator::_DoLayout()
 			tabLeft = right + 1;
 
 			tab->zoomRect = tab->tabRect;
-			tab->zoomRect.left = tab->zoomRect.right - 12;
-			tab->zoomRect.bottom = tab->zoomRect.top + 12;
+			tab->zoomRect.left = tab->zoomRect.right - OSTenSystemResources().Number(
+                "decorator.button_size", 12, 10, 18);
+			tab->zoomRect.bottom = tab->zoomRect.top + OSTenSystemResources().Number(
+                "decorator.button_size", 12, 10, 18);
 			tab->zoomRect.OffsetBy(-4, 4);
 			tab->closeRect = tab->zoomRect;
 			tab->minimizeRect = tab->zoomRect;
-			tab->closeRect.OffsetTo(tab->tabRect.left + 4,
-				tab->tabRect.top + 4);
+			tab->closeRect.OffsetTo(tab->tabRect.left + OSTenSystemResources().Number(
+                    "decorator.button_inset", 4, 1, 9),
+                tab->tabRect.top + OSTenSystemResources().Number(
+                    "decorator.button_inset", 4, 1, 9));
 			tab->zoomRect.OffsetBy(-(tab->zoomRect.Width() + 4), 0);
 
 			tab->truncatedTitle = title != NULL ? title : "";
@@ -345,7 +361,7 @@ MacDecorator::_DoLayout()
 
 
 void
-MacDecorator::_DrawFrame(BRect invalid)
+OSTenClassicDecorator::_DrawFrame(BRect invalid)
 {
 	if (_IsTabOnly() || fTopTab->look == B_NO_BORDER_WINDOW_LOOK)
 		return;
@@ -517,7 +533,8 @@ MacDecorator::_DrawFrame(BRect invalid)
 				pt2.y--;
 			} else {
 				r.top -= 3;
-				RGBColor inactive(82, 82, 82);
+				RGBColor inactive(OSTenSystemResources().Color("decorator.colors.inactive_hatch",
+                rgb_color{82, 82, 82, 255}));
 
 				fDrawingEngine->StrokeLine(r.LeftTop(), r.LeftBottom(),
 					inactive);
@@ -562,7 +579,7 @@ MacDecorator::_DrawFrame(BRect invalid)
 
 
 void
-MacDecorator::_DrawResizeCorner(BRect invalid)
+OSTenClassicDecorator::_DrawResizeCorner(BRect invalid)
 {
 	if (!fResizeRect.IsValid() || !invalid.Intersects(fResizeRect))
 		return;
@@ -572,12 +589,13 @@ MacDecorator::_DrawResizeCorner(BRect invalid)
 	BRect box(fResizeRect);
 	const bool focused = fTopTab != NULL && IsFocus(fTopTab);
 	const rgb_color background = focused
-		? (rgb_color){ 216, 216, 216, 255 }
-		: (rgb_color){ 224, 224, 224, 255 };
+		? OSTenSystemResources().Color("decorator.colors.resize_01", rgb_color{216, 216, 216, 255})
+		: OSTenSystemResources().Color("decorator.colors.resize_02", rgb_color{224, 224, 224, 255});
 	const rgb_color dark = focused
-		? (rgb_color){ 71, 71, 71, 255 }
-		: (rgb_color){ 139, 139, 139, 255 };
-	const rgb_color light = { 255, 255, 255, 255 };
+		? OSTenSystemResources().Color("decorator.colors.resize_03", rgb_color{71, 71, 71, 255})
+		: OSTenSystemResources().Color("decorator.colors.resize_04", rgb_color{139, 139, 139, 255});
+	const rgb_color light = OSTenSystemResources().Color(
+        "decorator.colors.resize_light", rgb_color{255, 255, 255, 255});
 
 	fDrawingEngine->FillRect(box, background);
 	fDrawingEngine->StrokeLine(box.LeftTop(), box.RightTop(),
@@ -602,7 +620,7 @@ MacDecorator::_DrawResizeCorner(BRect invalid)
 
 
 void
-MacDecorator::_DrawTab(Decorator::Tab* tab, BRect invalid)
+OSTenClassicDecorator::_DrawTab(Decorator::Tab* tab, BRect invalid)
 {
 	// If a window has a tab, this will draw it and any buttons which are
 	// in it.
@@ -648,7 +666,8 @@ MacDecorator::_DrawTab(Decorator::Tab* tab, BRect invalid)
 			right = tab->tabRect.right;
 
 		if (tab->tabRect.left + tab->textOffset > left + 5) {
-			RGBColor dark(115, 115, 115);
+			RGBColor dark(OSTenSystemResources().Color("decorator.colors.tab_hatch_dark",
+                rgb_color{115, 115, 115, 255}));
 
 			// Left side
 
@@ -707,7 +726,8 @@ MacDecorator::_DrawTab(Decorator::Tab* tab, BRect invalid)
 
 		_DrawButtons(tab, rect);
 	} else {
-		RGBColor inactive(82, 82, 82);
+		RGBColor inactive(OSTenSystemResources().Color("decorator.colors.inactive_hatch",
+                rgb_color{82, 82, 82, 255}));
 		// Not focused - Just draw a plain light grey area with the title
 		// in the middle
 		fDrawingEngine->StrokeLine(rect.LeftTop(), rect.RightTop(),
@@ -723,7 +743,7 @@ MacDecorator::_DrawTab(Decorator::Tab* tab, BRect invalid)
 
 
 void
-MacDecorator::_DrawButtons(Decorator::Tab* tab, const BRect& invalid)
+OSTenClassicDecorator::_DrawButtons(Decorator::Tab* tab, const BRect& invalid)
 {
 	if ((tab->flags & B_NOT_CLOSABLE) == 0
 		&& invalid.Intersects(tab->closeRect)) {
@@ -741,7 +761,7 @@ MacDecorator::_DrawButtons(Decorator::Tab* tab, const BRect& invalid)
 
 
 void
-MacDecorator::_DrawTitle(Decorator::Tab* tab, BRect rect)
+OSTenClassicDecorator::_DrawTitle(Decorator::Tab* tab, BRect rect)
 {
 	fDrawingEngine->SetHighColor(IsFocus(tab)
 		? fFocusTextColor : fNonFocusTextColor);
@@ -760,14 +780,14 @@ MacDecorator::_DrawTitle(Decorator::Tab* tab, BRect rect)
 
 
 void
-MacDecorator::_DrawClose(Decorator::Tab* tab, bool direct, BRect r)
+OSTenClassicDecorator::_DrawClose(Decorator::Tab* tab, bool direct, BRect r)
 {
 	_DrawButton(tab, direct, r, tab->closePressed);
 }
 
 
 void
-MacDecorator::_DrawZoom(Decorator::Tab* tab, bool direct, BRect rect)
+OSTenClassicDecorator::_DrawZoom(Decorator::Tab* tab, bool direct, BRect rect)
 {
 	_DrawButton(tab, direct, rect, tab->zoomPressed);
 
@@ -776,25 +796,25 @@ MacDecorator::_DrawZoom(Decorator::Tab* tab, bool direct, BRect rect)
 	rect.bottom = rect.top + 6;
 	rect.right = rect.left + 6;
 
-	fDrawState.SetHighColor(RGBColor(33, 33, 33));
+	fDrawState.SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_01", rgb_color{33, 33, 33, 255})));
 	fDrawingEngine->StrokeRect(rect, fDrawState.HighColor());
 }
 
 
 void
-MacDecorator::_DrawMinimize(Decorator::Tab* tab, bool direct, BRect rect)
+OSTenClassicDecorator::_DrawMinimize(Decorator::Tab* tab, bool direct, BRect rect)
 {
 	_DrawButton(tab, direct, rect, tab->minimizePressed);
 
 	rect.InsetBy(1, 5);
 
-	fDrawState.SetHighColor(RGBColor(33, 33, 33));
+	fDrawState.SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_02", rgb_color{33, 33, 33, 255})));
 	fDrawingEngine->StrokeRect(rect, fDrawState.HighColor());
 }
 
 
 void
-MacDecorator::_SetTitle(Tab* tab, const char* string, BRegion* updateRegion)
+OSTenClassicDecorator::_SetTitle(Tab* tab, const char* string, BRegion* updateRegion)
 {
 	// TODO: we could be much smarter about the update region
 	// TODO may this change the other tabs too ? (to make space for a longer
@@ -820,7 +840,7 @@ MacDecorator::_SetTitle(Tab* tab, const char* string, BRegion* updateRegion)
 
 
 void
-MacDecorator::_MoveBy(BPoint offset)
+OSTenClassicDecorator::_MoveBy(BPoint offset)
 {
 	// Move all internal rectangles the appropriate amount
 	for (int32 i = 0; i < fTabList.CountItems(); i++) {
@@ -839,7 +859,7 @@ MacDecorator::_MoveBy(BPoint offset)
 
 
 void
-MacDecorator::_ResizeBy(BPoint offset, BRegion* dirty)
+OSTenClassicDecorator::_ResizeBy(BPoint offset, BRegion* dirty)
 {
 	// Include the previous size box so its old pixels are cleared when
 	// the frame grows or shrinks, not only the new frame border.
@@ -871,7 +891,7 @@ MacDecorator::_ResizeBy(BPoint offset, BRegion* dirty)
 
 
 Decorator::Tab*
-MacDecorator::_AllocateNewTab()
+OSTenClassicDecorator::_AllocateNewTab()
 {
 	Decorator::Tab* tab = new(std::nothrow) Decorator::Tab;
 	if (tab == NULL)
@@ -885,7 +905,7 @@ MacDecorator::_AllocateNewTab()
 
 
 bool
-MacDecorator::_AddTab(DesktopSettings& settings, int32 index,
+OSTenClassicDecorator::_AddTab(DesktopSettings& settings, int32 index,
 	BRegion* updateRegion)
 {
 	_UpdateFont(settings);
@@ -898,7 +918,7 @@ MacDecorator::_AddTab(DesktopSettings& settings, int32 index,
 
 
 bool
-MacDecorator::_RemoveTab(int32 index, BRegion* updateRegion)
+OSTenClassicDecorator::_RemoveTab(int32 index, BRegion* updateRegion)
 {
 	BRect oldTitle = fTitleBarRect;
 	_DoLayout();
@@ -911,7 +931,7 @@ MacDecorator::_RemoveTab(int32 index, BRegion* updateRegion)
 
 
 bool
-MacDecorator::_MoveTab(int32 from, int32 to, bool isMoving,
+OSTenClassicDecorator::_MoveTab(int32 from, int32 to, bool isMoving,
 	BRegion* updateRegion)
 {
 	// The native Stack & Tile machinery manages the tab order. Our job is
@@ -929,7 +949,7 @@ MacDecorator::_MoveTab(int32 from, int32 to, bool isMoving,
 }
 
 bool
-MacDecorator::_SetTabLocation(Decorator::Tab* tab, float location,
+OSTenClassicDecorator::_SetTabLocation(Decorator::Tab* tab, float location,
 	bool isShifting, BRegion* updateRegion)
 {
 	if (tab == NULL || !tab->tabRect.IsValid()
@@ -957,7 +977,7 @@ MacDecorator::_SetTabLocation(Decorator::Tab* tab, float location,
 }
 
 void
-MacDecorator::_GetFootprint(BRegion* region)
+OSTenClassicDecorator::_GetFootprint(BRegion* region)
 {
 	// This function calculates the decorator's footprint in coordinates
 	// relative to the view. This is most often used to set a Window
@@ -1011,7 +1031,7 @@ MacDecorator::_GetFootprint(BRegion* region)
 
 
 void
-MacDecorator::_UpdateFont(DesktopSettings& settings)
+OSTenClassicDecorator::_UpdateFont(DesktopSettings& settings)
 {
 	ServerFont font;
 	if (fTopTab && fTopTab->look == B_FLOATING_WINDOW_LOOK)
@@ -1030,7 +1050,7 @@ MacDecorator::_UpdateFont(DesktopSettings& settings)
 
 // Draw a mac-style button
 void
-MacDecorator::_DrawButton(Decorator::Tab* tab, bool direct, BRect r,
+OSTenClassicDecorator::_DrawButton(Decorator::Tab* tab, bool direct, BRect r,
 	bool down)
 {
 	BRect rect(r);
@@ -1039,7 +1059,7 @@ MacDecorator::_DrawButton(Decorator::Tab* tab, bool direct, BRect r,
 
 	// Topleft dark grey border
 	pt2.x--;
-	fDrawingEngine->SetHighColor(RGBColor(136, 136, 136));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_03", rgb_color{136, 136, 136, 255})));
 	fDrawingEngine->StrokeLine(offset, pt2);
 
 	pt2 = r.LeftBottom();
@@ -1050,7 +1070,7 @@ MacDecorator::_DrawButton(Decorator::Tab* tab, bool direct, BRect r,
 	offset = r.RightBottom();
 	pt2 = r.RightTop();
 	pt2.y++;
-	fDrawingEngine->SetHighColor(RGBColor(255, 255, 255));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_04", rgb_color{255, 255, 255, 255})));
 	fDrawingEngine->StrokeLine(offset, pt2);
 
 	pt2 = r.LeftBottom();
@@ -1059,18 +1079,18 @@ MacDecorator::_DrawButton(Decorator::Tab* tab, bool direct, BRect r,
 
 	// Black outline
 	rect.InsetBy(1, 1);
-	fDrawingEngine->SetHighColor(RGBColor(33, 33, 33));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_05", rgb_color{33, 33, 33, 255})));
 	fDrawingEngine->StrokeRect(rect);
 
 	// Double-shaded button
 	rect.InsetBy(1, 1);
-	fDrawingEngine->SetHighColor(RGBColor(140, 140, 140));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_06", rgb_color{140, 140, 140, 255})));
 	fDrawingEngine->StrokeLine(rect.RightBottom(), rect.RightTop());
 	fDrawingEngine->StrokeLine(rect.RightBottom(), rect.LeftBottom());
-	fDrawingEngine->SetHighColor(RGBColor(206, 206, 206));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_07", rgb_color{206, 206, 206, 255})));
 	fDrawingEngine->StrokeLine(rect.LeftBottom(), rect.LeftTop());
 	fDrawingEngine->StrokeLine(rect.LeftTop(), rect.RightTop());
-	fDrawingEngine->SetHighColor(RGBColor(255, 255, 255));
+	fDrawingEngine->SetHighColor(RGBColor(OSTenSystemResources().Color("decorator.colors.accent_08", rgb_color{255, 255, 255, 255})));
 	fDrawingEngine->StrokeLine(rect.LeftTop(), rect.LeftTop());
 
 	rect.InsetBy(1, 1);
@@ -1082,7 +1102,7 @@ MacDecorator::_DrawButton(Decorator::Tab* tab, bool direct, BRect r,
   \param down The rectangle should be drawn recessed or not
 */
 void
-MacDecorator::_DrawBlendedRect(DrawingEngine* engine, BRect rect,
+OSTenClassicDecorator::_DrawBlendedRect(DrawingEngine* engine, BRect rect,
 	bool down/*, bool focus*/)
 {
 	// figure out which colors to use
@@ -1112,5 +1132,5 @@ MacDecorator::_DrawBlendedRect(DrawingEngine* engine, BRect rect,
 extern "C" DecorAddOn*
 instantiate_decor_addon(image_id id, const char* name)
 {
-	return new (std::nothrow)MacDecorAddOn(id, name);
+	return new (std::nothrow)OSTenClassicDecorAddOn(id, name);
 }

@@ -44,7 +44,7 @@ successful compilation and boot of the milestone must be checked separately.
 
 ## October 14: local Run 39 follow-up
 
-- Correct MacDecorator's minimize-button hit-testing: the base RegionAt()
+- Correct OSTenClassicDecorator's minimize-button hit-testing: the base RegionAt()
   omitted the minimize rectangle, so the drawn WindowShade button did not
   deliver any action even though double-click shading worked.
 - Track Finder's actual zoomed frame so pressing Zoom a second time restores

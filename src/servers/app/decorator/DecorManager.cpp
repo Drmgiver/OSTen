@@ -155,7 +155,7 @@ DecorManager::InitializeDefaultDecorator()
 		if (error == B_OK)
 			error = path.Append("decorators");
 		if (error == B_OK)
-			error = path.Append("MacDecorator");
+			error = path.Append("OSTenClassicDecorator");
 		if (error == B_OK)
 			decorator = _LoadDecor(path.Path(), error);
 		if (decorator != NULL)
@@ -169,7 +169,7 @@ DecorManager::InitializeDefaultDecorator()
 	} else {
 		// Keep the check pending so early window allocations can retry.
 		syslog(LOG_WARNING,
-			"app_server: can't load OSTen Mac OS Platinum "
+			"app_server: can't load OSTen Classic "
 			"decorator (status %ld)", (long)error);
 	}
 }
